@@ -1,0 +1,19 @@
+# 私人目录（不上传）
+/private/
+
+# 本地工具配置
+.claude/settings.local.json
+
+# 依赖与构建产物
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# 实验输出（可由命令重新生成）
+experiments/results/
+
+# 系统与环境
+.DS_Store
+.env
+.env.*

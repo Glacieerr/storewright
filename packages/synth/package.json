@@ -1,0 +1,14 @@
+{
+  "name": "@storewright/synth",
+  "version": "0.1.0",
+  "description": "Synthetic catalog and order stream generator",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@storewright/domain": "0.1.0",
+    "@storewright/store-config": "0.1.0"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "@storewright/store-config",
+  "version": "0.1.0",
+  "description": "Store configuration schema, layout generator, walk graph and templates",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@storewright/domain": "0.1.0",
+    "zod": "3.23.8"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "name": "storewright",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Storewright — integrated store operations for mid-size grocers: online fulfillment, backroom, replenishment, staffing, and a simulation-driven operations twin.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "npm run typecheck && npm run test",
+    "sim": "tsx apps/sim-cli/src/main.ts run",
+    "compare": "tsx apps/sim-cli/src/main.ts compare",
+    "sensitivity": "tsx apps/sim-cli/src/main.ts sensitivity"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.2",
+    "fast-check": "3.23.2",
+    "tsx": "4.19.2",
+    "typescript": "5.7.2",
+    "vitest": "2.1.8"
+  }
+}

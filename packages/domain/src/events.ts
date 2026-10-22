@@ -17,7 +17,12 @@ export interface EventPayloads {
   PickWalkCompleted: { walkId: string; associateId: string; durationSec: number };
   ExceptionCreated: { exceptionId: string; orderId: string; lineId: string; itemId: string };
   ExceptionResolved: { exceptionId: string; found: boolean };
-  ReplenishmentTaskCreated: { itemId: string; reason: 'EXCEPTION' };
+  ReplenishmentTaskCreated: { itemId: string; reason: 'EXCEPTION' | 'EMPTY' | 'LOW' | 'MANUAL' };
+  /** 货架存量模块：拣货员遇到空货位；补货上架完成 */
+  ShelfEmpty: { itemId: string; locationId: string };
+  ReplenishmentCompleted: { itemId: string; locationId: string; units: number };
+  /** 突发状况：小状况（标签重打、商品破损、框找不到、打印机卡纸）或大事件（火警、警情、停电、系统故障） */
+  IncidentOccurred: { kind: string; ref?: string; extraSec?: number; until?: number };
   OversizedPicked: { pieceId: string; orderId: string; associateId: string };
   ToteStaged: { toteId: string; orderId: string; slotCode: string; recorded: boolean };
   OrderStaged: { orderId: string; lateBySec: number };

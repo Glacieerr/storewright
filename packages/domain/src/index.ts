@@ -4,3 +4,4 @@ export * from './units';
 export * from './rules';
 export * from './labels';
 export * from './events';
+export * from './inventory';

@@ -1,0 +1,17 @@
+{
+  "name": "@storewright/ai",
+  "version": "0.1.0",
+  "description": "Local-first store AI framework: recommendation records with reasons, metrics, rolling-origin backtests, a model registry with promotion gates, and baseline forecasters",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@storewright/domain": "0.1.0"
+  },
+  "devDependencies": {
+    "@storewright/store-config": "0.1.0",
+    "@storewright/synth": "0.1.0"
+  }
+}

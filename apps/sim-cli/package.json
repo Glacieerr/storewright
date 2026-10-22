@@ -6,9 +6,11 @@
   "license": "AGPL-3.0-only",
   "type": "module",
   "dependencies": {
+    "@storewright/ai": "0.1.0",
+    "@storewright/algorithms": "0.1.0",
     "@storewright/domain": "0.1.0",
+    "@storewright/sim-engine": "0.1.0",
     "@storewright/store-config": "0.1.0",
-    "@storewright/synth": "0.1.0",
-    "@storewright/sim-engine": "0.1.0"
+    "@storewright/synth": "0.1.0"
   }
 }

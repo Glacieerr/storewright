@@ -59,6 +59,8 @@ export interface Item {
   shelfAvailability: number;
   /** 货架缺货时后仓仍有库存的概率（合成数据使用） */
   backroomAvailability: number;
+  /** 非食品行业的商品（例如家居建材，决策记录 0011）：没有「化学品与食品分开装框」的要求 */
+  nonFood?: true;
 }
 
 export interface Customer {

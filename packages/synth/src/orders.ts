@@ -44,10 +44,34 @@ const BASE: Omit<DemandScenario, 'ordersPerDay'> = {
   deliveryRadiusKm: [1.5, 12],
 };
 
+/** 家居建材：早上施工队取货是第一个高峰，下午下班后是第二个；订单行数少、单件重、多件购买多，大件（GM）订单比例高 */
+const HARDWARE_HOURLY = (() => {
+  const w = new Array<number>(24).fill(0);
+  const set: Record<number, number> = { 6: 0.6, 7: 1.4, 8: 1.5, 9: 1.2, 10: 1.0, 11: 0.9, 12: 0.8, 13: 0.8, 14: 0.9, 15: 1.0, 16: 1.1, 17: 1.0, 18: 0.7, 19: 0.4 };
+  for (const [h, v] of Object.entries(set)) w[Number(h)] = v;
+  return w;
+})();
+
+const HARDWARE: DemandScenario = {
+  ordersPerDay: 150,
+  hourlyProfile: HARDWARE_HOURLY,
+  pickupShare: 0.72,
+  gmOrderShare: 0.28,
+  gmDeliveryShare: 0.6,
+  expressShare: 0.1,
+  basketMeanLines: 6,
+  basketSigma: 0.7,
+  maxLines: 40,
+  qtyWeights: [0.45, 0.25, 0.12, 0.18],
+  substitutionAllowedShare: 0.5,
+  deliveryRadiusKm: [2, 25],
+};
+
 export const DEFAULT_DEMAND: Record<TemplateName, DemandScenario> = {
   small: { ...BASE, ordersPerDay: 70 },
   medium: { ...BASE, ordersPerDay: 260 },
   large: { ...BASE, ordersPerDay: 650 },
+  hardware: HARDWARE,
 };
 
 const FIRST = ['Wei', 'Maria', 'James', 'Aisha', 'Hiroshi', 'Olivia', 'Mateo', 'Priya', 'Noah', 'Fatima', 'Liam', 'Sofia', 'Chen', 'Amara', 'Ethan', 'Yuki', 'Diego', 'Grace', 'Omar', 'Hannah', 'Alexandria', 'Bartholomew', 'Seo-yeon', 'Kwame'];

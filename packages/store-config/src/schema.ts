@@ -150,12 +150,55 @@ export const RulesSchema = z.object({
   }),
 });
 
+/**
+ * 门店附属设施。目前支持汽车快修中心（换机油、换轮胎），独立于店内拣货网络，
+ * 建在门店一侧，车辆从停车场驶入维修工位。
+ */
+export const AutoServiceSchema = z.object({
+  id: z.string().min(1),
+  kind: z.literal('AUTO_SERVICE'),
+  name: z.string(),
+  side: z.enum(['LEFT', 'RIGHT']),
+  oilBays: z.number().int().min(0).max(8),
+  tireBays: z.number().int().min(0).max(8),
+  /** 每天到店车辆数；0 表示按工位数估算 */
+  carsPerDay: z.number().int().min(0).max(500).default(0),
+  hours: z.object({ openMin: z.number().int().min(0), closeMin: z.number().int().max(24 * 60) }),
+  /** 每小时在岗技师人数（长度 24）；不给时每个工位配一名技师 */
+  techs: z.array(z.number().int().min(0)).length(24).optional(),
+});
+
+/** 园艺中心：门店一侧带围栏的露天卖场（花卉、园艺用品），只用于画面和面积规划 */
+export const GardenCenterSchema = z.object({
+  id: z.string().min(1),
+  kind: z.literal('GARDEN_CENTER'),
+  name: z.string(),
+  side: z.enum(['LEFT', 'RIGHT']),
+  widthM: z.number().min(10).max(40).default(18),
+  depthM: z.number().min(12).max(40).default(22),
+});
+
+/** 药房：店内正面一角的柜台，顾客取药、咨询；按柜台数排队 */
+export const PharmacySchema = z.object({
+  id: z.string().min(1),
+  kind: z.literal('PHARMACY'),
+  name: z.string(),
+  counters: z.number().int().min(1).max(4),
+  /** 每天来取药 / 咨询的顾客数；0 表示按门店规模估算 */
+  patientsPerDay: z.number().int().min(0).max(800).default(0),
+  hours: z.object({ openMin: z.number().int().min(0), closeMin: z.number().int().max(24 * 60) }),
+});
+
+export const FacilitySchema = z.discriminatedUnion('kind', [AutoServiceSchema, GardenCenterSchema, PharmacySchema]);
+
 export const StoreConfigSchema = z.object({
   schemaVersion: z.literal(1),
   configVersion: z.number().int().nonnegative(),
   id: z.string().min(1),
   name: z.string(),
-  template: z.enum(['small', 'medium', 'large', 'custom']),
+  template: z.enum(['small', 'medium', 'large', 'hardware', 'custom']),
+  /** 行业（决策记录 0011）：决定默认品类、布局、需求形态；旧配置没有这一项时视为超市 */
+  industry: z.enum(['GROCERY', 'HARDWARE']).optional(),
   units: z.object({ weight: z.enum(['lb', 'kg']) }),
   hours: z.object({ openMin: z.number().int().min(0), closeMin: z.number().int().max(24 * 60) }),
   layout: z.object({
@@ -188,10 +231,37 @@ export const StoreConfigSchema = z.object({
     }),
   }),
   rules: RulesSchema,
+  /** 附属设施；旧版配置没有这一项时视为空 */
+  facilities: z.array(FacilitySchema).default([]),
+  /** 店外：停车场双排车位排数、线上取货专用车位数（0 表示按门店宽度自动确定） */
+  outdoor: z
+    .object({
+      parkingRows: z.number().int().min(0).max(5).default(0),
+      pickupBays: z.number().int().min(0).max(30).default(0),
+      /** 顾客入口在门店正面的位置（米）；不给时放在正面约 42% 处 */
+      entranceX: z.number().optional(),
+    })
+    .default({ parkingRows: 0, pickupBays: 0 }),
+  /**
+   * 后仓（库存仓库）：在售货区后墙之后再加深的米数、托盘货架排数（0 = 按深度自动）与层数、
+   * 卸货门数量、叉车与手动液压搬运车数量
+   */
+  backroom: z
+    .object({
+      extraDepthM: z.number().min(0).max(40).default(0),
+      rackRows: z.number().int().min(0).max(10).default(0),
+      rackLevels: z.number().int().min(2).max(5).default(3),
+      docks: z.number().int().min(1).max(4).default(3),
+      forklifts: z.number().int().min(0).max(4).default(1),
+      palletJacks: z.number().int().min(0).max(6).default(2),
+    })
+    .default({ extraDepthM: 0, rackRows: 0, rackLevels: 3, docks: 3, forklifts: 1, palletJacks: 2 }),
   modules: z.object({
     gm: z.boolean(),
     mto: z.boolean(),
     parcelHub: z.boolean(),
+    /** 退货（Phase 6）：旧配置没有这个字段时默认打开 */
+    returns: z.boolean().default(true),
     exceptions: z.boolean(),
     trips: z.boolean(),
     sensors: z.boolean(),
@@ -208,3 +278,7 @@ export type StagingRackConfig = z.infer<typeof StagingRackSchema>;
 export type CategoryConfig = z.infer<typeof CategorySchema>;
 export type RulesConfig = z.infer<typeof RulesSchema>;
 export type SizeRule = Rule<SizeClass>;
+export type AutoServiceConfig = z.infer<typeof AutoServiceSchema>;
+export type FacilityConfig = z.infer<typeof FacilitySchema>;
+export type GardenCenterConfig = z.infer<typeof GardenCenterSchema>;
+export type PharmacyConfig = z.infer<typeof PharmacySchema>;

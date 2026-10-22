@@ -51,7 +51,7 @@ function upcFromNumber(n: number): string {
   return body + String((10 - ((odd * 3 + even) % 10)) % 10);
 }
 
-export const DEFAULT_SKU_COUNT = { small: 1200, medium: 3000, large: 6000, custom: 3000 } as const;
+export const DEFAULT_SKU_COUNT = { small: 1200, medium: 3000, large: 6000, hardware: 2400, custom: 3000 } as const;
 
 /**
  * 生成合成商品目录，并把每个商品放到服务其类别的货架通道上。
@@ -67,6 +67,7 @@ export function generateCatalog(model: StoreModel, options: { seed: number; skuC
 
   const items: Item[] = [];
   let serial = 0;
+  const nonFood = model.config.industry === 'HARDWARE';
   categories.forEach((cat, ci) => {
     const profile = profiles[ci] as (typeof profiles)[number];
     const count = Math.max(3, Math.round((skuCount * profile.skuShare) / totalSkuShare));
@@ -94,7 +95,7 @@ export function generateCatalog(model: StoreModel, options: { seed: number; skuC
         if (second.id !== primary.id) locationIds.push(second.id);
       }
       const id = `SKU-${String(++serial).padStart(5, '0')}`;
-      const food = cat.fulfillmentType === 'GROCERY' && !handling.includes('CHEMICAL');
+      const food = !nonFood && cat.fulfillmentType === 'GROCERY' && !handling.includes('CHEMICAL');
       items.push({
         id,
         gtin: upcFromNumber(hashString(id) * 7 + serial),
@@ -119,6 +120,7 @@ export function generateCatalog(model: StoreModel, options: { seed: number; skuC
         popularity: (profile.demandShare / totalDemand) * ((zipf[k] as number) / zipfSum),
         shelfAvailability: rng.uniform(profile.shelfAvailability[0], profile.shelfAvailability[1]),
         backroomAvailability: rng.uniform(profile.backroomAvailability[0], profile.backroomAvailability[1]),
+        ...(nonFood ? { nonFood: true as const } : {}),
       });
     }
   });

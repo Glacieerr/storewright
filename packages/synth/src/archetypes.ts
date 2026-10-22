@@ -260,6 +260,160 @@ export const CATEGORY_PROFILES: Record<string, CategoryProfile> = {
       { stem: 'Ice Melt 25 lb', weight: 1, dims: [45, 30, 12], kg: [11.3, 11.4], price: [10, 16] },
     ],
   },
+
+  // —— 家居建材（决策记录 0011）——
+  fasteners: {
+    skuShare: 8, demandShare: 12, shelfAvailability: [0.9, 0.98], backroomAvailability: [0.5, 0.8],
+    archetypes: [
+      { stem: 'Wood Screws', weight: 3, dims: [12, 8, 4], kg: [0.2, 0.9], price: [4, 12], sizes: ['#8 x 1-1/4 in', '#8 x 2 in', '#10 x 3 in'] },
+      { stem: 'Drywall Anchors', weight: 2, dims: [14, 9, 3], kg: [0.05, 0.2], price: [3, 9] },
+      { stem: 'Hex Bolts', weight: 2, dims: [10, 6, 3], kg: [0.1, 0.6], price: [2, 8], sizes: ['1/4 in', '3/8 in', '1/2 in'] },
+      { stem: 'Hinges', weight: 1, dims: [12, 9, 2], kg: [0.1, 0.4], price: [4, 14] },
+      { stem: 'Nails', weight: 2, dims: [15, 10, 6], kg: [0.4, 2.3], price: [4, 15] },
+    ],
+  },
+  'hand-tools': {
+    skuShare: 5, demandShare: 6, shelfAvailability: [0.92, 0.99], backroomAvailability: [0.5, 0.8],
+    archetypes: [
+      { stem: 'Hammer', weight: 2, dims: [33, 12, 4], kg: [0.5, 0.9], price: [12, 35] },
+      { stem: 'Screwdriver Set', weight: 2, dims: [25, 15, 4], kg: [0.4, 0.9], price: [10, 30] },
+      { stem: 'Tape Measure', weight: 3, dims: [8, 8, 4], kg: [0.2, 0.5], price: [8, 25] },
+      { stem: 'Utility Knife', weight: 2, dims: [18, 6, 2], kg: [0.1, 0.2], price: [5, 15] },
+      { stem: 'Adjustable Wrench', weight: 1, dims: [25, 7, 2], kg: [0.3, 0.6], price: [10, 28] },
+    ],
+  },
+  'power-tools': {
+    skuShare: 3, demandShare: 4, shelfAvailability: [0.88, 0.97], backroomAvailability: [0.4, 0.7],
+    archetypes: [
+      { stem: 'Cordless Drill Kit', weight: 3, dims: [35, 30, 10], kg: [1.8, 3], price: [79, 199] },
+      { stem: 'Circular Saw', weight: 1, dims: [40, 30, 25], kg: [3.2, 5], price: [69, 179] },
+      { stem: 'Battery Pack', weight: 2, dims: [12, 8, 7], kg: [0.4, 0.7], price: [49, 129] },
+      { stem: 'Orbital Sander', weight: 1, dims: [25, 15, 15], kg: [1.2, 1.8], price: [49, 99] },
+    ],
+  },
+  plumbing: {
+    skuShare: 6, demandShare: 8, shelfAvailability: [0.9, 0.98], backroomAvailability: [0.5, 0.8],
+    archetypes: [
+      { stem: 'PVC Fitting', weight: 4, dims: [8, 8, 6], kg: [0.03, 0.2], price: [1, 6], sizes: ['1/2 in', '3/4 in', '1 in'] },
+      { stem: 'Copper Pipe 10 ft', weight: 1, dims: [305, 3, 3], kg: [1.2, 2.5], price: [18, 45] },
+      { stem: 'Faucet Cartridge', weight: 2, dims: [12, 6, 6], kg: [0.1, 0.3], price: [12, 35] },
+      { stem: 'Toilet Flapper', weight: 2, dims: [15, 12, 5], kg: [0.1, 0.2], price: [5, 14] },
+      { stem: 'Supply Line', weight: 2, dims: [30, 10, 4], kg: [0.2, 0.4], price: [6, 15] },
+    ],
+  },
+  electrical: {
+    skuShare: 6, demandShare: 7, shelfAvailability: [0.9, 0.98], backroomAvailability: [0.5, 0.8],
+    archetypes: [
+      { stem: 'Outlet', weight: 3, dims: [12, 7, 4], kg: [0.08, 0.15], price: [2, 15] },
+      { stem: 'Light Switch', weight: 2, dims: [12, 7, 4], kg: [0.08, 0.15], price: [3, 25] },
+      { stem: 'Electrical Wire 50 ft', weight: 2, dims: [25, 25, 10], kg: [2, 5], price: [35, 90] },
+      { stem: 'Extension Cord', weight: 2, dims: [25, 20, 8], kg: [0.5, 1.8], price: [10, 40] },
+      { stem: 'Wire Connectors', weight: 1, dims: [10, 6, 4], kg: [0.05, 0.2], price: [3, 9] },
+    ],
+  },
+  lighting: {
+    skuShare: 4, demandShare: 5, shelfAvailability: [0.9, 0.98], backroomAvailability: [0.4, 0.7],
+    archetypes: [
+      { stem: 'LED Bulbs 4-pack', weight: 4, dims: [18, 12, 6], kg: [0.2, 0.4], price: [8, 20] },
+      { stem: 'Ceiling Light', weight: 1, dims: [40, 40, 15], kg: [1.5, 4], price: [35, 120] },
+      { stem: 'Work Light', weight: 1, dims: [25, 20, 15], kg: [0.8, 2], price: [25, 60] },
+    ],
+  },
+  paint: {
+    skuShare: 5, demandShare: 9, shelfAvailability: [0.9, 0.98], backroomAvailability: [0.5, 0.8],
+    archetypes: [
+      { stem: 'Interior Paint 1 gal', weight: 4, dims: [17, 17, 19], kg: [4.5, 5.2], price: [25, 55], flavors: ['Eggshell', 'Satin', 'Semi-Gloss', 'Flat'] },
+      { stem: 'Exterior Paint 1 gal', weight: 2, dims: [17, 17, 19], kg: [4.6, 5.3], price: [30, 65] },
+      { stem: 'Primer 1 gal', weight: 2, dims: [17, 17, 19], kg: [4.4, 5], price: [18, 40] },
+      { stem: 'Spray Paint', weight: 3, dims: [7, 7, 22], kg: [0.35, 0.45], price: [5, 10] },
+      { stem: 'Paint Roller Kit', weight: 2, dims: [35, 25, 8], kg: [0.4, 0.8], price: [8, 20] },
+    ],
+  },
+  adhesives: {
+    skuShare: 3, demandShare: 4, shelfAvailability: [0.92, 0.99], backroomAvailability: [0.5, 0.8],
+    archetypes: [
+      { stem: 'Construction Adhesive', weight: 3, dims: [30, 6, 6], kg: [0.3, 0.4], price: [4, 10] },
+      { stem: 'Silicone Caulk', weight: 3, dims: [30, 6, 6], kg: [0.3, 0.35], price: [5, 12] },
+      { stem: 'Wood Glue', weight: 2, dims: [15, 7, 7], kg: [0.25, 0.6], price: [4, 12] },
+    ],
+  },
+  storage: {
+    skuShare: 4, demandShare: 4, shelfAvailability: [0.9, 0.98], backroomAvailability: [0.4, 0.7],
+    archetypes: [
+      { stem: 'Storage Tote 27 gal', weight: 3, dims: [75, 50, 40], kg: [2, 3], price: [10, 22] },
+      { stem: 'Shelving Unit', weight: 1, dims: [150, 45, 12], kg: [12, 22], price: [60, 150] },
+      { stem: 'Hooks Set', weight: 2, dims: [20, 12, 4], kg: [0.2, 0.6], price: [6, 20] },
+    ],
+  },
+  'kitchen-bath': {
+    skuShare: 3, demandShare: 3, shelfAvailability: [0.88, 0.97], backroomAvailability: [0.4, 0.7],
+    archetypes: [
+      { stem: 'Kitchen Faucet', weight: 2, dims: [40, 25, 12], kg: [2, 4], price: [70, 220] },
+      { stem: 'Shower Head', weight: 3, dims: [25, 15, 10], kg: [0.4, 1], price: [20, 80] },
+      { stem: 'Toilet Seat', weight: 1, dims: [48, 40, 8], kg: [2, 3.5], price: [25, 60] },
+    ],
+  },
+  'garden-supplies': {
+    skuShare: 4, demandShare: 6, shelfAvailability: [0.88, 0.97], backroomAvailability: [0.4, 0.7],
+    archetypes: [
+      { stem: 'Potting Mix 1 cu ft', weight: 3, dims: [55, 35, 12], kg: [9, 12], price: [8, 16] },
+      { stem: 'Garden Hose 50 ft', weight: 2, dims: [35, 35, 12], kg: [2, 4], price: [20, 50] },
+      { stem: 'Grass Seed', weight: 2, dims: [35, 22, 10], kg: [1.4, 3.2], price: [15, 40] },
+      { stem: 'Pruning Shears', weight: 2, dims: [22, 8, 3], kg: [0.2, 0.4], price: [12, 35] },
+    ],
+  },
+  hvac: {
+    skuShare: 2, demandShare: 3, shelfAvailability: [0.85, 0.96], backroomAvailability: [0.3, 0.6],
+    archetypes: [
+      { stem: 'Air Filter', weight: 4, dims: [51, 51, 3], kg: [0.4, 0.8], price: [8, 30] },
+      { stem: 'Box Fan', weight: 2, dims: [55, 15, 55], kg: [3, 4.5], price: [25, 45] },
+      { stem: 'Space Heater', weight: 1, dims: [30, 25, 40], kg: [2.5, 5], price: [35, 90] },
+    ],
+  },
+  lumber: {
+    skuShare: 4, demandShare: 7, shelfAvailability: [0.9, 0.98], backroomAvailability: [0.6, 0.9],
+    archetypes: [
+      { stem: 'Stud 2x4 8 ft', weight: 4, dims: [244, 9, 4], kg: [4, 5.5], price: [4, 8] },
+      { stem: 'Plywood 4x8 1/2 in', weight: 2, dims: [244, 122, 1.3], kg: [20, 25], price: [30, 55] },
+      { stem: 'Board 1x6 8 ft', weight: 2, dims: [244, 14, 2], kg: [3, 4.5], price: [8, 16] },
+      { stem: 'Trim Molding 8 ft', weight: 1, dims: [244, 6, 1.5], kg: [0.8, 1.5], price: [6, 18] },
+    ],
+  },
+  building: {
+    skuShare: 3, demandShare: 5, shelfAvailability: [0.9, 0.98], backroomAvailability: [0.6, 0.9],
+    archetypes: [
+      { stem: 'Concrete Mix 80 lb', weight: 3, dims: [60, 40, 12], kg: [36.2, 36.4], price: [5, 9] },
+      { stem: 'Drywall Sheet 4x8', weight: 2, dims: [244, 122, 1.3], kg: [24, 28], price: [14, 22] },
+      { stem: 'Insulation Roll', weight: 2, dims: [120, 40, 40], kg: [5, 9], price: [30, 60] },
+      { stem: 'Mortar Mix 60 lb', weight: 1, dims: [55, 38, 11], kg: [27.1, 27.3], price: [8, 14] },
+    ],
+  },
+  appliances: {
+    skuShare: 2, demandShare: 2, shelfAvailability: [0.85, 0.95], backroomAvailability: [0.6, 0.9],
+    archetypes: [
+      { stem: 'Microwave', weight: 3, dims: [55, 45, 35], kg: [12, 18], price: [90, 250] },
+      { stem: 'Dehumidifier', weight: 2, dims: [40, 30, 60], kg: [15, 22], price: [180, 320] },
+      { stem: 'Range Hood', weight: 1, dims: [80, 50, 20], kg: [9, 15], price: [120, 350] },
+      { stem: 'Chest Freezer', weight: 1, dims: [90, 60, 85], kg: [30, 40], price: [200, 400] },
+    ],
+  },
+  'outdoor-power': {
+    skuShare: 2, demandShare: 2, shelfAvailability: [0.85, 0.95], backroomAvailability: [0.5, 0.8],
+    archetypes: [
+      { stem: 'Lawn Mower', weight: 2, dims: [100, 55, 45], kg: [20, 35], price: [220, 450] },
+      { stem: 'String Trimmer', weight: 2, dims: [120, 25, 20], kg: [4, 6], price: [90, 200] },
+      { stem: 'Leaf Blower', weight: 2, dims: [80, 25, 30], kg: [3, 5], price: [80, 180] },
+      { stem: 'Portable Generator', weight: 1, dims: [65, 55, 50], kg: [40, 55], price: [450, 900] },
+    ],
+  },
+  flooring: {
+    skuShare: 2, demandShare: 2, shelfAvailability: [0.88, 0.97], backroomAvailability: [0.6, 0.9],
+    archetypes: [
+      { stem: 'Vinyl Plank Case', weight: 3, dims: [125, 20, 8], kg: [18, 24], price: [45, 90] },
+      { stem: 'Ceramic Tile Case', weight: 2, dims: [35, 35, 15], kg: [20, 26], price: [25, 60] },
+      { stem: 'Underlayment Roll', weight: 1, dims: [100, 25, 25], kg: [4, 8], price: [25, 50] },
+    ],
+  },
 };
 
 /** 自定义类别没有合成原型时，按温区使用的通用原型 */

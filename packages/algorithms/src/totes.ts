@@ -54,7 +54,8 @@ function splitOversized(ctx: PlanningContext, order: Order): { standard: OrderLi
 }
 
 function groupKey(order: Order, item: Item): string {
-  const chemical = item.handling.includes('CHEMICAL') || item.handling.includes('HAZMAT');
+  // 化学品与食品分开装框；非食品行业的商品没有这个要求（HAZMAT 始终单独装）
+  const chemical = (item.handling.includes('CHEMICAL') && !item.nonFood) || item.handling.includes('HAZMAT');
   return `${item.tempZone}|${order.fulfillmentType}|${chemical ? 'C' : 'F'}`;
 }
 
@@ -213,7 +214,7 @@ export function mixesChemicalWithFood(ctx: PlanningContext, tote: ToteAssignment
   for (const l of tote.lines) {
     const item = getItem(ctx, l.itemId);
     if (item.handling.includes('CHEMICAL') || item.handling.includes('HAZMAT')) chem = true;
-    else if (item.fulfillmentType === 'GROCERY') food = true;
+    else if (item.fulfillmentType === 'GROCERY' && !item.nonFood) food = true;
   }
   return chem && food;
 }

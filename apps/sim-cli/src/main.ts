@@ -5,11 +5,13 @@ import { createTemplate, StoreModel, type TemplateName } from '@storewright/stor
 import { generateCatalog, generateOrders } from '@storewright/synth';
 import { BASELINE, EFFICIENCY, OPTIMIZED, ablationPolicies, defaultScenario, runExperiment, simulateDay, type SimScenario } from '@storewright/sim-engine';
 import { renderComparison, renderDay, renderSensitivity, type SensitivityRow } from './report';
+import { aiReport } from './aiReport';
+import { industryReport } from './industryReport';
 
 const HELP = `Storewright 仿真命令行
 
 用法：
-  npm run sim -- [--template small|medium|large] [--policy baseline|optimized] [--seed N] [--events 文件.json]
+  npm run sim -- [--template small|medium|large|hardware] [--policy baseline|optimized] [--seed N] [--events 文件.json]
       仿真一天并打印指标；--events 导出完整事件日志（回放 / 动画用）
 
   npm run compare -- [--template medium] [--reps 30] [--seed 1] [--profiles] [--ablation] [--out experiments/results]
@@ -17,6 +19,12 @@ const HELP = `Storewright 仿真命令行
 
   npm run sensitivity -- [--template medium] [--reps 10] [--seed 1]
       敏感性分析：逐个把假设参数调到低值 / 高值，观察「优化 − 基线」的差值如何变化
+
+  npm run ai-report -- [--reps 20] [--seeds 4] [--quick] [--out experiments/results]
+      AI 效益报告：五个模型族的离线评估、运营上的 AI 开 / 关对比、到店时间的取舍曲线、敏感性分析
+
+  npm run industry-report -- [--reps 20] [--seeds 3] [--out experiments/results]
+      行业迁移报告：中型超市与家居建材店的配置、订单形态、运营仿真、AI 开 / 关和订单量预测对比
 `;
 
 function parseArgs(argv: string[]): { command: string; flags: Record<string, string | boolean> } {
@@ -38,7 +46,7 @@ function parseArgs(argv: string[]): { command: string; flags: Record<string, str
 
 function template(flags: Record<string, string | boolean>): TemplateName {
   const t = String(flags.template ?? 'medium');
-  if (t !== 'small' && t !== 'medium' && t !== 'large') throw new Error(`未知模板：${t}`);
+  if (t !== 'small' && t !== 'medium' && t !== 'large' && t !== 'hardware') throw new Error(`未知模板：${t}`);
   return t;
 }
 
@@ -141,11 +149,42 @@ function sensitivity(flags: Record<string, string | boolean>): void {
   console.log(`报告：${file}`);
 }
 
+function runAiReport(flags: Record<string, string | boolean>): void {
+  const reps = Number(flags.reps ?? 20);
+  const seeds = Number(flags.seeds ?? 4);
+  const quick = !!flags.quick;
+  const outDir = resolve(String(flags.out ?? 'experiments/results'));
+  const t0 = performance.now();
+  const md = aiReport({ reps, seeds, quick, onProgress: (m) => process.stdout.write(`\r${m}                    `) });
+  process.stdout.write(`\r完成，用时 ${((performance.now() - t0) / 1000).toFixed(1)} s                    \n`);
+  mkdirSync(outDir, { recursive: true });
+  const file = join(outDir, `ai-report-reps${reps}-seeds${seeds}${quick ? '-quick' : ''}.md`);
+  writeFileSync(file, md);
+  console.log(md);
+  console.log(`报告：${file}`);
+}
+
+function runIndustryReport(flags: Record<string, string | boolean>): void {
+  const reps = Number(flags.reps ?? 20);
+  const seeds = Number(flags.seeds ?? 3);
+  const outDir = resolve(String(flags.out ?? 'experiments/results'));
+  const t0 = performance.now();
+  const md = industryReport({ reps, seeds, onProgress: (m) => process.stdout.write(`\r${m}                    `) });
+  process.stdout.write(`\r完成，用时 ${((performance.now() - t0) / 1000).toFixed(1)} s                    \n`);
+  mkdirSync(outDir, { recursive: true });
+  const file = join(outDir, `industry-report-reps${reps}-seeds${seeds}.md`);
+  writeFileSync(file, md);
+  console.log(md);
+  console.log(`报告：${file}`);
+}
+
 const { command, flags } = parseArgs(process.argv.slice(2));
 try {
   if (command === 'run') runDay(flags);
   else if (command === 'compare') compare(flags);
   else if (command === 'sensitivity') sensitivity(flags);
+  else if (command === 'ai-report') runAiReport(flags);
+  else if (command === 'industry-report') runIndustryReport(flags);
   else console.log(HELP);
 } catch (err) {
   console.error(err instanceof Error ? err.message : err);

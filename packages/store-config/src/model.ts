@@ -138,6 +138,8 @@ export class StoreModel {
   readonly stagingNode: number;
   readonly handoffNode: number;
   readonly backroomNode: number;
+  /** 楼层连接两端的节点（连接 id → [a, b]）；扶梯不进入行走网络，见下文 */
+  readonly connectorNodes = new Map<string, [number, number]>();
   readonly toteDims: Dimensions;
   readonly toteCapacityL: number;
 
@@ -203,11 +205,13 @@ export class StoreModel {
       }
     }
 
-    // 3. 楼层连接
+    // 3. 楼层连接。员工推着拣货车，不能乘自动扶梯，所以扶梯不进入行走网络；
+    //    两端节点仍然保留（顾客乘扶梯由画面层处理）
     for (const c of layout.connectors) {
       const a = this.nodeAt(c.a.floorId, c.a.x, c.a.y);
       const b = this.nodeAt(c.b.floorId, c.b.x, c.b.y);
-      this.connect(a, b, c.traversalSec * CONNECTOR_EQUIV_SPEED);
+      this.connectorNodes.set(c.id, [a, b]);
+      if (c.kind !== 'ESCALATOR') this.connect(a, b, c.traversalSec * CONNECTOR_EQUIV_SPEED);
     }
 
     // 4. 货位

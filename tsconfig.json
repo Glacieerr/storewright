@@ -3,5 +3,13 @@
   "compilerOptions": {
     "noEmit": true
   },
-  "include": ["packages/*/src/**/*.ts", "apps/*/src/**/*.ts", "vitest.config.ts"]
+  "include": [
+    "packages/*/src/**/*.ts",
+    "apps/*/src/**/*.ts",
+    "vitest.config.ts"
+  ],
+  "exclude": [
+    "apps/simulator/**",
+    "apps/associate/**"
+  ]
 }

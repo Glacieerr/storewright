@@ -1,0 +1,40 @@
+{
+  "name": "@storewright/server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Storewright realtime backend: command API, event store, WebSocket push, scheduler and the local store-AI service",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "exports": {
+    "./hub": "./src/hub.ts",
+    "./storage": "./src/storage.ts",
+    "./platform": "./src/platform.ts"
+  },
+  "scripts": {
+    "start": "tsx src/main.ts",
+    "dev": "tsx watch src/main.ts",
+    "bench": "tsx src/bench.ts"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "0.2.15",
+    "@fastify/cors": "10.0.1",
+    "@fastify/static": "8.0.3",
+    "@fastify/websocket": "11.0.1",
+    "@storewright/ai": "0.1.0",
+    "@storewright/algorithms": "0.1.0",
+    "@storewright/domain": "0.1.0",
+    "@storewright/labels": "0.1.0",
+    "@storewright/ops": "0.1.0",
+    "@storewright/sim-engine": "0.1.0",
+    "@storewright/store-config": "0.1.0",
+    "@storewright/synth": "0.1.0",
+    "fastify": "5.2.0",
+    "mqtt": "5.10.3",
+    "pg": "8.13.1"
+  },
+  "devDependencies": {
+    "@types/pg": "8.11.10",
+    "@types/ws": "8.5.13",
+    "aedes": "0.51.3"
+  }
+}

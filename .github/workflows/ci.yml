@@ -1,0 +1,48 @@
+# 持续集成：类型检查、单元与属性测试、Phase 1 结果可复现、多浏览器端到端测试
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - name: Phase 1 comparison still runs
+        run: npm run compare -- --template medium --reps 5 --seed 1 --profiles
+
+  e2e:
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build:all
+      - run: npx playwright install --with-deps chromium
+      - name: End-to-end tests (real backend + in-browser demo site)
+        run: npm run e2e
+        env:
+          CI: 'true'
+          PW_CHANNEL: ''
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-report
+          path: experiments/results/e2e-report

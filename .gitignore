@@ -7,8 +7,13 @@
 # 依赖与构建产物
 node_modules/
 dist/
+dist-demo/
+/site/
 coverage/
 *.tsbuildinfo
+
+# 后端的本地数据库（嵌入式 PGlite）
+apps/server/.data/
 
 # 实验输出（可由命令重新生成）
 experiments/results/

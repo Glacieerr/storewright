@@ -1,0 +1,31 @@
+{
+  "name": "@storewright/associate",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Storewright associate app (PWA): Pick, Stage, Handoff, Inventory, AI and a demo console",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build:demo": "vite build --mode demo --outDir dist-demo"
+  },
+  "dependencies": {
+    "@storewright/ai": "0.1.0",
+    "@storewright/algorithms": "0.1.0",
+    "@storewright/domain": "0.1.0",
+    "@storewright/ops": "0.1.0",
+    "@storewright/server": "0.1.0",
+    "jsqr": "1.4.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "18.3.12",
+    "@types/react-dom": "18.3.1",
+    "@vitejs/plugin-react": "4.3.4",
+    "vite": "5.4.21"
+  }
+}

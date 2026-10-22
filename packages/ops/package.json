@@ -1,0 +1,22 @@
+{
+  "name": "@storewright/ops",
+  "version": "0.1.0",
+  "description": "Live store operations core: commands, events, state and views shared by the server, associate app and simulator",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/client.ts",
+    "./server": "./src/server.ts",
+    "./hub-link": "./src/hubLink.ts"
+  },
+  "dependencies": {
+    "@storewright/ai": "0.1.0",
+    "@storewright/algorithms": "0.1.0",
+    "@storewright/domain": "0.1.0",
+    "@storewright/store-config": "0.1.0"
+  },
+  "devDependencies": {
+    "@storewright/synth": "0.1.0"
+  }
+}

@@ -1,0 +1,10 @@
+node_modules
+**/node_modules
+**/dist
+**/dist-demo
+site
+private
+experiments
+.claude
+.git
+apps/server/.data

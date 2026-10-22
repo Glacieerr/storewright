@@ -13,15 +13,29 @@
     "apps/*"
   ],
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p apps/simulator/tsconfig.json --noEmit && tsc -p apps/associate/tsconfig.json --noEmit && tsc -p e2e/tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "check": "npm run typecheck && npm run test",
     "sim": "tsx apps/sim-cli/src/main.ts run",
     "compare": "tsx apps/sim-cli/src/main.ts compare",
-    "sensitivity": "tsx apps/sim-cli/src/main.ts sensitivity"
+    "sensitivity": "tsx apps/sim-cli/src/main.ts sensitivity",
+    "ai-report": "tsx apps/sim-cli/src/main.ts ai-report",
+    "industry-report": "tsx apps/sim-cli/src/main.ts industry-report",
+    "dev": "npm run dev -w @storewright/simulator",
+    "build:sim": "npm run build -w @storewright/simulator",
+    "server": "npm run start -w @storewright/server",
+    "associate": "npm run dev -w @storewright/associate",
+    "build:associate": "npm run build -w @storewright/associate",
+    "build:demo": "npm run build:demo -w @storewright/associate",
+    "build:all": "npm run build:sim && npm run build:associate && npm run build:demo",
+    "build:site": "npm run build:sim && npm run build:demo && node scripts/build-site.mjs",
+    "e2e": "playwright test",
+    "walkthrough": "playwright test -c playwright.walkthrough.config.ts; node scripts/walkthrough-report.mjs",
+    "demo:site": "node e2e/static-server.mjs"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@types/node": "22.10.2",
     "fast-check": "3.23.2",
     "tsx": "4.19.2",

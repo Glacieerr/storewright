@@ -1,0 +1,17 @@
+{
+  "name": "@storewright/labels",
+  "version": "0.1.0",
+  "description": "Label generation: opaque-ID QR codes, tote and staging-slot labels as SVG previews and ZPL print templates",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@storewright/domain": "0.1.0",
+    "qrcode-generator": "1.4.4"
+  },
+  "devDependencies": {
+    "jsqr": "1.4.0"
+  }
+}

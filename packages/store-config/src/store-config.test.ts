@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addRun, backroomLayout, backroomRoute, createTemplate, distributeRuns, fitsInside, formatSlotCode, GENERATOR_PRESETS, generateStoreConfig, moveRuns, moveStaging, pasteRuns, planRun, randomGeneratorParams, rotateRun, runSpan, StoreModel, templateParams, validateStoreConfig, walkSegments } from './index';
+import { addArea, addDock, addRun, AREA_KINDS, goLiveCheck, backroomLayout, materializeAreas, moveArea, moveDock, rectsOverlap, removeArea, removeDock, resizeArea, storeAreas, backroomRoute, createTemplate, distributeRuns, fitsInside, formatSlotCode, GENERATOR_PRESETS, generateStoreConfig, moveRuns, moveStaging, pasteRuns, planRun, randomGeneratorParams, rotateRun, runSpan, StoreModel, templateParams, validateStoreConfig, walkSegments } from './index';
 
 describe('门店模板', () => {
   for (const t of ['small', 'medium', 'large'] as const) {
@@ -310,5 +310,160 @@ describe('布局编辑：画通道、旋转、成组移动、复制粘贴', () =
     expect(p.y).toBe(front?.start.y);
     expect(c2.layout.points.cartDepot).toEqual(c2.layout.points.staging);
     expect(issues(c2).some((m) => m.includes('暂存区'))).toBe(true);
+  });
+});
+
+describe('区域、卸货门与取货车位（决策记录 0013）', () => {
+  it('默认区域：超市分出冷藏库和冷冻库，建材店分出大件区；收货区细分；暂存区按货架用途；互不重叠', () => {
+    for (const tpl of ['small', 'medium', 'large', 'hardware'] as const) {
+      const c = createTemplate(tpl);
+      const { areas, docks, racks } = storeAreas(c);
+      const kinds = new Set(areas.map((a) => a.kind));
+      for (const k of ['RACKS', 'UNLOAD', 'RECEIVING_HOLD', 'QA', 'RTV', 'PALLETS', 'BALER', 'STAGING'] as const) expect(kinds.has(k), `${tpl} ${k}`).toBe(true);
+      if (tpl === 'hardware') {
+        expect(kinds.has('BULK')).toBe(true);
+        expect(kinds.has('COOLER')).toBe(false);
+      } else {
+        expect(kinds.has('COOLER') && kinds.has('FREEZER')).toBe(true);
+        expect(areas.find((a) => a.kind === 'COOLER')?.tempZone).toBe('CHILLED');
+      }
+      // 同一楼层的区域不重叠
+      for (let i = 0; i < areas.length; i++)
+        for (let j = i + 1; j < areas.length; j++) {
+          const a = areas[i]!;
+          const b = areas[j]!;
+          if (a.floorId === b.floorId) expect(rectsOverlap(a, b), `${tpl}: ${a.id} × ${b.id}`).toBe(false);
+        }
+      for (const a of areas) {
+        expect(a.capacity, a.id).toBeGreaterThan(0);
+        expect(a.unit).toBe(AREA_KINDS[a.kind].unit);
+      }
+      expect(docks.length).toBe(c.backroom.docks);
+      expect(docks.filter((d) => d.reefer)).toHaveLength(1);
+      expect(racks).toHaveLength(c.staging.racks.length);
+      // 托盘货架都在货架区里
+      const b = backroomLayout(c);
+      const rackArea = areas.find((a) => a.kind === 'RACKS')!;
+      for (const l of b.locations) {
+        expect(l.areaId).toBe(rackArea.id);
+        expect(l.x).toBeGreaterThanOrEqual(rackArea.x0);
+        expect(l.x).toBeLessThanOrEqual(rackArea.x1);
+      }
+    }
+  });
+
+  it('明确给出的区域、卸货门和暂存货架位置优先；货架区决定托盘货架；配置能通过校验', () => {
+    const c = createTemplate('medium');
+    const f = c.layout.floors[0]!;
+    c.areas = [
+      { id: 'R1', kind: 'RACKS', floorId: f.id, x0: 2, z0: f.depthM - 7.5, x1: 40, z1: f.depthM - 0.6 },
+      { id: 'C1', kind: 'COOLER', floorId: f.id, x0: 41, z0: f.depthM - 8, x1: 50, z1: f.depthM - 0.6, capacity: 600 },
+      { id: 'U1', kind: 'UNLOAD', floorId: f.id, x0: 52, z0: f.depthM - 5, x1: 72, z1: f.depthM - 0.5 },
+      { id: 'S1', kind: 'STAGING', floorId: f.id, x0: 60, z0: 8, x1: 80, z1: 22 },
+    ];
+    c.docks = [
+      { id: 'D1', x: 55, reefer: true },
+      { id: 'D2', x: 62 },
+      { id: 'D3', x: 69, kind: 'GRADE' },
+    ];
+    c.staging.racks = c.staging.racks.map((r, i) => (i < 4 ? { ...r, areaId: 'S1' } : r));
+    const sa = storeAreas(c);
+    expect(sa.areas.map((a) => a.id)).toEqual(['R1', 'C1', 'U1', 'S1']);
+    expect(sa.areas.find((a) => a.id === 'C1')?.capacity).toBe(600);
+    expect(sa.docks.map((d) => [d.id, d.x, d.kind, d.reefer])).toEqual([
+      ['D1', 55, 'DOCK', true],
+      ['D2', 62, 'DOCK', false],
+      ['D3', 69, 'GRADE', false],
+    ]);
+    // 指定区域的货架排在区域里
+    for (const r of sa.racks.filter((x) => x.areaId === 'S1')) {
+      expect(r.x - r.length / 2).toBeGreaterThanOrEqual(60);
+      expect(r.z).toBeGreaterThanOrEqual(8);
+    }
+    const b = backroomLayout(c);
+    expect(b.rows.length).toBeGreaterThan(0);
+    expect(b.docks.map((d) => d.x)).toEqual([55, 62, 69]);
+    const v = validateStoreConfig(c);
+    expect(v.ok ? [] : v.issues.map((i) => i.message)).toEqual([]);
+  });
+});
+
+describe('区域编辑（决策记录 0013）', () => {
+  it('把默认区域写进配置后结果不变；新建、移动、改大小、删除区域，增删和移动卸货门；校验能发现问题', () => {
+    const c = createTemplate('medium');
+    const before = storeAreas(c);
+    materializeAreas(c);
+    const after = storeAreas(c);
+    expect(after.areas.map((a) => [a.id, a.kind, a.x0, a.z1, a.capacity])).toEqual(before.areas.map((a) => [a.id, a.kind, a.x0, a.z1, a.capacity]));
+    expect(after.docks.map((d) => d.x)).toEqual(before.docks.map((d) => d.x));
+    expect(backroomLayout(c).capacity).toBe(backroomLayout(createTemplate('medium')).capacity);
+    expect(c.staging.racks.every((r) => r.areaId === 'STAGING-1')).toBe(true);
+    expect(validateStoreConfig(c).ok).toBe(true);
+
+    // 新建：放在空地上，不和已有区域重叠
+    const id = addArea(c, 'CHARGING');
+    const added = c.areas!.find((a) => a.id === id)!;
+    for (const a of c.areas!) if (a.id !== id && a.floorId === added.floorId) expect(rectsOverlap(a, added), a.id).toBe(false);
+    expect(validateStoreConfig(c).ok).toBe(true);
+
+    // 移动暂存区：按区域网格摆放的暂存货架跟着走
+    const zs = storeAreas(c).racks.map((r) => r.z);
+    moveArea(c, 'STAGING-1', 0, 1);
+    expect(storeAreas(c).racks.map((r) => Math.round((r.z - 1) * 10) / 10)).toEqual(zs.map((z) => Math.round(z * 10) / 10));
+    expect(validateStoreConfig(c).ok).toBe(true);
+
+    // 改大小：货架区变小，托盘位变少
+    const rack = c.areas!.find((a) => a.kind === 'RACKS')!;
+    const cap = backroomLayout(c).capacity;
+    resizeArea(c, rack.id, rack.x0 + 12, rack.z1);
+    expect(backroomLayout(c).capacity).toBeLessThan(cap);
+
+    // 重叠时校验失败
+    moveArea(c, id, (c.areas!.find((a) => a.kind === 'COOLER')!.x0 - added.x0), (c.areas!.find((a) => a.kind === 'COOLER')!.z0 - added.z0));
+    const bad = validateStoreConfig(c);
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) expect(bad.issues.some((i) => i.message.startsWith('区域重叠'))).toBe(true);
+    removeArea(c, id);
+    expect(validateStoreConfig(c).ok).toBe(true);
+
+    // 删除暂存区：货架回到默认网格
+    removeArea(c, 'STAGING-1');
+    expect(c.staging.racks.every((r) => r.areaId === undefined)).toBe(true);
+
+    // 卸货门
+    const d = addDock(c);
+    expect(c.docks).toHaveLength(4);
+    moveDock(c, d, 1000);
+    expect(c.docks!.find((k) => k.id === d)!.x).toBeLessThanOrEqual(c.layout.floors[0]!.widthM - 2);
+    moveDock(c, d, c.docks![0]!.x + 1);
+    const close = validateStoreConfig(c);
+    expect(close.ok).toBe(false);
+    if (!close.ok) expect(close.issues.some((i) => i.message.includes('相距不到 4 米'))).toBe(true);
+    removeDock(c, d);
+    expect(c.docks).toHaveLength(3);
+    // 没有货架区、卸货区时提醒
+    c.areas = c.areas!.filter((a) => a.kind !== 'RACKS' && a.kind !== 'UNLOAD');
+    const missing = validateStoreConfig(c);
+    expect(missing.ok).toBe(false);
+    if (!missing.ok) expect(missing.issues.map((i) => i.message)).toEqual(expect.arrayContaining(['后仓至少需要一个托盘货架区', '收货至少需要一个卸货区']));
+  });
+});
+
+describe('开业检查（「你的商店」，决策记录 0013）', () => {
+  it('模板门店能开业；删掉卸货区、冷库、货架区后给出问题；订单量太大时暂存和车位不够', () => {
+    const c = createTemplate('medium');
+    const ok = goLiveCheck(c, 246);
+    expect(ok.filter((i) => i.level === 'error')).toEqual([]);
+    expect(ok.find((i) => i.code === 'STAGING_CAPACITY')?.level).toBe('ok');
+    const busy = goLiveCheck(c, 4000);
+    expect(busy.find((i) => i.code === 'STAGING_CAPACITY')?.level).not.toBe('ok');
+    expect(busy.find((i) => i.code === 'PICKUP_BAYS')?.level).toBe('warn');
+    materializeAreas(c);
+    c.areas = c.areas!.filter((a) => a.kind !== 'UNLOAD' && a.kind !== 'COOLER' && a.kind !== 'RACKS');
+    c.docks = c.docks!.map((d) => ({ ...d, reefer: false }));
+    const v = validateStoreConfig(c);
+    const bad = goLiveCheck(c, 246, v.ok ? [] : v.issues);
+    const codes = bad.map((i) => `${i.level}:${i.code}:${i.params.kind ?? ''}`);
+    expect(codes).toEqual(expect.arrayContaining(['error:AREA_MISSING:UNLOAD', 'error:AREA_MISSING:RACKS', 'warn:COLD_STORAGE:COOLER', 'warn:REEFER_DOOR:', 'error:RACK_CAPACITY:', 'error:CONFIG_ISSUE:']));
   });
 });

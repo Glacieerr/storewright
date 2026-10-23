@@ -1,7 +1,6 @@
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
-import { Html } from '@react-three/drei';
 import { backroomLayout, floorSpotFor, LETDOWN_DIST } from '@storewright/store-config';
 import type { EquipmentTrace, PalletRecord } from '@storewright/sim-engine';
 import { useApp } from '../state/store';
@@ -9,7 +8,6 @@ import { clock } from '../state/clock';
 import { makePolyPose, polyPose } from './polyTrace';
 import { toonGradient } from './toon';
 import { useNightGlow } from './environment';
-import { t } from '../i18n';
 
 const tmp = new THREE.Object3D();
 const col = new THREE.Color();
@@ -154,8 +152,6 @@ export function Warehouse() {
   const geo = useApp((s) => s.simGeo);
   const timeline = useApp((s) => s.timeline);
   const floor = useApp((s) => s.floor);
-  const mode = useApp((s) => s.mode);
-  const buildingView = useApp((s) => s.buildingView);
   const b = useMemo(() => backroomLayout(model.config), [model]);
   const visible = floor === 'ALL' || geo.floors.find((f) => f.floorId === floor)?.level === 0;
 
@@ -172,23 +168,15 @@ export function Warehouse() {
         for (const dz of [-depth / 2, depth / 2]) out.push({ x: (r.x0 + r.x1) / 2, y: l * 1.5 - 0.12, z: r.z + dz, w: r.x1 - r.x0, h: 0.12, d: 0.08, color: '#e8a33d' });
       }
     }
-    // 收货区地面（黄色区域）与卸货平台
-    const rc = b.receiving;
-    out.push({ x: (rc.x0 + rc.x1) / 2, y: 0.005, z: (rc.z0 + rc.z1) / 2, w: rc.x1 - rc.x0, h: 0.01, d: rc.z1 - rc.z0, color: '#efd98a' });
+    // 卸货平台（收货区、暂存区的地面由区域图层画）
     for (const d of b.docks) out.push({ x: d.x, y: 0.005, z: d.z - 1.3, w: 3, h: 0.02, d: 2.4, color: '#5c636a' });
     // 叉车主通道标线
     out.push({ x: b.mainAisleX, y: 0.006, z: (b.zone.z0 + b.zone.z1) / 2, w: 0.12, h: 0.01, d: b.zone.z1 - b.zone.z0, color: '#f1c232' });
-    // 线上订单暂存仓：地面着色与矮隔断
-    if (geo.racks.length) {
-      const xs = geo.racks.map((r) => r.x);
-      const zs = geo.racks.map((r) => r.z);
-      const x0 = Math.min(...xs) - 3;
-      const x1 = Math.max(...xs) + 3;
-      const z0 = Math.min(...zs) - 1.6;
-      const z1 = Math.max(...zs) + 1.6;
-      out.push({ x: (x0 + x1) / 2, y: 0.004, z: (z0 + z1) / 2, w: x1 - x0, h: 0.01, d: z1 - z0, color: '#dfe8f0' });
-      out.push({ x: (x0 + x1) / 2, y: 0, z: z1, w: x1 - x0, h: 1.2, d: 0.08, color: '#c9d3dc' });
-      out.push({ x: x1, y: 0, z: (z0 + z1) / 2, w: 0.08, h: 1.2, d: z1 - z0, color: '#c9d3dc' });
+    // 线上订单暂存区的矮隔断（沿暂存区域的后边和外侧）
+    for (const a of geo.areas) {
+      if (a.kind !== 'STAGING' && a.kind !== 'STAGING_DELIVERY') continue;
+      out.push({ x: (a.x0 + a.x1) / 2, y: 0, z: a.z1 + 0.6, w: a.x1 - a.x0 + 1.2, h: 1.2, d: 0.08, color: '#c9d3dc' });
+      out.push({ x: a.x1 + 0.6, y: 0, z: (a.z0 + a.z1) / 2, w: 0.08, h: 1.2, d: a.z1 - a.z0 + 1.2, color: '#c9d3dc' });
     }
     return out;
   }, [b, geo.racks]);
@@ -343,7 +331,6 @@ export function Warehouse() {
 
   if (!visible) return null;
   const cap = Math.max(1, pallets.length);
-  const showLabels = mode === 'sim' && buildingView !== 'exterior';
   return (
     <group>
       <StaticBoxes items={statics} />
@@ -356,16 +343,6 @@ export function Warehouse() {
         <meshToonMaterial ref={glowS} color="#ffffff" gradientMap={toonGradient()} />
       </instancedMesh>
       {equipment.map((e) => (e.kind === 'forklift' ? <Forklift key={e.id} id={e.id} register={register} /> : <Jack key={e.id} id={e.id} register={register} />))}
-      {showLabels && (
-        <>
-          <Html position={[(b.zone.x0 + b.zone.x1) / 2, 4.6, (b.zone.z0 + b.zone.z1) / 2]} center className="scene-label area-label warehouse-label">
-            {t('库存仓库 · {0} 个托盘位', b.capacity)}
-          </Html>
-          <Html position={[(b.receiving.x0 + b.receiving.x1) / 2, 2.4, (b.receiving.z0 + b.receiving.z1) / 2]} center className="scene-label area-label">
-            {t('收货区')}
-          </Html>
-        </>
-      )}
     </group>
   );
 }

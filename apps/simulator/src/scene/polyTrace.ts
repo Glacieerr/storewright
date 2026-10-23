@@ -106,6 +106,8 @@ export function polyPose(segs: readonly PolySegment[], t: number, out: PolyPose)
   out.y = a.y + (b.y - a.y) * k;
   out.z = a.z + (b.z - a.z) * k;
   out.heading = Math.abs(b.x - a.x) + Math.abs(b.z - a.z) > 1e-6 ? Math.atan2(b.x - a.x, b.z - a.z) : restHeading(segs, lo);
+  // 倒车的那几段：车头朝行进方向的反方向（叉车从车厢里倒出来）
+  if (i - 1 < (s.reverseLegs ?? 0)) out.heading += Math.PI;
   out.moving = true;
   return true;
 }

@@ -9,7 +9,6 @@ import { trafficFor } from './traffic';
 import { useSiteLayout } from './useSite';
 import { toonGradient } from './toon';
 import { env } from './environment';
-import { backroomLayout } from '@storewright/store-config';
 import { t } from '../i18n';
 
 const tmp = new THREE.Object3D();
@@ -353,11 +352,9 @@ export function Surroundings() {
     const canopyPosts: Slab[] = site.canopies.flatMap((c) => [-1, 1].flatMap((sx) => [-1, 1].map((sz) => ({ x: c.x + sx * (c.w / 2 - 2), z: c.z + sz * (c.d / 2 - 2), w: 0.4, d: 0.4, y: 0, h: c.h }))));
     const lampPoles: Slab[] = site.lamps.map((p) => ({ x: p.x, z: p.z, w: 0.14, d: 0.14, y: 0, h: 6.5 }));
     const lampHeads: Slab[] = site.lamps.map((p) => ({ x: p.x, z: p.z, w: 0.9, d: 0.35, y: 6.4, h: 0.18 }));
-    // 卸货区的卷帘门
-    const dockDoors: Slab[] = f0 ? backroomLayout(simModel.config).docks.map((d) => ({ x: d.x, z: f0.maxZ + 0.05, w: 3.2, d: 0.12, y: 0, h: 3.2 })) : [];
     const white = site.markings.filter((m) => m.color === 'white');
     const yellowMarks = site.markings.filter((m) => m.color === 'yellow');
-    return { white, yellowMarks, ground: [site.ground], lotAsphalt, front, lines, paint, bayPosts, yellow, zebra, islands, buildings, roofs, windows, canopyRoofs, canopyPosts, lampPoles, lampHeads, dockDoors };
+    return { white, yellowMarks, ground: [site.ground], lotAsphalt, front, lines, paint, bayPosts, yellow, zebra, islands, buildings, roofs, windows, canopyRoofs, canopyPosts, lampPoles, lampHeads };
   }, [site, lot, geo.door.x, f0, simModel]);
 
   // 夜间：窗户亮灯、路灯发光
@@ -431,7 +428,6 @@ export function Surroundings() {
       <Slabs items={statics.lampPoles} color="#6b7379" cast />
       <Slabs items={statics.lampHeads} color="#4d5459" basic matRef={lampMat} />
       <LampPools lamps={site.lamps} />
-      <Slabs items={statics.dockDoors} color="#7f8c96" />
       <Trees trees={site.trees} season={season} snow={snow} />
       {site.ponds.map((p, i) => (
         <mesh key={`pond${i}`} position={[p.x, -0.02, p.z]} scale={[p.rx, 1, p.rz]} receiveShadow>
@@ -453,7 +449,8 @@ export function Surroundings() {
       <Signals />
       {mode === 'sim' && (
         <Html position={[lot.pickupSign.x, 2.6, lot.pickupSign.z - 3.2]} center className="scene-label area-label pickup-label">
-          {t('线上取货 · {0} 个车位', lot.pickupCount)}
+          <span className="label-full">{t('线上取货 · {0} 个车位', lot.pickupCount)}</span>
+          <span className="label-short">{t('线上取货')}</span>
         </Html>
       )}
     </group>

@@ -58,6 +58,8 @@ export interface PolySegment {
   carry?: string;
   /** 叉车在货位前举升：目标层高度（米）、托盘、放上去（up）还是取下来（down） */
   lift?: { y: number; pallet: string; mode: 'up' | 'down' };
+  /** 前几段折线是倒车（叉车叉着托盘从车厢里倒出来，车头仍朝车厢） */
+  reverseLegs?: number;
 }
 
 export type WorkerKind = 'forklift' | 'jack' | 'receiver' | 'stocker';
@@ -102,7 +104,10 @@ export interface Truck {
   id: string;
   kind: 'SEMI' | 'REEFER' | 'BOX';
   label: string;
+  /** 到达场地的时刻 */
   arrive: number;
+  /** 开始倒车靠台的时刻（卸货门被占用时在场地里等，决策记录 0013） */
+  dockAt: number;
   unloadStart: number;
   leave: number;
   door: number;
@@ -200,13 +205,13 @@ export function simulateInbound(model: StoreModel, runWeights: Record<string, nu
   // ---------- 到货车辆 ----------
   const trucks: Truck[] = [];
   const reeferAt = p.open - 90 * 60;
-  trucks.push({ id: 'TRUCK-REEFER', kind: 'REEFER', label: '配送中心冷藏半挂车', arrive: reeferAt, unloadStart: reeferAt + 6 * 60, leave: 0, door: 0, pallets: p.reeferPallets });
+  trucks.push({ id: 'TRUCK-REEFER', kind: 'REEFER', label: '配送中心冷藏半挂车', arrive: reeferAt, dockAt: reeferAt, unloadStart: reeferAt + 6 * 60, leave: 0, door: 0, pallets: p.reeferPallets });
   for (let k = 0; k < p.vendorTrucks; k++) {
     const at = p.open - 3600 + rng.uniform(0, 5 * 3600);
-    trucks.push({ id: `VENDOR-${k + 1}`, kind: 'BOX', label: rng.pick(['面包直送', '饮料直送', '乳品直送', '零食直送', '鲜花直送']), arrive: at, unloadStart: at + 4 * 60, leave: 0, door: Math.min(b.docks.length - 1, 1 + (k % 2)), pallets: rng.int(2, 5) });
+    trucks.push({ id: `VENDOR-${k + 1}`, kind: 'BOX', label: rng.pick(['面包直送', '饮料直送', '乳品直送', '零食直送', '鲜花直送']), arrive: at, dockAt: at, unloadStart: at + 4 * 60, leave: 0, door: Math.min(b.docks.length - 1, 1 + (k % 2)), pallets: rng.int(2, 5) });
   }
   const nightAt = p.close + 20 * 60;
-  trucks.push({ id: 'TRUCK-NIGHT', kind: 'SEMI', label: '配送中心长途半挂车', arrive: nightAt, unloadStart: nightAt + 6 * 60, leave: 0, door: Math.min(1, b.docks.length - 1), pallets: p.dcPallets });
+  trucks.push({ id: 'TRUCK-NIGHT', kind: 'SEMI', label: '配送中心长途半挂车', arrive: nightAt, dockAt: nightAt, unloadStart: nightAt + 6 * 60, leave: 0, door: Math.min(1, b.docks.length - 1), pallets: p.dcPallets });
   trucks.sort((a, c) => a.arrive - c.arrive);
 
   // ---------- 人员与设备 ----------
@@ -297,11 +302,11 @@ export function simulateInbound(model: StoreModel, runWeights: Record<string, nu
     return undefined;
   };
 
-  function drive(w: WorkerTrace, e: EquipmentTrace | undefined, pts: Pt3[], activity: string, carry?: string, speed = SPEED): number {
+  function drive(w: WorkerTrace, e: EquipmentTrace | undefined, pts: Pt3[], activity: string, carry?: string, speed = SPEED, reverseLegs = 0): number {
     const t0 = sim.now;
     const dur = len3(pts) / speed;
     seg(w.segments, { t0, t1: t0 + dur, pts, activity, carry });
-    if (e) seg(e.segments, { t0, t1: t0 + dur, pts, activity, carry });
+    if (e) seg(e.segments, reverseLegs ? { t0, t1: t0 + dur, pts, activity, carry, reverseLegs } : { t0, t1: t0 + dur, pts, activity, carry });
     const last = pts[pts.length - 1] as Pt3;
     pos.set(w.id, { ...last });
     if (e) pos.set(e.id, { ...last });
@@ -340,7 +345,8 @@ export function simulateInbound(model: StoreModel, runWeights: Record<string, nu
           let u = drive(w, eqUnload, toDock, isFork ? '叉车进车厢' : '搬运车进车厢');
           const back = flat([{ x: door.x, z: door.z + 4 }, { x: door.x, z: door.z - 2 }, { x: spot.x, z: spot.z }]);
           sim.after(u + LIFT_SEC, () => {
-            u = drive(w, eqUnload, back, isFork ? '叉车卸货' : '搬运车卸货', pr.id, isFork ? SPEED : 1.1);
+            // 叉着托盘先从车厢里倒出来（车头仍朝车厢），再开到收货区
+            u = drive(w, eqUnload, back, isFork ? '叉车卸货' : '搬运车卸货', pr.id, isFork ? SPEED : 1.1, 1);
             sim.after(u + LIFT_SEC, () => {
               pr.receivedAt = sim.now;
               pr.spot = { x: spot.x, z: spot.z };
@@ -358,8 +364,10 @@ export function simulateInbound(model: StoreModel, runWeights: Record<string, nu
                     spot.taken = false;
                   });
                 } else if (!pr.direct) waitingPutaway.push(pr);
-                if (dockTask.remaining === 0 && !docked.some((d) => d !== dockTask && d.remaining > 0)) {
+                // 这辆车卸完：8 分钟后驶离，让出卸货门（决策记录 0013）
+                if (dockTask.remaining === 0 && !dockTask.truck.leave) {
                   dockTask.truck.leave = sim.now + 8 * 60;
+                  sim.at(dockTask.truck.leave, () => releaseDoor(dockTask.truck));
                 }
                 next(w);
               });
@@ -503,15 +511,42 @@ export function simulateInbound(model: StoreModel, runWeights: Record<string, nu
     }
   }
 
-  // 车辆靠台后开始卸货
-  for (const tr of trucks) {
+  // 卸货门调度（决策记录 0013）：每个门同时只停一辆车；冷藏车优先用冷藏门，其他车优先用普通门；
+  // 没有空门时在场地里排队，前一辆车驶离后再倒车靠台
+  const doorBusy: Array<Truck | undefined> = b.docks.map(() => undefined);
+  const yard: Truck[] = [];
+  const pickDoor = (tr: Truck): number => {
+    const order = b.docks
+      .map((d, i) => ({ i, reefer: !!d.reefer }))
+      .sort((a, c) => (tr.kind === 'REEFER' ? Number(c.reefer) - Number(a.reefer) : Number(a.reefer) - Number(c.reefer)) || a.i - c.i);
+    return order.find((d) => !doorBusy[d.i])?.i ?? -1;
+  };
+  const dockTruck = (tr: Truck, door: number, at: number) => {
+    doorBusy[door] = tr;
+    tr.door = door;
+    tr.dockAt = at;
+    tr.unloadStart = at + (tr.kind === 'BOX' ? 4 : 6) * 60;
     sim.at(tr.unloadStart, () => {
       docked.push({ truck: tr, remaining: tr.pallets });
+    });
+  };
+  function releaseDoor(tr: Truck): void {
+    const i = doorBusy.indexOf(tr);
+    if (i >= 0) doorBusy[i] = undefined;
+    const nextTruck = yard.shift();
+    if (nextTruck && i >= 0) dockTruck(nextTruck, i, sim.now + 60);
+  }
+  for (const tr of trucks) {
+    sim.at(tr.arrive, () => {
+      const door = pickDoor(tr);
+      if (door >= 0) dockTruck(tr, door, sim.now);
+      else yard.push(tr);
     });
   }
   for (const w of workers) sim.at(w.shifts[0]?.[0] ?? sim.now, () => next(w));
   sim.run(p.nextOpen);
   for (const tr of trucks) if (!tr.leave) tr.leave = Math.min(p.nextOpen, tr.unloadStart + tr.pallets * 4 * 60 + 10 * 60);
+  for (const tr of trucks) if (tr.dockAt < tr.arrive) tr.dockAt = tr.arrive;
 
   progress.sort((a, c) => a[0] - c[0]);
   const received = pallets.filter((q) => q.receivedAt !== undefined);

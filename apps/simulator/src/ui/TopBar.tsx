@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { TemplateName } from '@storewright/store-config';
 import { useApp, type BuildingView, type Overlay, type Quality, type ViewMode } from '../state/store';
 import type { PolicyName } from '../sim/protocol';
@@ -5,6 +6,7 @@ import { POLICY_LABEL, TEMPLATE_LABEL } from './format';
 import { t } from '../i18n';
 import { summary } from '@storewright/ops';
 import { liveClient } from '../live/link';
+import { useYourStore } from '../extensions';
 
 const VIEWS: Array<[ViewMode, string]> = [
   ['iso', '2.5D'],
@@ -43,17 +45,28 @@ export function TopBar() {
   const buildingView = useApp((s) => s.buildingView);
   const cutPos = useApp((s) => s.cutPos);
   const timeline = useApp((s) => s.timeline);
+  const yourStoreExt = useYourStore();
   const app = useApp.getState;
+  // 手机上（窄于 600 像素）第一行只留品牌、「你的商店」和这个开关，其余控件收进下面的面板（样式里的 .tb-more）
+  const [more, setMore] = useState(false);
 
   return (
-    <header className="topbar">
+    <header className={more ? 'topbar open' : 'topbar'}>
       <div className="brand">
         <span className="logo" aria-hidden>▦</span>
         <strong>Storewright</strong>
         <span className="muted">{t('运营模拟器')}</span>
+        {yourStoreExt && (
+          <button className="your-store-btn" onClick={() => app().setYourStore(true)} title={t('从零搭建并运营自己的门店')}>
+            {t('你的商店')}
+          </button>
+        )}
       </div>
+      <button className="chip topbar-toggle" aria-expanded={more} onClick={() => setMore(!more)}>
+        <span aria-hidden>{more ? '✕' : '☰'}</span> {t('设置')}
+      </button>
 
-      <label className="field">
+      <label className="field tb-more">
         <span>{t('门店')}</span>
         <select value={custom ? 'custom' : template} disabled={mode === 'edit'} onChange={(e) => app().setTemplate(e.target.value as TemplateName)}>
           {(Object.keys(TEMPLATE_LABEL) as TemplateName[]).map((t) => (
@@ -69,7 +82,7 @@ export function TopBar() {
         </select>
       </label>
 
-      <label className="field">
+      <label className="field tb-more">
         <span>{t('策略')}</span>
         <select value={policy} onChange={(e) => app().setPolicy(e.target.value as PolicyName)}>
           {(Object.keys(POLICY_LABEL) as PolicyName[]).map((p) => (
@@ -79,11 +92,11 @@ export function TopBar() {
           ))}
         </select>
       </label>
-      <button className={ai ? 'chip active' : 'chip'} aria-pressed={ai} onClick={() => app().setAi(!ai)} title={t('AI 模块：按订单预测排班（总工时不变）、修正顾客到店时间、替代推荐')}>
+      <button className={ai ? 'chip tb-more active' : 'chip tb-more'} aria-pressed={ai} onClick={() => app().setAi(!ai)} title={t('AI 模块：按订单预测排班（总工时不变）、修正顾客到店时间、替代推荐')}>
         AI
       </button>
 
-      <div className="segmented" role="group" aria-label={t('视角')}>
+      <div className="segmented tb-more" role="group" aria-label={t('视角')}>
         {VIEWS.map(([v, label]) => (
           <button key={v} className={view === v ? 'active' : ''} onClick={() => app().setView(v)}>
             {t(label)}
@@ -92,7 +105,7 @@ export function TopBar() {
       </div>
 
       {floors.length > 1 && (
-        <div className="segmented" role="group" aria-label={t('楼层')}>
+        <div className="segmented tb-more" role="group" aria-label={t('楼层')}>
           {floors.map((f) => (
             <button key={f.id} className={floor === f.id ? 'active' : ''} onClick={() => app().setFloor(f.id)}>
               {f.name}
@@ -106,7 +119,7 @@ export function TopBar() {
         </div>
       )}
 
-      <div className="segmented" role="group" aria-label={t('建筑')}>
+      <div className="segmented tb-more" role="group" aria-label={t('建筑')}>
         {(
           [
             ['interior', '内部'],
@@ -120,20 +133,21 @@ export function TopBar() {
         ))}
       </div>
       {buildingView === 'cutaway' && (
-        <input className="cut-slider" type="range" min={5} max={95} value={Math.round(cutPos * 100)} aria-label={t('剖切位置')} onChange={(e) => app().setCutPos(Number(e.target.value) / 100)} />
+        <input className="cut-slider tb-more" type="range" min={5} max={95} value={Math.round(cutPos * 100)} aria-label={t('剖切位置')} onChange={(e) => app().setCutPos(Number(e.target.value) / 100)} />
       )}
 
-      <label className="field">
+      <label className="field tb-more">
         <span>{t('叠加层')}</span>
         <select value={overlay} onChange={(e) => app().setOverlay(e.target.value as Overlay)}>
           <option value="temp">{t('温区')}</option>
           <option value="heat">{t('拣货热度')}</option>
           <option value="stock">{t('货架存量')}</option>
+          <option value="areas">{t('区域占用')}</option>
           <option value="none">{t('无')}</option>
         </select>
       </label>
 
-      <label className="field">
+      <label className="field tb-more">
         <span>{t('画质')}</span>
         <select value={quality} onChange={(e) => app().setQuality(e.target.value as Quality)} title={t('高：实时阴影；中：无阴影；低：标准分辨率，适合性能较弱的设备')}>
           <option value="high">{t('高')}</option>
@@ -145,11 +159,11 @@ export function TopBar() {
       <div className="spacer" />
       {new URLSearchParams(location.search).get('live') === 'demo' && <EmbeddedLive />}
 
-      <span className={`status ${status}`}>
+      <span className={`status tb-more ${status}`}>
         {status === 'running' ? t('仿真中…') : status === 'error' ? t('仿真出错') : timeline ? t('{0} 单 · 仿真用时 {1} ms', timeline.orderCount, timeline.simMs.toFixed(0)) : ''}
       </span>
 
-      <div className="tour-tools" role="group" aria-label={t('导览与巡游')}>
+      <div className="tour-tools tb-more" role="group" aria-label={t('导览与巡游')}>
         <button onClick={() => app().setTourStep(0)} title={t('一步一步介绍模拟器')}>
           {t('导览')}
         </button>
@@ -158,7 +172,7 @@ export function TopBar() {
         </button>
       </div>
 
-      <div className="segmented lang-switch" role="group" aria-label="Language / 语言">
+      <div className="segmented lang-switch tb-more" role="group" aria-label="Language / 语言">
         <button className={lang === 'zh' ? 'active' : ''} onClick={() => app().setLang('zh')} lang="zh-CN">
           中文
         </button>
@@ -168,13 +182,13 @@ export function TopBar() {
       </div>
 
       {mode === 'sim' ? (
-        <button className="primary" onClick={() => app().setTab('edit')}>
+        <button className="primary tb-more" onClick={() => app().setTab('edit')}>
           {t('编辑布局')}
         </button>
       ) : (
         <>
-          <span className="badge">{t('布局编辑中 · 实时应用')}</span>
-          <button className="primary" onClick={() => app().exitEdit(true)}>
+          <span className="badge tb-more">{t('布局编辑中 · 实时应用')}</span>
+          <button className="primary tb-finish" onClick={() => app().exitEdit(true)}>
             {t('完成编辑')}
           </button>
         </>

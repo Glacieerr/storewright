@@ -150,8 +150,7 @@ export function Ground() {
           {mode === 'sim' && (
             <>
               <Html position={[geo.door.x, 2, geo.door.z]} center className="scene-label area-label">{t('交付门口')}</Html>
-              {inside(points.backroom.x) && <Html position={[points.backroom.x, backroomY + 1.5, points.backroom.y]} center className="scene-label area-label">{t('后仓')}</Html>}
-              {inside(points.staging.x + 5) && <Html position={[points.staging.x + 5, 2.6, points.staging.y + 1]} center className="scene-label area-label">{t('暂存区')}</Html>}
+              {inside(points.backroom.x) && <Html position={[points.backroom.x, backroomY + 1.5, points.backroom.y]} center className="scene-label area-label backroom-label">{t('后仓')}</Html>}
             </>
           )}
         </group>

@@ -19,7 +19,8 @@ export function PickScreen({ onDone }: { onDone: () => void }) {
 function WalkList() {
   const { client, run } = useLive();
   const now = useNow(15_000);
-  const walks = openWalks(client.state);
+  // 自动运营的批次由虚拟员工处理，不在员工手机上显示
+  const walks = openWalks(client.state).filter((w) => w.track !== 'AUTO');
   if (!walks.length) {
     return (
       <div className="empty">

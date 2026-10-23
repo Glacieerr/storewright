@@ -80,6 +80,8 @@ export function LiveProvider({ auth, children, onAuthError }: { auth: Auth; chil
       if (!id) return '';
       // 演示门店的虚拟补货员（不在员工名单里）
       if (id === 'auto-restock') return t('自动补货');
+      // 自动运营的虚拟员工：V-P1 拣货、V-S1 暂存、V-H1 交付、V-D1 司机
+      if (id.startsWith('V-')) return t('虚拟员工 {0}', id.slice(2));
       return client.statics?.roster.find((a) => a.id === id)?.name ?? id;
     };
     return {

@@ -17,6 +17,8 @@ export interface ParkingSpot {
   kind: 'pickup' | 'general';
   /** 从哪条车道驶入（aisles 下标） */
   aisle: number;
+  /** 线上取货车位的编号（门店配置了明确车位时，决策记录 0013） */
+  id?: string;
 }
 
 export interface LotLayout {
@@ -56,6 +58,8 @@ export interface LotInput {
   doubleRows?: number;
   /** 线上取货专用车位数；不给时按门店宽度估算（最多一整排） */
   pickupBays?: number;
+  /** 明确摆放的线上取货车位（编号、位置、车头朝向：度，0 = 朝门店）；给了就不用 pickupBays */
+  bays?: ReadonlyArray<{ id: string; x: number; z: number; heading: number }>;
 }
 
 export function buildLot(input: LotInput): LotLayout {
@@ -81,7 +85,8 @@ export function buildLot(input: LotInput): LotLayout {
   const pickupZ = pickupRowTop - SPOT_D / 2;
   let z = pickupRowTop - SPOT_D;
   aisles.push(z - AISLE_W / 2);
-  const pickupWanted = input.pickupBays ?? Math.min(16, Math.max(8, Math.round(width / 6)));
+  const explicit = input.bays && input.bays.length ? input.bays : undefined;
+  const pickupWanted = explicit ? 0 : (input.pickupBays ?? Math.min(16, Math.max(8, Math.round(width / 6))));
   const byDoor = Array.from({ length: perRow }, (_, i) => i).sort((a, b) => Math.abs(colX(a) - input.doorX) - Math.abs(colX(b) - input.doorX) || a - b);
   const pickupCols = new Set(byDoor.slice(0, Math.min(pickupWanted, perRow)));
   const pickup: ParkingSpot[] = [];
@@ -117,7 +122,17 @@ export function buildLot(input: LotInput): LotLayout {
   // 取货车位按离门口由近到远编号；普通车位同样按离门口的距离排序（溢出时先用近的）
   const door = { x: input.doorX, z: 0 };
   const dist = (s: ParkingSpot) => Math.hypot(s.x - door.x, s.z - door.z);
-  pickup.sort((a, b) => Math.abs(a.x - door.x) - Math.abs(b.x - door.x) || a.x - b.x);
+  if (explicit) {
+    // 明确摆放的取货车位按配置的顺序（编号）；和它们重叠的普通车位去掉；从最近的车道驶入
+    for (const b of explicit) {
+      const aisle = aisles.reduce((best, a, i) => (Math.abs(a - b.z) < Math.abs((aisles[best] ?? a) - b.z) ? i : best), 0);
+      pickup.push({ x: b.x, y: 0, z: b.z, heading: (b.heading * Math.PI) / 180, kind: 'pickup', aisle, id: b.id });
+    }
+    for (let i = general.length - 1; i >= 0; i--) {
+      const g = general[i] as ParkingSpot;
+      if (explicit.some((b) => Math.abs(b.x - g.x) < SPOT_W * 0.9 && Math.abs(b.z - g.z) < SPOT_D * 0.9)) general.splice(i, 1);
+    }
+  } else pickup.sort((a, b) => Math.abs(a.x - door.x) - Math.abs(b.x - door.x) || a.x - b.x);
   general.sort((a, b) => dist(a) - dist(b) || a.x - b.x || a.z - b.z);
   const pickupXs = pickup.map((s) => s.x);
   return {
@@ -132,7 +147,7 @@ export function buildLot(input: LotInput): LotLayout {
     pickupCount: pickup.length,
     islands,
     corrals,
-    pickupSign: { x: pickupXs.length ? (Math.min(...pickupXs) + Math.max(...pickupXs)) / 2 : input.doorX, z: pickupRowTop + 0.6 },
+    pickupSign: { x: pickupXs.length ? (Math.min(...pickupXs) + Math.max(...pickupXs)) / 2 : input.doorX, z: explicit ? Math.max(...explicit.map((b) => b.z)) + SPOT_D / 2 + 0.6 : pickupRowTop + 0.6 },
   };
 }
 
@@ -176,7 +191,44 @@ export function roundCorners(pts: Pt[], radius: number): Pt[] {
   return out;
 }
 
-/** 带累计长度和分段速度的路径，按时间取位置 */
+/** 车辆的动力学参数（米、秒）：最大加速度、减速度、过弯侧向加速度，起点 / 终点速度（'cap' = 该段限速） */
+export interface Dynamics {
+  accel?: number;
+  decel?: number;
+  lat?: number;
+  v0?: number | 'cap';
+  v1?: number | 'cap';
+  /** 轴距（米），用来算前轮转角 */
+  wheelbase?: number;
+}
+
+/** 按时间取到的车辆状态；speed / accel / steer / dist 供车轮转动、刹车灯和转向灯使用 */
+export interface PathState {
+  x: number;
+  z: number;
+  heading: number;
+  speed?: number;
+  accel?: number;
+  steer?: number;
+  dist?: number;
+}
+
+const CAR_DYN: Required<Omit<Dynamics, 'v0' | 'v1'>> = { accel: 2.2, decel: 3, lat: 2, wheelbase: 2.7 };
+const PIECE = 3;
+
+function angDiff(a: number, b: number): number {
+  let d = b - a;
+  while (d > Math.PI) d -= 2 * Math.PI;
+  while (d < -Math.PI) d += 2 * Math.PI;
+  return d;
+}
+
+/**
+ * 带速度剖面的路径（决策记录 0013）：长线段切成不超过 3 米的小段；每个顶点的速度受该段限速、
+ * 转弯处的侧向加速度（v ≤ √(a·R)）、前后的加速度和减速度约束（正向、反向各扫一遍），
+ * 段内匀加速，所以车辆会起步、刹车、过弯减速。车头朝向在顶点处平滑过渡，前轮转角 δ = atan(轴距 × 曲率)。
+ * 构造参数与原来相同（第 4 个参数可选），duration 仍然是走完全程的时间。
+ */
 export class TimedPath {
   readonly pts: Pt[];
   readonly cumT: number[];
@@ -184,37 +236,129 @@ export class TimedPath {
   readonly duration: number;
   /** 倒车：车头与行进方向相反 */
   readonly reverse: boolean;
+  private readonly v: number[];
+  private readonly h: number[];
+  private readonly wheelbase: number;
 
-  constructor(pts: Pt[], speedAt: (a: Pt, b: Pt) => number, reverse = false) {
-    this.pts = pts;
+  constructor(raw: Pt[], speedAt: (a: Pt, b: Pt) => number, reverse = false, dyn: Dynamics = {}) {
+    const d = { ...CAR_DYN, ...dyn };
     this.reverse = reverse;
-    this.cumT = [0];
+    this.wheelbase = d.wheelbase;
+    // 1. 切成小段，记下每段的限速
+    const pts: Pt[] = raw.length ? [{ ...(raw[0] as Pt) }] : [];
+    const cap: number[] = [];
+    for (let i = 1; i < raw.length; i++) {
+      const a = raw[i - 1] as Pt;
+      const b = raw[i] as Pt;
+      const len = Math.hypot(b.x - a.x, b.z - a.z);
+      const n = Math.max(1, Math.ceil(len / PIECE));
+      const limit = Math.max(0.5, speedAt(a, b));
+      for (let k = 1; k <= n; k++) {
+        pts.push({ x: a.x + ((b.x - a.x) * k) / n, z: a.z + ((b.z - a.z) * k) / n });
+        cap.push(limit);
+      }
+    }
+    this.pts = pts;
+    const n = pts.length;
     this.cumD = [0];
-    for (let i = 1; i < pts.length; i++) {
+    const len: number[] = [];
+    const head: number[] = [];
+    for (let i = 1; i < n; i++) {
       const a = pts[i - 1] as Pt;
       const b = pts[i] as Pt;
-      const d = Math.hypot(b.x - a.x, b.z - a.z);
-      this.cumD.push((this.cumD[i - 1] as number) + d);
-      this.cumT.push((this.cumT[i - 1] as number) + d / Math.max(0.5, speedAt(a, b)));
+      const l = Math.hypot(b.x - a.x, b.z - a.z);
+      len.push(l);
+      head.push(l > 1e-6 ? Math.atan2(b.x - a.x, b.z - a.z) : (head[head.length - 1] ?? 0));
+      this.cumD.push((this.cumD[i - 1] as number) + l);
     }
-    this.duration = this.cumT[this.cumT.length - 1] as number;
+    this.h = head;
+    // 2. 顶点限速：相邻两段的限速、转弯半径
+    const vmax: number[] = new Array(n).fill(0);
+    for (let j = 0; j < n; j++) {
+      let v = Math.min(cap[j - 1] ?? Infinity, cap[j] ?? Infinity);
+      if (j > 0 && j < n - 1) {
+        const turn = Math.abs(angDiff(head[j - 1] as number, head[j] as number));
+        if (turn > 1e-3) {
+          const r = ((len[j - 1] as number) + (len[j] as number)) / 2 / turn;
+          v = Math.min(v, Math.sqrt(d.lat * r));
+        }
+      }
+      vmax[j] = Number.isFinite(v) ? v : 0.5;
+    }
+    const v0 = dyn.v0 === 'cap' ? (vmax[0] as number) : (dyn.v0 ?? 0);
+    const v1 = dyn.v1 === 'cap' ? (vmax[n - 1] as number) : (dyn.v1 ?? 0);
+    if (n) {
+      vmax[0] = Math.min(vmax[0] as number, v0);
+      vmax[n - 1] = Math.min(vmax[n - 1] as number, v1);
+    }
+    // 3. 正向（加速度）、反向（减速度）各扫一遍
+    const v = [...vmax];
+    for (let j = 1; j < n; j++) v[j] = Math.min(v[j] as number, Math.sqrt((v[j - 1] as number) ** 2 + 2 * d.accel * (len[j - 1] as number)));
+    for (let j = n - 2; j >= 0; j--) v[j] = Math.min(v[j] as number, Math.sqrt((v[j + 1] as number) ** 2 + 2 * d.decel * (len[j] as number)));
+    this.v = v;
+    // 4. 每段匀加速的用时
+    this.cumT = [0];
+    for (let j = 1; j < n; j++) {
+      const a = v[j - 1] as number;
+      const b = v[j] as number;
+      const l = len[j - 1] as number;
+      const dt = l <= 1e-9 ? 0 : 2 * l / Math.max(0.3, a + b);
+      this.cumT.push((this.cumT[j - 1] as number) + dt);
+    }
+    this.duration = this.cumT[this.cumT.length - 1] ?? 0;
   }
 
-  /** 时刻 τ（0…duration）的位置与车头朝向 */
-  at(tau: number, out: { x: number; z: number; heading: number }): void {
+  /** 时刻 τ（0…duration）的位置、车头朝向，以及速度、加速度、前轮转角和已行驶距离 */
+  at(tau: number, out: PathState): void {
+    const n = this.pts.length;
+    if (n < 2) {
+      const p = this.pts[0];
+      if (p) {
+        out.x = p.x;
+        out.z = p.z;
+      }
+      out.speed = 0;
+      out.accel = 0;
+      out.steer = 0;
+      out.dist = 0;
+      return;
+    }
     const t = Math.min(this.duration, Math.max(0, tau));
-    let i = 1;
-    while (i < this.cumT.length - 1 && (this.cumT[i] as number) < t) i++;
+    // 二分查找所在的小段
+    let lo = 1;
+    let hi = n - 1;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if ((this.cumT[mid] as number) < t) lo = mid + 1;
+      else hi = mid;
+    }
+    const i = lo;
     const a = this.pts[i - 1] as Pt;
     const b = this.pts[i] as Pt;
-    const seg = (this.cumT[i] as number) - (this.cumT[i - 1] as number);
-    const k = seg > 0 ? (t - (this.cumT[i - 1] as number)) / seg : 1;
+    const t0 = this.cumT[i - 1] as number;
+    const dt = (this.cumT[i] as number) - t0;
+    const va = this.v[i - 1] as number;
+    const vb = this.v[i] as number;
+    const l = (this.cumD[i] as number) - (this.cumD[i - 1] as number);
+    const u = t - t0;
+    const acc = dt > 0 ? (vb - va) / dt : 0;
+    const sIn = dt > 0 ? Math.min(l, va * u + 0.5 * acc * u * u) : l;
+    const k = l > 1e-9 ? sIn / l : 1;
     out.x = a.x + (b.x - a.x) * k;
     out.z = a.z + (b.z - a.z) * k;
-    if (Math.abs(b.x - a.x) + Math.abs(b.z - a.z) > 1e-6) {
-      const h = Math.atan2(b.x - a.x, b.z - a.z);
-      out.heading = this.reverse ? h + Math.PI : h;
-    }
+    // 车头朝向：在相邻两段方向的中间值之间插值（连续，没有跳变）
+    const hp = this.h[i - 2] ?? (this.h[i - 1] as number);
+    const hc = this.h[i - 1] as number;
+    const hn = this.h[i] ?? hc;
+    const start = hp + angDiff(hp, hc) / 2;
+    const end = hc + angDiff(hc, hn) / 2;
+    const hh = start + angDiff(start, end) * k;
+    out.heading = this.reverse ? hh + Math.PI : hh;
+    out.speed = dt > 0 ? va + acc * u : 0;
+    out.accel = acc;
+    const kappa = l > 1e-6 ? angDiff(start, end) / l : 0;
+    out.steer = Math.atan(this.wheelbase * kappa) * (this.reverse ? -1 : 1);
+    out.dist = (this.cumD[i - 1] as number) + sIn;
   }
 }
 
@@ -256,7 +400,7 @@ export function entryPath(lot: LotLayout, road: RoadAccess, spot: ParkingSpot, f
     ],
     3,
   );
-  return new TimedPath(pts, (a, b) => (Math.max(a.z, b.z) < lot.edgeZ - 1 ? ROAD_SPEED : LOT_SPEED));
+  return new TimedPath(pts, (a, b) => (Math.max(a.z, b.z) < lot.edgeZ - 1 ? ROAD_SPEED : LOT_SPEED), false, { v0: 'cap' });
 }
 
 /** 离开：先倒车退出车位，再沿车道开到较远一侧的出入口并驶离 */
@@ -293,6 +437,8 @@ export function exitPaths(lot: LotLayout, road: RoadAccess, spot: ParkingSpot, t
       3,
     ),
     (a, b) => (Math.max(a.z, b.z) < lot.edgeZ - 1 ? ROAD_SPEED : LOT_SPEED),
+    false,
+    { v1: 'cap' },
   );
   return [back, drive];
 }

@@ -10,6 +10,9 @@ import { Ground } from './Ground';
 import { Shelves } from './Shelves';
 import { Staging } from './Staging';
 import { Associates, BackroomCrew, framePositions } from './Actors';
+import { LiveFleet } from './LiveFleet';
+import { DockDoors } from './DockDoors';
+import { Areas } from './Areas';
 import { Warehouse } from './Warehouse';
 import { Shoppers } from './InStoreShoppers';
 import { Surroundings } from './Surroundings';
@@ -244,6 +247,8 @@ export function Scene() {
       <Staging />
       {!liveOnly && <Associates />}
       {!liveOnly && <BackroomCrew />}
+      <Areas />
+      <DockDoors />
       <Warehouse />
       {!liveOnly && <Shoppers />}
       <AutoServiceCenters />
@@ -253,7 +258,9 @@ export function Scene() {
       <BuildingShell />
       <IncidentFx />
       <WeatherFx />
-      {!liveOnly && <Vehicles />}
+      {/* 门店实况：只显示背景车流和实况里的车辆（顾客、配送司机、到货车） */}
+      {liveOnly ? <Vehicles trafficOnly /> : <Vehicles />}
+      {liveOnly && <LiveFleet />}
       <StreetPedestrians />
       {!liveOnly && <CartAttendants />}
       <StoreDetails />

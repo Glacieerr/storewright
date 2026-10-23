@@ -303,3 +303,22 @@ describe('路边行人与购物车回收', () => {
     expect(plan.pickups.every((p) => p.t >= firstDeposit)).toBe(true);
   });
 });
+
+describe('explicit pickup bays (decision 0013)', () => {
+  it('uses the configured bays in their order, with ids and headings; general spots stay clear of them', () => {
+    const bays = [
+      { id: 'A', x: 30, z: -11.7, heading: 0 },
+      { id: 'B', x: 33, z: -11.7, heading: 0 },
+      { id: 'C', x: -2, z: 8, heading: 90 },
+    ];
+    const lot = buildLot({ storeMinX: 0, storeMaxX: 74, doorX: 66, bays });
+    expect(lot.pickupCount).toBe(3);
+    expect(lot.spots.slice(0, 3).map((s) => [s.id, s.x, s.z, s.kind])).toEqual([
+      ['A', 30, -11.7, 'pickup'],
+      ['B', 33, -11.7, 'pickup'],
+      ['C', -2, 8, 'pickup'],
+    ]);
+    expect(lot.spots[2]?.heading).toBeCloseTo(Math.PI / 2);
+    for (const g of lot.spots.slice(3)) for (const b of bays) expect(Math.abs(g.x - b.x) < SPOT_W * 0.9 && Math.abs(g.z - b.z) < SPOT_D * 0.9).toBe(false);
+  });
+});

@@ -87,6 +87,8 @@ export function planServiceVisits(fac: FacilityGeometry, lot: LotLayout, road: R
           3,
         ),
         speed,
+        false,
+        { v0: 'cap' },
       );
       wait = { x: slotX, z: fire, heading: Math.atan2(-outward, 0) };
       toBay = new TimedPath(
@@ -127,6 +129,8 @@ export function planServiceVisits(fac: FacilityGeometry, lot: LotLayout, road: R
         3,
       ),
       speed,
+      false,
+      { v1: 'cap' },
     );
     out.push({ job, entry, wait, toBay, back, drive, bay });
   }

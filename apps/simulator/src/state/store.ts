@@ -15,7 +15,7 @@ export type ViewMode = 'iso' | '3d' | 'top';
 export type CameraCmd = 'in' | 'out' | 'reset' | 'rotateLeft' | 'rotateRight' | 'front' | 'side' | 'bird' | 'street';
 export type DataTab = 'live' | 'compare' | 'report' | 'events' | 'edit' | 'ops';
 export type SplitOrder = 'scene-left' | 'scene-right';
-export type Overlay = 'temp' | 'heat' | 'stock' | 'none';
+export type Overlay = 'temp' | 'heat' | 'stock' | 'areas' | 'none';
 export type AppMode = 'sim' | 'edit';
 /** 画质：高 = 阴影 + 高分辨率，中 = 无阴影，低 = 无阴影 + 标准分辨率 */
 export type Quality = 'high' | 'medium' | 'low';
@@ -56,6 +56,11 @@ interface AppState {
   view: ViewMode;
   floor: string;
   overlay: Overlay;
+  /** 编辑器里选中的区域（场景里只显示它的拖拽把手） */
+  areaSel?: string;
+  /** 「你的商店」：打开着的门店项目、项目页是否显示（决策记录 0013） */
+  project?: { id: string; name: string };
+  yourStore: boolean;
   mode: AppMode;
   selection?: Selection;
   focus?: Focus;
@@ -169,6 +174,10 @@ interface AppState {
   setView(v: ViewMode): void;
   setFloor(f: string): void;
   setOverlay(o: Overlay): void;
+  setAreaSel(id: string | undefined): void;
+  setYourStore(open: boolean): void;
+  openProject(p: { id: string; name: string; config: StoreConfig; sizing?: { ordersPerDay: number; staffScale: number } }, edit?: boolean): void;
+  closeProject(): void;
   select(s?: Selection): void;
   focusOn(x: number, y: number, z: number): void;
   setDemandFactor(f: number): void;
@@ -413,6 +422,40 @@ export const useApp = create<AppState>((set, get) => ({
   },
   setOverlay(o) {
     set({ overlay: o });
+  },
+  setAreaSel(id) {
+    set({ areaSel: id });
+  },
+  yourStore: false,
+  setYourStore(open) {
+    set({ yourStore: open });
+  },
+  openProject(p, edit = false) {
+    if (get().mode === 'edit') get().exitEdit(false);
+    const config = cloneConfig(p.config);
+    // 日订单量和排班按门店规模（与生成器相同的规则），需求的时段分布取最接近的模板
+    const aisles = config.layout.runs.filter((r) => r.kind === 'AISLE').length;
+    const size: TemplateName = config.industry === 'HARDWARE' ? 'hardware' : aisles <= 11 ? 'small' : aisles <= 23 ? 'medium' : 'large';
+    const s = storeSizing(aisles);
+    const sizing = p.sizing ?? { ordersPerDay: s.ordersPerDay, staffScale: s.staffScale };
+    set({
+      project: { id: p.id, name: p.name },
+      yourStore: false,
+      template: size,
+      sizing,
+      staffing: shiftStaffing(scaledStaffing(sizing.staffScale), config.hours.openMin, config.hours.closeMin),
+      demandFactor: 1,
+      config,
+      ...derive(config),
+      floor: 'F1',
+      selection: undefined,
+    });
+    void get().simulate();
+    if (edit) get().enterEdit();
+  },
+  closeProject() {
+    if (get().mode === 'edit') get().exitEdit(true);
+    set({ project: undefined, yourStore: true });
   },
   select(s) {
     set({ selection: s, follow: s && get().follow === s.id ? get().follow : undefined });

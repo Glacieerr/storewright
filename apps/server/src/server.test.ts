@@ -91,6 +91,10 @@ describe('后端：命令、推送与同步', () => {
     expect(created.status).toBe(200);
     const { orderId, code } = created.body.orders[0] as { orderId: string; code: string };
     await until(() => Object.keys(v.state.walks).length > 0 && v.state.orders[orderId]?.status === 'LOCKED');
+    // 拣货员和交付员的客户端也要收到同样多的事件：负载高时拣货员的客户端可能还差一个批次，
+    // 那个批次的框没拣，后面暂存就会被拒绝（偶发失败的原因）
+    const seen = v.state.seq;
+    await until(() => a.state.seq >= seen && h.state.seq >= seen);
     // 拣货
     for (const w of Object.values(a.state.walks).filter((x) => x.toteIds.some((id) => a.state.totes[id]?.orderId === orderId))) {
       expect((await a.send({ type: 'ClaimWalk', walkId: w.id })).ok).toBe(true);

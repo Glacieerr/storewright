@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { Html } from '@react-three/drei';
 import { useFrame, type ThreeEvent } from '@react-three/fiber';
-import { moveStaging, type StoreConfig } from '@storewright/store-config';
+import { moveArea, moveDock, moveStaging, resizeArea, storeAreas, type StoreConfig } from '@storewright/store-config';
+import { AREA_NAME } from '../ui/areaNames';
 import { useApp } from '../state/store';
 import { activeControls, handleState } from './drag';
 import { customerEntrance } from './crowd';
@@ -41,6 +42,7 @@ function frontCorridor(d: StoreConfig): { x0: number; x1: number; y: number } | 
 export function Handles() {
   const mode = useApp((s) => s.mode);
   const draft = useApp((s) => s.draft);
+  const areaSel = useApp((s) => s.areaSel);
   const geo = useApp((s) => s.geo);
   const model = useApp((s) => s.model);
   const [drag, setDrag] = useState<{ id: string; x: number; z: number } | undefined>();
@@ -148,8 +150,33 @@ export function Handles() {
         },
       });
     }
+    // 区域（决策记录 0013）：选中的区域显示移动把手（中间）和改大小把手（右后角）；卸货门沿后墙左右拖动
+    const sa = storeAreas(draft);
+    const sel = sa.areas.find((a) => a.id === areaSel);
+    if (sel) {
+      const cx = (sel.x0 + sel.x1) / 2;
+      const cz = (sel.z0 + sel.z1) / 2;
+      const name = sel.label || AREA_NAME[sel.kind] || sel.kind;
+      out.push({ id: `area-move-${sel.id}`, label: name, color: '#2f6f9f', x: cx, z: cz, min: f0.minX - 40, max: f0.maxX + 40, free: { zMin: f0.minZ - 20, zMax: f0.maxZ + 20 }, commit: (d, x, z) => moveArea(d, sel.id, x - cx, z - cz) });
+      out.push({ id: `area-size-${sel.id}`, label: '改大小', color: '#8c5fb8', x: sel.x1, z: sel.z1, min: sel.x0 + 1, max: f0.maxX + 40, free: { zMin: sel.z0 + 1, zMax: f0.maxZ + 20 }, commit: (d, x, z) => resizeArea(d, sel.id, x, z) });
+    }
+    // 选中的线上取货车位：自由拖动（决策记录 0013）
+    if (areaSel?.startsWith('bay:')) {
+      const id = areaSel.slice(4);
+      const b = draft.parking?.pickupBays?.find((x) => x.id === id);
+      if (b) out.push({ id: `bay-${id}`, label: `取货车位`, color: '#ee8a35', x: b.x, z: b.z, min: f0.minX - 60, max: f0.maxX + 60, free: { zMin: -80, zMax: f0.maxZ + 20 }, commit: (d, x, z) => {
+        const q = d.parking?.pickupBays?.find((k) => k.id === id);
+        if (q) {
+          q.x = Math.round(x * 10) / 10;
+          q.z = Math.round(z * 10) / 10;
+        }
+      } });
+    }
+    for (const dk of sa.docks) {
+      out.push({ id: `dock-${dk.id}`, label: '卸货门', color: '#5c636a', x: dk.x, z: dk.z + 2.5, min: 2, max: (draft.layout.floors.find((f) => f.level === 0)?.widthM ?? f0.maxX) - 2, commit: (d, x) => moveDock(d, dk.id, x) });
+    }
     return out;
-  }, [draft, geo, model]);
+  }, [draft, geo, model, areaSel]);
 
   // 拖动中：每帧用指针射线与地面求交，得到把手的新位置
   useFrame(({ pointer, camera, raycaster }) => {

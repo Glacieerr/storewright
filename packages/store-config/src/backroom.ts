@@ -1,4 +1,5 @@
 import type { StoreConfig } from './schema';
+import { RACK, rackRowsIn, storeAreas } from './areas';
 
 /**
  * 后仓（库存仓库）布局：由门店配置推导，供仿真引擎和模拟器共用。
@@ -21,6 +22,8 @@ export interface BackroomLocation {
   z: number;
   /** 货位离地高度（米） */
   y: number;
+  /** 所在区域（货架区） */
+  areaId: string;
 }
 
 export interface BackroomLayout {
@@ -33,49 +36,41 @@ export interface BackroomLayout {
   /** 货架区与收货区之间的纵向主通道 x */
   mainAisleX: number;
   locations: BackroomLocation[];
-  docks: Array<{ x: number; z: number }>;
+  docks: Array<{ x: number; z: number; reefer?: boolean }>;
   /** 后仓与店内行走网络的连接点（配置中的 backroom 点） */
   entry: { x: number; z: number };
   capacity: number;
   levels: number;
 }
 
-const BAY_W = 2.7;
-const RACK_D = 2.4;
-const AISLE_D = 3.6;
-const LEVEL_H = 1.5;
+const { BAY_W, RACK_D, LEVEL_H } = RACK;
 
+/**
+ * 后仓布局：托盘货架排在「货架区」类型的区域里（可以有多块），卸货门和收货区来自区域与卸货门配置（决策记录 0013）。
+ * 没有明确给出区域时，默认区域与原来一致，只是超市的后仓左端分出了冷藏库和冷冻库、建材店分出了大件区。
+ */
 export function backroomLayout(config: StoreConfig): BackroomLayout {
   const br = config.backroom;
-  const f1 = config.layout.floors.find((f) => f.level === 0) ?? config.layout.floors[0];
-  const width = f1?.widthM ?? 60;
-  const depth = f1?.depthM ?? 40;
-  const f1Runs = config.layout.runs.filter((r) => r.floorId === (f1?.id ?? 'F1'));
-  const backWall = Math.max(...f1Runs.map((r) => Math.max(r.start.y, r.end.y)), 0);
-  const stagingX = config.layout.points.staging.x;
-  const entry = { x: config.layout.points.backroom.x, z: config.layout.points.backroom.y };
-
-  // 卸货门：后墙右侧，间隔 5 米
-  const docks = Array.from({ length: br.docks }, (_, k) => ({ x: width - 3 - k * 5, z: depth }));
-  const receiving = { x0: Math.min(stagingX - 8, width - 3 - (br.docks - 1) * 5 - 4), x1: width - 1, z0: Math.max(backWall + 2.4, depth - 9), z1: depth - 0.5 };
-  const zone = { x0: 1.5, x1: Math.max(4, receiving.x0 - 4), z0: backWall + 2.4, z1: depth - 0.6 };
-  const mainAisleX = zone.x1 + 1.8;
-
-  // 货架排：从后墙（z1）往前排，第一排靠墙只有一面
-  const zoneDepth = zone.z1 - zone.z0;
-  const fit = zoneDepth >= RACK_D / 2 + AISLE_D ? Math.max(1, Math.floor((zoneDepth - RACK_D / 2) / (RACK_D + AISLE_D)) + 1) : 0;
-  const rowsWanted = br.rackRows > 0 ? Math.min(br.rackRows, fit) : fit;
-  const bays = Math.max(0, Math.floor((zone.x1 - zone.x0 - 4) / BAY_W));
+  const { areas, docks, frame } = storeAreas(config);
+  const rackAreas = areas.filter((a) => a.kind === 'RACKS' || a.kind === 'OVERSTOCK');
+  const zone = rackAreas.length
+    ? { x0: Math.min(...rackAreas.map((a) => a.x0)), x1: Math.max(...rackAreas.map((a) => a.x1)), z0: Math.min(...rackAreas.map((a) => a.z0)), z1: Math.max(...rackAreas.map((a) => a.z1)) }
+    : frame.zone;
+  const recv = areas.filter((a) => a.kind === 'UNLOAD' || a.kind === 'RECEIVING_HOLD');
+  const receiving = recv.length
+    ? { x0: Math.min(...recv.map((a) => a.x0)), x1: Math.max(...recv.map((a) => a.x1)), z0: Math.min(...recv.map((a) => a.z0)), z1: Math.max(...recv.map((a) => a.z1)) }
+    : frame.receiving;
   const rows: BackroomLayout['rows'] = [];
   const aisles: number[] = [];
-  for (let i = 0; i < rowsWanted; i++) {
-    const singleSided = i === 0;
-    const z = singleSided ? zone.z1 - RACK_D / 4 - 0.1 : zone.z1 - RACK_D / 2 - i * (RACK_D + AISLE_D) + RACK_D / 4;
-    if (z - RACK_D / 2 - AISLE_D < zone.z0 - 0.01) break;
-    rows.push({ z, x0: zone.x0 + 2, x1: zone.x0 + 2 + bays * BAY_W, bays, singleSided });
-    aisles.push(z - (singleSided ? RACK_D / 4 : RACK_D / 2) - AISLE_D / 2);
+  const rowArea: string[] = [];
+  for (const a of rackAreas) {
+    // 靠着后墙的货架区第一排只有一面
+    for (const r of rackRowsIn(a, a.z1 >= frame.depth - 1.2)) {
+      rows.push({ z: r.z, x0: r.x0, x1: r.x1, bays: r.bays, singleSided: r.singleSided });
+      aisles.push(r.aisle);
+      rowArea.push(a.id);
+    }
   }
-
   const locations: BackroomLocation[] = [];
   rows.forEach((r, ri) => {
     for (let b = 0; b < r.bays; b++) {
@@ -90,12 +85,24 @@ export function backroomLayout(config: StoreConfig): BackroomLayout {
             x: r.x0 + (b + 0.5) * BAY_W,
             z: r.z + side * (r.singleSided ? 0 : RACK_D / 4),
             y: l * LEVEL_H,
+            areaId: rowArea[ri] as string,
           });
         }
       }
     }
   });
-  return { zone, receiving, rows, aisles, mainAisleX, locations, docks, entry, capacity: locations.length, levels: br.rackLevels };
+  return {
+    zone,
+    receiving,
+    rows,
+    aisles,
+    mainAisleX: zone.x1 + 1.8,
+    locations,
+    docks: docks.map((d) => ({ x: d.x, z: d.z, reefer: d.reefer })),
+    entry: frame.entry,
+    capacity: locations.length,
+    levels: br.rackLevels,
+  };
 }
 
 /**

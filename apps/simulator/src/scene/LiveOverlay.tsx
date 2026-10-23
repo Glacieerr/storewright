@@ -35,7 +35,8 @@ export function LiveOverlay() {
   const people: Array<{ id: string; name: string; role: string; x: number; y: number; z: number }> = [];
   for (const [id, a] of Object.entries(s.activity)) {
     if (!a.lastScanAt || sNow - a.lastScanAt > STALE_MS) continue;
-    const who = st.roster.find((r) => r.id === id);
+    // 自动运营的虚拟员工（V-P1 拣货、V-S1 暂存、V-H1 交付）不在员工名单里
+    const who = st.roster.find((r) => r.id === id) ?? virtualWorker(id);
     if (!who) continue;
     let p: { x: number; y: number; z: number } | undefined;
     if (a.lastLocationId) {
@@ -70,8 +71,9 @@ export function LiveOverlay() {
         </group>
       ))}
       {arrivals.map((r, i) => {
+        // 车位编号：门店配置了明确车位时按编号找，否则按序号（1 = 离交付门最近）
         const bayNo = Number(r.bay);
-        const spot = Number.isInteger(bayNo) && bayNo >= 1 ? bays[bayNo - 1] : undefined;
+        const spot = bays.find((b) => b.id !== undefined && b.id === r.bay) ?? (Number.isInteger(bayNo) && bayNo >= 1 ? bays[bayNo - 1] : undefined);
         const x = spot?.x ?? geo.lot.pickupSign.x + 3 + i * 3;
         const z = spot?.z ?? geo.lot.pickupSign.z - 4;
         const color = BOARD_COLOR[r.color];
@@ -81,10 +83,6 @@ export function LiveOverlay() {
               <ringGeometry args={[1.5, 1.9, 40]} />
               <meshBasicMaterial color={color} transparent opacity={0.9} side={THREE.DoubleSide} depthWrite={false} />
             </mesh>
-            <mesh position={[0, 0.7, 0]}>
-              <boxGeometry args={[1.8, 1.2, 4.2]} />
-              <meshStandardMaterial color={color} transparent opacity={0.55} />
-            </mesh>
             <Html position={[0, 2.4, 0]} center className="scene-label live-label car" zIndexRange={[20, 0]}>
               {r.kind === 'TRIP' ? t('行程 {0}', r.title) : (r.shortCode ?? r.title)} · {Math.floor(r.waitSec / 60)}:{String(r.waitSec % 60).padStart(2, '0')}
             </Html>
@@ -93,4 +91,9 @@ export function LiveOverlay() {
       })}
     </group>
   );
+}
+
+function virtualWorker(id: string): { id: string; name: string; role: string } | undefined {
+  const role = id.startsWith('V-') ? ({ P: 'PICK', S: 'STAGE', H: 'HANDOFF' } as Record<string, string>)[id.charAt(2)] : undefined;
+  return role ? { id, name: id, role } : undefined;
 }

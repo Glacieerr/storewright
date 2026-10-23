@@ -4,7 +4,6 @@ import { useThree } from '@react-three/fiber';
 import { useApp } from '../state/store';
 import { FLOOR_HEIGHT, type FloorBounds } from './layout';
 import { customerEntrance } from './crowd';
-import { backroomLayout } from '@storewright/store-config';
 import { toonGradient } from './toon';
 
 /**
@@ -120,9 +119,7 @@ export function BuildingShell() {
         }
       }
     });
-    // 卸货门（一楼后墙）
-    const f0 = floors[0];
-    if (f0) for (const d of backroomLayout(model.config).docks) out.push({ x: d.x, y: 0, z: f0.maxZ + 0.2, w: 3.2, h: 3.4, d: 0.1, color: '#7f8c96' });
+    // 卸货门由 DockDoors 画（卷帘门随靠台车辆升降）
     // 汽车服务中心：外墙与屋顶（正面是卷帘门工位，保持敞开）
     for (const fac of geo.facilities) {
       const w = fac.x1 - fac.x0;

@@ -1,5 +1,5 @@
 import { caseId, createRng, gtin14, type Item, type TempZone } from '@storewright/domain';
-import { backroomLayout, type StoreModel } from '@storewright/store-config';
+import { backroomLayout, storeAreas, type StoreModel } from '@storewright/store-config';
 import { classifyAbc, suggestBins, type AbcClass, type BinRule, type InventoryStatus } from './replenish';
 
 /**
@@ -15,6 +15,8 @@ export interface BinInfo {
   /** 存储分区：大类分区，CHEM 为化学品隔离区 */
   area: string;
   capacityCases: number;
+  /** 所在区域（决策记录 0013）：货架区、冷藏库、冷冻库、待检区…… */
+  areaId?: string;
 }
 
 export type DisplayMethod = 'PUSHER' | 'STACK' | 'HANG' | 'BULK';
@@ -117,24 +119,49 @@ export function buildBins(model: StoreModel): BinInfo[] {
   let i = 0;
   shares.forEach(([area, share], k) => {
     const n = k === shares.length - 1 ? locs.length - i : Math.max(1, Math.round(locs.length * share));
-    for (const l of locs.slice(i, i + n)) bins.push({ code: l.id, tempZone: 'AMBIENT', status: 'SELLABLE', area, capacityCases: 60 });
+    for (const l of locs.slice(i, i + n)) bins.push({ code: l.id, tempZone: 'AMBIENT', status: 'SELLABLE', area, capacityCases: 60, areaId: l.areaId });
     i += n;
   });
-  if (!hw) {
-    for (let k = 1; k <= 12; k++) bins.push({ code: `CLR-${String(k).padStart(2, '0')}`, tempZone: 'CHILLED', status: 'SELLABLE', area: 'COLD', capacityCases: 30 });
-    for (let k = 1; k <= 10; k++) bins.push({ code: `FRZ-${String(k).padStart(2, '0')}`, tempZone: 'FROZEN', status: 'SELLABLE', area: 'FROZEN', capacityCases: 30 });
+  // 冷藏库、冷冻库：每个区域按容量切成 30 箱一个的库位（默认冷藏 12 个、冷冻 10 个）
+  const { areas } = storeAreas(model.config);
+  const cold: Array<['COOLER' | 'FREEZER', string, 'CHILLED' | 'FROZEN', string]> = [
+    ['COOLER', 'CLR', 'CHILLED', 'COLD'],
+    ['FREEZER', 'FRZ', 'FROZEN', 'FROZEN'],
+  ];
+  for (const [kind, prefix, tempZone, area] of cold) {
+    let k = 0;
+    for (const a of areas.filter((x) => x.kind === kind)) {
+      const n = Math.max(1, Math.round(a.capacity / 30));
+      for (let j = 0; j < n; j++) bins.push({ code: `${prefix}-${String(++k).padStart(2, '0')}`, tempZone, status: 'SELLABLE', area, capacityCases: 30, areaId: a.id });
+    }
   }
-  const zones = hw
+  // 大件区（建材店的板材、建材地面堆放）
+  let bulk = 0;
+  for (const a of areas.filter((x) => x.kind === 'BULK')) {
+    const n = Math.max(1, Math.round(a.capacity / 10));
+    for (let j = 0; j < n; j++) bins.push({ code: `BLK-${String(++bulk).padStart(2, '0')}`, tempZone: 'AMBIENT', status: 'SELLABLE', area: 'BULK', capacityCases: 40, areaId: a.id });
+  }
+  // 待检、退供应商、报废：每个温区一个库位，放在对应的区域里（报废放在纸箱回收 / 垃圾区）
+  const hasCold = areas.some((x) => x.kind === 'COOLER' || x.kind === 'FREEZER');
+  const zones = hw && !hasCold
     ? ([['AMB', 'AMBIENT']] as const)
     : ([
         ['AMB', 'AMBIENT'],
         ['CHL', 'CHILLED'],
         ['FRZ', 'FROZEN'],
       ] as const);
+  const areaOf = (kind: string) => areas.find((x) => x.kind === kind)?.id;
+  const holds: Array<['QA' | 'RTV' | 'SCRAP', string | undefined]> = [
+    ['QA', areaOf('QA')],
+    ['RTV', areaOf('RTV')],
+    ['SCRAP', areaOf('BALER')],
+  ];
   for (const [code, zone] of zones) {
-    bins.push({ code: `QA-${code}`, tempZone: zone, status: 'QA', area: 'QA', capacityCases: 80 });
-    bins.push({ code: `RTV-${code}`, tempZone: zone, status: 'RTV', area: 'RTV', capacityCases: 80 });
-    bins.push({ code: `SCRAP-${code}`, tempZone: zone, status: 'SCRAP', area: 'SCRAP', capacityCases: 80 });
+    for (const [status, areaId] of holds) {
+      const b: BinInfo = { code: `${status}-${code}`, tempZone: zone, status, area: status, capacityCases: 80 };
+      if (areaId) b.areaId = areaId;
+      bins.push(b);
+    }
   }
   return bins;
 }

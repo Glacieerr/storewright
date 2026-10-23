@@ -1,5 +1,5 @@
 import type { TempZone } from '@storewright/domain';
-import { STAGING_COL_PITCH, STAGING_PER_COLUMN, STAGING_ROW_PITCH, stagingRackLength, type RunConfig, type StagingSlot, type StoreModel } from '@storewright/store-config';
+import { storeAreas, type ResolvedArea, type ResolvedDock, type RunConfig, type StagingSlot, type StoreModel } from '@storewright/store-config';
 import { buildLot, OVERFLOW_RESERVE, type LotLayout, type ParkingSpot } from './lot';
 
 /**
@@ -128,6 +128,9 @@ export interface StoreGeometry {
   shelves: ShelfInstance[];
   racks: RackLayout[];
   slots: Map<string, SlotPosition>;
+  /** 区域与卸货门（决策记录 0013） */
+  areas: ResolvedArea[];
+  docks: ResolvedDock[];
   /** 停车位：先是线上取货专用车位（按离门口由近到远），再是普通车位 */
   parking: ParkingSpot[];
   lot: LotLayout;
@@ -215,25 +218,12 @@ export function buildGeometry(model: StoreModel): StoreGeometry {
     runLabels.push({ runId: run.id, label: run.label ?? run.id, floorId: run.floorId, x: run.start.x, y: y + 2.4, z: run.start.y - 0.8 * Math.sign(uy || 1), tempZone: run.tempZone });
   }
 
-  // 暂存区：货架按区域分组，从暂存点向店内排成若干列
+  // 暂存区：货架位置来自门店配置（明确给出的位置、所在区域，或从暂存点往店内排开的默认网格，决策记录 0013）
   const sp = cfg.layout.points.staging;
   const stagingY = floorY.get(sp.floorId) ?? 0;
-  const order = ['AMB', 'GM', 'CHL', 'FRZ', 'HOT', 'OVS', 'RCV'];
-  const rank = (code: string) => {
-    const i = order.indexOf(code);
-    return i < 0 ? order.length : i;
-  };
-  const racksCfg = [...cfg.staging.racks].sort((a, b) => rank(a.zoneCode) - rank(b.zoneCode) || a.rackNo - b.rackNo);
-  const racks: RackLayout[] = [];
+  const sa = storeAreas(cfg);
+  const racks: RackLayout[] = sa.racks.map((r) => ({ rackId: r.rackId, zoneCode: r.zoneCode, tempZone: r.tempZone, purpose: r.purpose, x: r.x, z: r.z, length: r.length, levels: r.levels, slotsPerLevel: r.slotsPerLevel }));
   const slots = new Map<string, SlotPosition>();
-  racksCfg.forEach((r, i) => {
-    const col = Math.floor(i / STAGING_PER_COLUMN);
-    const row = i % STAGING_PER_COLUMN;
-    const length = stagingRackLength(r.slotsPerLevel);
-    const x = sp.x + 3 + col * STAGING_COL_PITCH + length / 2;
-    const z = sp.y + 2 + row * STAGING_ROW_PITCH;
-    racks.push({ rackId: r.id, zoneCode: r.zoneCode, tempZone: r.tempZone, purpose: r.purpose, x, z, length, levels: r.levels, slotsPerLevel: r.slotsPerLevel });
-  });
   const rackById = new Map(racks.map((r) => [r.rackId, r]));
   for (const s of model.stagingSlots) {
     const r = rackById.get(s.rackId);
@@ -259,13 +249,23 @@ export function buildGeometry(model: StoreModel): StoreGeometry {
   const floors: FloorBounds[] = cfg.layout.floors.map((f) => {
     let maxX = f.widthM;
     let maxZ = f.depthM;
+    let minX = 0;
+    let minZ = 0;
     if (f.id === sp.floorId) {
       for (const r of racks) {
         maxX = Math.max(maxX, r.x + r.length / 2 + 2);
         maxZ = Math.max(maxZ, r.z + 2);
       }
     }
-    return { floorId: f.id, level: f.level, y: f.level * FLOOR_HEIGHT, minX: 0, maxX, minZ: 0, maxZ };
+    // 区域画在建筑里：楼层轮廓包住这一层的全部区域
+    for (const a of sa.areas) {
+      if (a.floorId !== f.id) continue;
+      maxX = Math.max(maxX, a.x1 + 1);
+      maxZ = Math.max(maxZ, a.z1 + 0.6);
+      minX = Math.min(minX, a.x0 - 1);
+      minZ = Math.min(minZ, a.z0 - 1);
+    }
+    return { floorId: f.id, level: f.level, y: f.level * FLOOR_HEIGHT, minX, maxX, minZ, maxZ };
   });
   const f0 = floors[0] as FloorBounds;
   // 附属设施建在门店一侧，正面与门店对齐；停车场覆盖门店和设施的正面
@@ -315,7 +315,7 @@ export function buildGeometry(model: StoreModel): StoreGeometry {
   }
   const minX = Math.min(f0.minX, ...facilities.map((f) => f.x0), ...gardens.map((g) => g.x0));
   const maxX = Math.max(f0.maxX, ...facilities.map((f) => f.x1), ...gardens.map((g) => g.x1));
-  const lot = buildLot({ storeMinX: minX, storeMaxX: maxX, doorX: door.x, doubleRows: cfg.outdoor.parkingRows || undefined, pickupBays: cfg.outdoor.pickupBays || undefined });
+  const lot = buildLot({ storeMinX: minX, storeMaxX: maxX, doorX: door.x, doubleRows: cfg.outdoor.parkingRows || undefined, pickupBays: cfg.outdoor.pickupBays || undefined, bays: cfg.parking?.pickupBays });
   for (const fac of facilities) {
     fac.waitingSpots = lot.spots
       .map((s, i) => ({ s, i }))
@@ -359,6 +359,8 @@ export function buildGeometry(model: StoreModel): StoreGeometry {
     shelves,
     racks,
     slots,
+    areas: sa.areas,
+    docks: sa.docks,
     parking,
     lot,
     facilities,

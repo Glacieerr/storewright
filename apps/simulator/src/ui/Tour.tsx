@@ -22,8 +22,9 @@ interface Step {
 const SEEN_KEY = 'storewright.tour.seen';
 
 export function tourSeen(): boolean {
-  // 嵌在展示页里（浏览器内演示）时不弹导览邀请
-  if (new URLSearchParams(location.search).get('live') === 'demo') return true;
+  // 嵌在展示页里（门店实况、全天仿真）时不弹导览邀请
+  const q = new URLSearchParams(location.search);
+  if (q.get('live') === 'demo' || q.get('autoplay') === '1') return true;
   try {
     return window.localStorage.getItem(SEEN_KEY) === '1';
   } catch {

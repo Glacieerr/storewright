@@ -1,16 +1,17 @@
 import { useState } from 'react';
 import { t } from '../i18n';
 import { useLive } from '../live';
-import { roleOf } from '@storewright/ops';
+import { areaUsage, roleOf } from '@storewright/ops';
+import { AreaBoard } from './inventory/AreaView';
 import { CountView, PutAwayView, ReceiveView } from './inventory/BackroomViews';
 import { ExceptionView } from './inventory/ExceptionView';
 import { ReplenishView } from './inventory/ReplenishView';
 
-type Section = 'repl' | 'exception' | 'receive' | 'putaway' | 'count';
+type Section = 'repl' | 'exception' | 'receive' | 'putaway' | 'count' | 'area';
 
 const DEFAULT: Record<string, Section> = { RESTOCK: 'repl', BACKROOM: 'receive', LEAD: 'exception' };
 
-/** 库存：补货、后仓补取、收货、上架、盘点 */
+/** 库存：补货、后仓补取、收货、上架、盘点、区域 */
 export function InventoryScreen() {
   const { client, auth } = useLive();
   const s = client.state;
@@ -22,6 +23,7 @@ export function InventoryScreen() {
     receive: Object.values(s.receipts).filter((x) => !x.closedAt).length,
     putaway: Object.values(s.cases).filter((c) => c.state === 'RECEIVED').length,
     count: Object.values(s.counts).filter((c) => c.status === 'OPEN').length,
+    area: client.statics?.areas ? areaUsage(s, client.statics).filter((u) => u.alert).length : 0,
   };
   const tabs: [Section, string][] = [
     ['repl', '补货'],
@@ -29,6 +31,7 @@ export function InventoryScreen() {
     ['receive', '收货'],
     ['putaway', '上架'],
     ['count', '盘点'],
+    ['area', '区域'],
   ];
   return (
     <div className="inventory">
@@ -45,6 +48,7 @@ export function InventoryScreen() {
       {section === 'receive' && <ReceiveView />}
       {section === 'putaway' && <PutAwayView />}
       {section === 'count' && <CountView />}
+      {section === 'area' && <AreaBoard />}
     </div>
   );
 }

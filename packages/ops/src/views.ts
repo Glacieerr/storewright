@@ -1,5 +1,5 @@
 import type { TempZone } from '@storewright/domain';
-import type { HandoffSession, LiveOrder, LiveTote, LiveWalk, OpsState, StoreStatic } from './types';
+import type { AreaInfo, BinInfo, HandoffSession, LiveOrder, LiveTote, LiveWalk, OpsState, SlotInfo, StoreStatic } from './types';
 
 /**
  * 读模型：从状态计算界面需要的视图。纯函数，服务端、员工端、模拟器共用。
@@ -336,4 +336,83 @@ export function summary(s: OpsState, now: number): OpsSummary {
     staged,
     avgWaitSec: waitN ? Math.round(waitSum / waitN) : 0,
   };
+}
+
+export interface AreaUsage {
+  area: AreaInfo;
+  used: number;
+  capacity: number;
+  rate: number;
+  alert: boolean;
+  /** 这个区域的占用能不能从作业记录里算出来（空托盘区、充电区没有记录） */
+  tracked: boolean;
+}
+
+/**
+ * 每个区域的占用（决策记录 0013）：货架区按占用的托盘位，冷库和待检区按箱数，收货暂放按还没上架的箱数，
+ * 暂存区按框数，包裹区按包裹数，熟食保温区按保温中的份数，大件暂存区按已暂存的件数。
+ */
+export function areaUsage(s: OpsState, st: StoreStatic): AreaUsage[] {
+  const areas = st.areas ?? [];
+  const binsByArea = new Map<string, BinInfo[]>();
+  for (const b of st.bins) if (b.areaId) binsByArea.set(b.areaId, [...(binsByArea.get(b.areaId) ?? []), b]);
+  const slotsByArea = new Map<string, SlotInfo[]>();
+  for (const sl of st.slots) if (sl.areaId) slotsByArea.set(sl.areaId, [...(slotsByArea.get(sl.areaId) ?? []), sl]);
+  const cases = Object.values(s.cases);
+  return areas.map((a) => {
+    let used = 0;
+    let capacity = a.capacity;
+    let tracked = true;
+    const bins = binsByArea.get(a.id) ?? [];
+    switch (a.kind) {
+      case 'RACKS':
+      case 'OVERSTOCK':
+        used = bins.filter((b) => (s.bins[b.code]?.length ?? 0) > 0).length;
+        break;
+      case 'COOLER':
+      case 'FREEZER':
+      case 'BULK':
+      case 'QA':
+      case 'RTV':
+      case 'BALER':
+      case 'CAGE':
+      case 'CHEM':
+        used = bins.reduce((n, b) => n + (s.bins[b.code]?.length ?? 0), 0);
+        if (!bins.length) tracked = a.kind !== 'CAGE' && a.kind !== 'CHEM';
+        break;
+      case 'RECEIVING_HOLD':
+        used = cases.filter((c) => c.state === 'RECEIVED').length;
+        break;
+      case 'UNLOAD': {
+        const open = new Set(Object.values(s.receipts).filter((r) => r.arrivedAt !== undefined && r.closedAt === undefined).map((r) => r.id));
+        used = Math.ceil(cases.filter((c) => c.state === 'RECEIVED' && c.receiptId && open.has(c.receiptId)).length / 20);
+        break;
+      }
+      case 'STAGING':
+      case 'STAGING_DELIVERY':
+      case 'RECOVERY': {
+        const slots = slotsByArea.get(a.id) ?? [];
+        used = slots.reduce((n, sl) => n + (s.slots[sl.code]?.length ?? 0), 0);
+        if (slots.length) capacity = slots.reduce((n, sl) => n + sl.capacity, 0);
+        if (a.kind === 'RECOVERY' && !slots.length) used = Object.values(s.totes).filter((t) => t.status === 'RECOVERY').length;
+        break;
+      }
+      case 'STAGING_OVERSIZED':
+        used = Object.values(s.oversized).filter((o) => o.status === 'STAGED').length;
+        break;
+      case 'HOT_HOLD':
+        used = Object.values(s.mto).filter((m) => m.status === 'HELD').reduce((n, m) => n + m.qty, 0);
+        break;
+      case 'PARCEL':
+        used = Object.values(s.parcels).filter((p) => p.status === 'INDUCTED' || p.status === 'STAGED').length;
+        break;
+      case 'RETURNS':
+        used = Object.values(s.returns).filter((r) => r.status === 'OPEN').reduce((n, r) => n + r.lines.reduce((m, l) => m + l.qty, 0), 0);
+        break;
+      default:
+        tracked = false;
+    }
+    const rate = capacity > 0 ? used / capacity : 0;
+    return { area: a, used, capacity, rate, alert: tracked && rate >= a.alertAt, tracked };
+  });
 }

@@ -104,6 +104,8 @@ export function emergencyPaths(lot: LotLayout, road: RoadAccess, stopX: number, 
       4,
     ),
     speed,
+    false,
+    { v0: 'cap', accel: 3, decel: 4, lat: 2.8, wheelbase: 4.5 },
   );
   const outLane = fromLeft ? road.nearLaneZ : road.farLaneZ;
   const endX = fromLeft ? road.spawnMaxX : road.spawnMinX;
@@ -119,6 +121,8 @@ export function emergencyPaths(lot: LotLayout, road: RoadAccess, stopX: number, 
       4,
     ),
     speed,
+    false,
+    { v1: 'cap', accel: 3, decel: 4, lat: 2.8, wheelbase: 4.5 },
   );
   return { entry, leave };
 }

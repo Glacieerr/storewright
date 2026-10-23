@@ -19,8 +19,9 @@ test('01 登录与语言', async ({ browser }) => {
     await p.getByRole('button', { name: '中文' }).click();
     await p.getByLabel('门店').fill('hardware');
     await expect(p.getByRole('button', { name: /Jamie/ })).toBeVisible();
+    // 名单按门店编号重新读取：等它换成建材店的名单
+    await expect(p.getByRole('button', { name: /Jamie/ })).not.toContainText('熟食', { timeout: 15_000 });
     const jamie = await p.getByRole('button', { name: /Jamie/ }).innerText();
-    expect(jamie).not.toContain('熟食');
     return `Jamie 的岗位：${jamie.split('\n').pop()}`;
   }, { shot: p, device: '手机' });
   await r.step('不存在的门店给出提示', async () => {

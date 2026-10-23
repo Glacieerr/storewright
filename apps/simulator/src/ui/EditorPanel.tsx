@@ -6,6 +6,8 @@ import { copySelected, deleteSelected, distributeSelected, duplicateSelected, ed
 import { ZONE_LABEL } from '../scene/palette';
 import { ROAD_STYLE_LABEL, SITE_LAYOUT_LABEL, type RoadStyle, type SiteLayoutKind } from '../scene/site';
 import { GeneratorPanel } from './GeneratorPanel';
+import { AreaEditor } from './AreaEditor';
+import { ParkingEditor } from './ParkingEditor';
 import { getLang, t, translate } from '../i18n';
 
 const ZONES: TempZone[] = ['AMBIENT', 'CHILLED', 'FROZEN'];
@@ -358,10 +360,12 @@ export function EditorPanel() {
           <span>{t('货架层数')}</span>
           <input type="number" min={2} max={5} value={draft.backroom.rackLevels} onChange={(e) => update((d) => (d.backroom.rackLevels = Math.min(5, Math.max(2, Number(e.target.value) || 3))))} />
         </label>
-        <label>
-          <span>{t('卸货门')}</span>
-          <input type="number" min={1} max={4} value={draft.backroom.docks} onChange={(e) => update((d) => (d.backroom.docks = Math.min(4, Math.max(1, Number(e.target.value) || 1))))} />
-        </label>
+        {!draft.docks && (
+          <label>
+            <span>{t('卸货门')}</span>
+            <input type="number" min={1} max={4} value={draft.backroom.docks} onChange={(e) => update((d) => (d.backroom.docks = Math.min(4, Math.max(1, Number(e.target.value) || 1))))} />
+          </label>
+        )}
         <label>
           <span>{t('叉车 / 搬运车')}</span>
           <span className="inline">
@@ -375,7 +379,9 @@ export function EditorPanel() {
             value={stagingScaleOf(draft)}
             onChange={(e) =>
               update((d) => {
-                d.staging.racks = stagingRacks(Number(e.target.value));
+                // 换规模后新货架放进原来的暂存区（手动编辑区域时）
+                const area = d.areas?.find((a) => a.kind === 'STAGING')?.id;
+                d.staging.racks = stagingRacks(Number(e.target.value)).map((r) => (area ? { ...r, areaId: area } : r));
               })
             }
           >
@@ -390,6 +396,8 @@ export function EditorPanel() {
           {t('库存仓库：{0} 个托盘位（{1} 排 × {2} 层）。货架排数 0 表示按后仓深度放满。没有叉车时货只能用搬运车卸下、堆在收货区，进不了高层货架。线上订单暂存仓的规模决定暂存格位数。', backroomLayout(draft).capacity, backroomLayout(draft).rows.length, draft.backroom.rackLevels)}
         </p>
       </div>
+
+      <AreaEditor draft={draft} update={update} />
 
       <div className="form">
         <h3>{t('营业时间与停车场')}</h3>
@@ -417,10 +425,7 @@ export function EditorPanel() {
           <span>{t('停车排数')}</span>
           <input type="number" min={0} max={5} value={draft.outdoor.parkingRows} onChange={(e) => update((d) => (d.outdoor.parkingRows = Math.min(5, Math.max(0, Number(e.target.value) || 0))))} />
         </label>
-        <label>
-          <span>{t('取货车位')}</span>
-          <input type="number" min={0} max={30} value={draft.outdoor.pickupBays} onChange={(e) => update((d) => (d.outdoor.pickupBays = Math.min(30, Math.max(0, Number(e.target.value) || 0))))} />
-        </label>
+        <ParkingEditor draft={draft} update={update} />
         <p className="hint">{t('营业时间决定线上订单的取货时段、员工排班和到店客流；0 表示停车场按门店宽度自动确定。')}</p>
       </div>
 

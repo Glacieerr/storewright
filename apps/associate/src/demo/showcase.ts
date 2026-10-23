@@ -8,12 +8,17 @@ import './showcase.css';
  * 展示页：同一个浏览器里，运营模拟器（门店实况）、演示控制台和两部员工手机，
  * 全部连到浏览器里的同一个门店中枢（SharedWorker），任何一边的操作都会实时出现在其他画面里。
  * 上方的引导按门店的实时状态自动打勾：下单 → 拣货 → 暂存 → 到店 → 交付 → AI。
+ * 电脑上左栏可以切换：演示控制台、门店实况（你的操作和自动运营都会出现在这里）、全天仿真（模拟器自己按策略跑完一整天，
+ * 和门店实况同时运行），高度足够时默认上下并排（全流程走查发现：笔记本屏幕上控制台只剩一百多像素高，几乎无法操作）。
  * 窄屏（手机）上一次只显示一个画面，用标签切换。
- * 地址参数：?store=hardware 换成家居建材店；?sim=模拟器地址（默认 ../sim/）。
+ * 地址参数：?store=hardware 换成家居建材店；?sim=模拟器地址（默认 ../sim/）；?layout=console|live|auto|split 指定左栏。
  */
 
 const q = new URLSearchParams(location.search);
-const store = q.get('store') === 'hardware' ? 'hardware' : 'demo';
+// 「你的商店」的实时沙盒：?project=<编号>，门店按访客自己搭的配置在浏览器里的中枢建出来（决策记录 0013）
+const projectId = q.get('project') ?? undefined;
+let store = q.get('store') === 'hardware' ? 'hardware' : 'demo';
+let projectName: string | undefined;
 const simBase = q.get('sim') ?? '../sim/';
 // 不支持 SharedWorker 的浏览器：iframe 向本页要端口
 servePortRequests();
@@ -32,16 +37,41 @@ interface Step {
   done: (s: OpsState) => boolean;
 }
 
+/** 引导只看你自己的订单（自动运营的订单由虚拟员工处理，不算） */
+const mine = (s: OpsState) => Object.values(s.orders).filter((o) => o.track !== 'AUTO');
+const mineIds = (s: OpsState) => new Set(mine(s).map((o) => o.id));
+
 const STEPS: Step[] = [
-  { title: '下单', hint: '在控制台点「创建」，下一张自取订单（默认立即锁单并生成拣货批次）。', done: (s) => Object.keys(s.orders).length > 0 },
-  { title: '拣货', hint: '第一部手机（拣货员）：领取批次，点框绑定标签，逐行点「已拣到」，最后「完成拣货，去暂存」。', done: (s) => Object.values(s.totes).some((x) => x.status === 'PICKED' || x.status === 'STAGED' || x.status === 'PULLED' || x.status === 'HANDED_OFF') },
-  { title: '暂存', hint: '把第一部手机切换成「暂存员 Riley」，逐框点选，放进建议的格位。', done: (s) => Object.values(s.orders).some((o) => o.stagedAt !== undefined) },
-  { title: '到店', hint: '在控制台点这张订单的「我在路上」和「到店」——交付看板变色，模拟器里出现顾客的车。', done: (s) => Object.values(s.orders).some((o) => o.arrivedAt !== undefined) },
-  { title: '交付', hint: '第二部手机（交付员）：打开这张订单，开始准备、逐框核对，输入控制台显示的验证码，完成交付。', done: (s) => Object.values(s.orders).some((o) => o.status === 'COMPLETED') },
+  { title: '下单', hint: '在控制台点「创建」，下一张自取订单（默认立即锁单并生成拣货批次）。', done: (s) => mine(s).length > 0 },
+  { title: '拣货', hint: '第一部手机（拣货员）：领取批次，点框绑定标签，逐行点「已拣到」，最后「完成拣货，去暂存」。', done: (s) => { const ids = mineIds(s); return Object.values(s.totes).some((x) => ids.has(x.orderId) && (x.status === 'PICKED' || x.status === 'STAGED' || x.status === 'PULLED' || x.status === 'HANDED_OFF')); } },
+  { title: '暂存', hint: '把第一部手机切换成「暂存员 Riley」，逐框点选，放进建议的格位。', done: (s) => mine(s).some((o) => o.stagedAt !== undefined) },
+  { title: '到店', hint: '在控制台点这张订单的「我在路上」和「到店」——交付看板变色，左栏切到「门店实况」可以看到顾客的车。', done: (s) => mine(s).some((o) => o.arrivedAt !== undefined) },
+  { title: '交付', hint: '第二部手机（交付员）：打开这张订单，开始准备、逐框核对，输入控制台显示的验证码，完成交付。', done: (s) => mine(s).some((o) => o.status === 'COMPLETED') },
   { title: 'AI', hint: '把一部手机切换成「带班负责人 Taylor」，打开 AI 页：每条建议都有理由和置信度，可以采纳或否决。', done: (s) => Object.values(s.recs).some((r) => r.status === 'ACCEPTED' || r.status === 'OVERRIDDEN' || r.status === 'DISMISSED') },
 ];
 
 const GUIDE_KEY = 'storewright.showcase.guide';
+const LAYOUT_KEY = 'storewright.showcase.layout';
+type Layout = 'console' | 'live' | 'auto' | 'split';
+const LAYOUTS: Array<[Layout, string]> = [
+  ['console', '控制台'],
+  ['live', '门店实况'],
+  ['auto', '全天仿真'],
+  ['split', '上下并排'],
+];
+
+function initialLayout(): Layout {
+  const asked = q.get('layout');
+  if (asked && LAYOUTS.some(([k]) => k === asked)) return asked as Layout;
+  try {
+    const saved = localStorage.getItem(LAYOUT_KEY);
+    if (saved && LAYOUTS.some(([k]) => k === saved)) return saved as Layout;
+  } catch {
+    // 本机存储不可用
+  }
+  // 屏幕够高才上下并排，否则控制台单独占满左栏
+  return window.innerHeight >= 980 ? 'split' : 'console';
+}
 
 function appUrl(as: string): string {
   return `./?demo&store=${store}&as=${as}${as === 'console' ? '&embed' : ''}`;
@@ -49,7 +79,43 @@ function appUrl(as: string): string {
 
 function simUrl(): string {
   const bridge = new URL('./bridge.html', location.href).href;
-  return `${simBase}${simBase.includes('?') ? '&' : '?'}live=demo&store=${store}&bridge=${encodeURIComponent(bridge)}`;
+  return `${simBase}${simBase.includes('?') ? '&' : '?'}live=demo&store=${store}&bridge=${encodeURIComponent(bridge)}${projectId ? `&project=${encodeURIComponent(projectId)}` : ''}`;
+}
+
+/** 全天仿真：模拟器自己的离散事件仿真（虚拟顾客、员工、车辆按策略跑完一整天），和门店实况互不影响 */
+function autoSimUrl(): string {
+  if (projectId) return `${simBase}${simBase.includes('?') ? '&' : '?'}project=${encodeURIComponent(projectId)}&autoplay=1`;
+  const tpl = store === 'hardware' ? 'hardware' : 'medium';
+  return `${simBase}${simBase.includes('?') ? '&' : '?'}template=${tpl}&autoplay=1`;
+}
+
+/** 从本机浏览器读出「你的商店」的门店项目（模拟器保存的） */
+function readProject(id: string): Promise<{ name: string; config: unknown } | undefined> {
+  return new Promise((resolve) => {
+    try {
+      const req = indexedDB.open('storewright-projects', 1);
+      req.onupgradeneeded = () => req.result.createObjectStore('projects', { keyPath: 'id' });
+      req.onerror = () => resolve(undefined);
+      req.onsuccess = () => {
+        const get = req.result.transaction('projects', 'readonly').objectStore('projects').get(id);
+        get.onsuccess = () => resolve(get.result as { name: string; config: unknown } | undefined);
+        get.onerror = () => resolve(undefined);
+      };
+    } catch {
+      resolve(undefined);
+    }
+  });
+}
+
+/** 让浏览器里的门店中枢按项目的配置建店，返回门店编号 */
+async function setupProjectStore(id: string): Promise<string> {
+  const p = await readProject(id);
+  if (!p) throw new Error(t('找不到这家门店（可能是在别的浏览器里搭的）'));
+  projectName = p.name;
+  const res = await link.fetch('/api/custom-stores', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ config: p.config }) });
+  const body = (await res.json()) as { ok: boolean; storeId?: string; issues?: Array<{ message: string }> };
+  if (!body.ok || !body.storeId) throw new Error(t('这家门店还不能开业：{0}', body.issues?.map((i) => i.message).join('；') ?? ''));
+  return body.storeId;
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string): HTMLElementTagNameMap[K] {
@@ -148,10 +214,13 @@ function render(): void {
   root.innerHTML = '';
   const header = el('header', 'sc-head');
   const intro = el('div');
-  intro.append(el('h1', undefined, 'Storewright'), el('p', undefined, t('整个系统都在你的浏览器里运行：左边是门店模拟器和演示控制台，右边是两部员工手机。在控制台创建订单，看它在手机上被拣货、暂存、交付，同时出现在模拟器里。')));
+  intro.append(
+    el('h1', undefined, projectName ? `${t('你的商店')} · ${projectName}` : 'Storewright'),
+    el('p', undefined, projectName ? t('这是你自己搭的门店的实时沙盒：控制台下单、两部员工手机作业，也可以在控制台打开「自动运营」，两条线同时跑在你的门店上。') : t('整个系统都在你的浏览器里运行。左栏是演示控制台、门店实况和全天仿真，右边是两部员工手机：在控制台创建订单，看它在手机上被拣货、暂存、交付，同时出现在门店实况里。')),
+  );
   const actions = el('div', 'sc-actions');
-  const switchStore = el('a', undefined, store === 'demo' ? t('换成家居建材店') : t('换成中型超市'));
-  switchStore.href = `?store=${store === 'demo' ? 'hardware' : 'demo'}${q.get('sim') ? `&sim=${encodeURIComponent(simBase)}` : ''}`;
+  const switchStore = el('a', undefined, projectName ? t('返回你的商店') : store === 'demo' ? t('换成家居建材店') : t('换成中型超市'));
+  switchStore.href = projectName ? `${simBase}${simBase.includes('?') ? '&' : '?'}yours` : `?store=${store === 'demo' ? 'hardware' : 'demo'}${q.get('sim') ? `&sim=${encodeURIComponent(simBase)}` : ''}`;
   const reset = el('button', undefined, t('重置演示门店'));
   reset.onclick = () => {
     if (!confirm(t('清空这家演示门店的订单和作业记录？AI 模型保留。'))) return;
@@ -173,12 +242,50 @@ function render(): void {
   const main = el('main', 'sc-main');
   const left = el('div', 'sc-left');
   const sim = el('iframe', 'sc-sim pane');
-  sim.title = t('运营模拟器');
+  sim.title = t('门店实况');
   sim.src = simUrl();
   const consoleFrame = el('iframe', 'sc-console pane');
   consoleFrame.title = t('演示控制台');
   consoleFrame.src = appUrl('console');
-  left.append(sim, consoleFrame);
+  const autoSim = el('iframe', 'sc-auto');
+  autoSim.title = t('全天仿真');
+  // 第一次切到「全天仿真」时才加载，之后一直在后台运行
+  const loadAuto = () => {
+    if (!autoSim.src) autoSim.src = autoSimUrl();
+  };
+  const stage = el('div', 'sc-stage');
+  stage.append(sim, consoleFrame, autoSim);
+  // 左栏切换 + 在新标签页打开当前画面
+  const bar = el('div', 'sc-switch');
+  bar.setAttribute('role', 'tablist');
+  bar.setAttribute('aria-label', t('左栏显示'));
+  const openNew = el('a', 'sc-open', t('在新标签页打开 ↗'));
+  openNew.target = '_blank';
+  openNew.rel = 'noopener';
+  const switchButtons = LAYOUTS.map(([key, label]) => {
+    const b = el('button', undefined, t(label));
+    b.setAttribute('role', 'tab');
+    b.dataset.layout = key;
+    b.onclick = () => setLayout(key);
+    bar.append(b);
+    return b;
+  });
+  bar.append(openNew);
+  const setLayout = (layout: Layout) => {
+    left.dataset.layout = layout;
+    if (layout === 'auto') loadAuto();
+    switchButtons.forEach((b) => b.setAttribute('aria-selected', String(b.dataset.layout === layout)));
+    const target = layout === 'live' ? simUrl() : layout === 'auto' ? autoSimUrl() : appUrl('console').replace('&embed', '');
+    openNew.href = target;
+    openNew.hidden = layout === 'split';
+    try {
+      localStorage.setItem(LAYOUT_KEY, layout);
+    } catch {
+      // 忽略
+    }
+  };
+  left.append(bar, stage);
+  setLayout(initialLayout());
   const right = el('div', 'sc-phones');
   const p1 = phone('A01');
   const p2 = phone('A05');
@@ -190,7 +297,7 @@ function render(): void {
     [consoleFrame, '控制台'],
     [p1.box, '手机 1'],
     [p2.box, '手机 2'],
-    [sim, '模拟器'],
+    [sim, '门店实况'],
   ];
   const buttons = panes.map(([pane, label]) => {
     const b = el('button', undefined, t(label));
@@ -212,4 +319,18 @@ function render(): void {
   void watch(g.update).catch((err: unknown) => console.warn(err));
 }
 
-render();
+// 「你的商店」先建店，再渲染各个画面（iframe 打开时门店已经存在）
+if (projectId) {
+  setupProjectStore(projectId)
+    .then((id) => {
+      store = id;
+      render();
+    })
+    .catch((err: unknown) => {
+      const root = document.getElementById('root') as HTMLElement;
+      root.innerHTML = '';
+      const box = el('section', 'sc-guide');
+      box.append(el('h1', undefined, t('你的商店')), el('p', 'sc-hint', err instanceof Error ? err.message : String(err)));
+      root.append(box);
+    });
+} else render();

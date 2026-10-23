@@ -45,6 +45,8 @@ export function rejectText(r: Rejection, nameOf: (id: string) => string): string
       return t('格位已满（最多 {0} 个框）', p.capacity ?? 0);
     case 'SAME_SLOT':
       return t('已经在这个格位里');
+    case 'BAY_NOT_FOUND':
+      return t('没有这个取货车位：{0}', String(p.bay ?? ''));
     case 'NOT_STAGED':
       return t('订单还没有全部暂存，请告诉顾客预计等待时间');
     case 'PREP_LOCKED':
@@ -63,8 +65,6 @@ export function rejectText(r: Rejection, nameOf: (id: string) => string): string
       return t('已经核验过了');
     case 'NO_CODE':
       return t('没有验证码，请人工核验');
-    case 'MANUAL_REQUIRED':
-      return t('尝试次数已用完，请人工核验');
     case 'MANUAL_NOT_ALLOWED':
       return t('请先输入验证码');
     case 'NOT_VERIFIED':
@@ -79,6 +79,16 @@ export function rejectText(r: Rejection, nameOf: (id: string) => string): string
       return t('订单已完成');
     case 'NOTHING_TO_RELEASE':
       return t('没有需要生成批次的订单');
+    case 'TRIP_NOT_ACCEPTED':
+      return t('这个行程还没有司机接单');
+    case 'CANCEL_LOCKED':
+      return t('已进入预计到店前的准备期，不能取消');
+    case 'CANCEL_WAIT': {
+      const left = Math.max(1, Math.ceil((Number(p.opensAt ?? 0) - Date.now()) / 60_000));
+      return t('到店后要再等一会儿才能取消（已等 {0} 分钟，还差约 {1} 分钟）', p.waitedMin ?? 0, left);
+    }
+    case 'NOT_NO_SHOW':
+      return t('司机还没有超过预计到店时间足够久，暂时不能改派');
     case 'TRIP_ACCEPTED':
       return t('司机已经接单');
     case 'ORDER_NOT_CREATED':

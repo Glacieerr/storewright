@@ -12,6 +12,9 @@ export function SignIn({ onSignedIn }: { onSignedIn: (a: Auth) => void }) {
   const [storeId, setStoreId] = useState(() => new URLSearchParams(location.search).get('store') || 'demo');
   const [roster, setRoster] = useState<Array<{ id: string; name: string; role: string }> | null>(null);
   const [error, setError] = useState('');
+  // 大型店有几百名员工（决策记录 0014）：名单多时先搜索（名字或员工编号）、按岗位筛选，只显示前 60 个
+  const [query, setQuery] = useState('');
+  const [role, setRole] = useState('');
   useEffect(() => {
     setRoster(null);
     setError('');
@@ -26,6 +29,10 @@ export function SignIn({ onSignedIn }: { onSignedIn: (a: Auth) => void }) {
       setError(t('登录失败'));
     }
   };
+  const big = (roster?.length ?? 0) > 24;
+  const needle = query.trim().toLowerCase();
+  const matches = (roster ?? []).filter((a) => (!role || a.role === role) && (!needle || a.name.toLowerCase().includes(needle) || a.id.toLowerCase().includes(needle)));
+  const shown = big ? matches.slice(0, 60) : matches;
   return (
     <div className="signin">
       <header className="signin-head">
@@ -44,8 +51,36 @@ export function SignIn({ onSignedIn }: { onSignedIn: (a: Auth) => void }) {
       </label>
       {error && <p className="banner error">{error}</p>}
       <h2 className="section-title">{t('选择你的身份')}</h2>
+      {big && (
+        <div className="roster-search">
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return;
+              const exact = (roster ?? []).find((a) => a.id.toLowerCase() === query.trim().toLowerCase());
+              if (exact) void go({ associateId: exact.id });
+            }}
+            placeholder={t('搜索名字或员工编号（输入编号后按回车直接登录）')}
+            aria-label={t('搜索员工')}
+          />
+          <div className="chips">
+            <button className={role === '' ? 'chip on' : 'chip'} onClick={() => setRole('')}>
+              {t('全部 {0}', roster?.length ?? 0)}
+            </button>
+            {Object.keys(ROLE_TEXT)
+              .filter((r) => roster?.some((a) => a.role === r))
+              .map((r) => (
+                <button key={r} className={role === r ? 'chip on' : 'chip'} onClick={() => setRole(role === r ? '' : r)}>
+                  {t(ROLE_TEXT[r] ?? r)} {roster?.filter((a) => a.role === r).length}
+                </button>
+              ))}
+          </div>
+          {matches.length > shown.length && <p className="muted">{t('共 {0} 人符合，显示前 {1} 个；输入名字或编号缩小范围', matches.length, shown.length)}</p>}
+        </div>
+      )}
       <div className="roster">
-        {(roster ?? []).map((a) => (
+        {shown.map((a) => (
           <button key={a.id} className="person" onClick={() => void go({ associateId: a.id })}>
             <span className="avatar" aria-hidden>
               {a.name.slice(0, 1)}

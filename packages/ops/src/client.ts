@@ -55,6 +55,8 @@ function randomId(): string {
 export class LiveClient {
   state: OpsState = emptyState();
   statics: StoreStatic | undefined;
+  /** 本机这份静态数据的版本；连接时告诉服务端，版本相同时快照里不再带静态数据（决策记录 0014） */
+  staticsHash: string | undefined;
   status: LinkStatus = 'connecting';
   /** 服务端时间 - 本机时间（毫秒） */
   offset = 0;
@@ -86,6 +88,17 @@ export class LiveClient {
       if (saved) this.outbox = JSON.parse(saved) as Queued[];
     } catch {
       this.outbox = [];
+    }
+    // 上次保存的门店静态数据（陈列表、库位、名单……大型店有一两兆）：版本没变就不用再下载
+    try {
+      const cached = o.storage?.getItem(this.staticsKey());
+      if (cached) {
+        const c = JSON.parse(cached) as { hash: string; statics: StoreStatic };
+        this.statics = c.statics;
+        this.staticsHash = c.hash;
+      }
+    } catch {
+      // 忽略：下次连接时服务端会发完整的静态数据
     }
   }
 
@@ -197,7 +210,8 @@ export class LiveClient {
   private open(): void {
     if (this.closed) return;
     this.setStatus('connecting');
-    const url = `${this.url('/ws', true)}?after=${this.state.seq}&token=${encodeURIComponent(this.o.token)}`;
+    const known = this.statics && this.staticsHash ? `&statics=${encodeURIComponent(this.staticsHash)}` : '';
+    const url = `${this.url('/ws', true)}?after=${this.state.seq}&token=${encodeURIComponent(this.o.token)}${known}`;
     let ws: WebSocket;
     try {
       ws = new this.WS(url);
@@ -255,7 +269,12 @@ export class LiveClient {
       }
       case 'snapshot':
         this.state = m.state as OpsState;
-        this.statics = m.statics as StoreStatic;
+        // 服务端省略静态数据：本机的版本和服务端相同
+        if (m.statics) {
+          this.statics = m.statics as StoreStatic;
+          this.staticsHash = typeof m.staticsHash === 'string' ? m.staticsHash : undefined;
+          this.saveStatics();
+        }
         this.bump();
         break;
       case 'events':
@@ -301,6 +320,19 @@ export class LiveClient {
     if (!applied.length) return;
     this.bump();
     for (const l of this.listeners) l(applied);
+  }
+
+  private staticsKey(): string {
+    return `storewright.statics.${this.o.storeId}`;
+  }
+
+  private saveStatics(): void {
+    if (!this.staticsHash || !this.statics) return;
+    try {
+      this.o.storage?.setItem(this.staticsKey(), JSON.stringify({ hash: this.staticsHash, statics: this.statics }));
+    } catch {
+      // 本机存储满了：只是下次要重新下载
+    }
   }
 
   private setStatus(s: LinkStatus): void {

@@ -690,9 +690,11 @@ export class AiService {
     const state: DispatchState = { staff, waiting, arriving, horizonMin, handoffServiceMin: 4, pickBacklogMin, pickDueInMin, stageBacklog, stageMinPerTote: 0.5 };
     const advice = adviseDispatch(state, movable);
     if (!advice) return false;
-    // 负荷均衡：今天完成任务最少的人
-    const done = (id: string) =>
-      Object.values(s.walks).filter((w) => w.associateId === id && w.status === 'COMPLETED').length + Object.values(s.sessions).filter((x) => x.owner === id && x.status === 'COMPLETED').length;
+    // 负荷均衡：今天完成任务最少的人（先一次数好每人的完成数：大型店几百人、几千个批次时不在排序里反复遍历，决策记录 0014）
+    const doneBy = new Map<string, number>();
+    for (const w of Object.values(s.walks)) if (w.status === 'COMPLETED' && w.associateId) doneBy.set(w.associateId, (doneBy.get(w.associateId) ?? 0) + 1);
+    for (const x of Object.values(s.sessions)) if (x.status === 'COMPLETED') doneBy.set(x.owner, (doneBy.get(x.owner) ?? 0) + 1);
+    const done = (id: string) => doneBy.get(id) ?? 0;
     const who = [...people[advice.from]].sort((a, b) => done(a) - done(b) || a.localeCompare(b))[0];
     if (!who) return false;
     const toRole = (Object.entries(map).find(([, v]) => v === advice.to)?.[0] ?? 'HANDOFF') as AssociateRole;

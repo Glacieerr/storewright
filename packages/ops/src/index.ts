@@ -10,4 +10,6 @@ export { locationIndex, planogramIndex } from './apply';
 export { isBusy, MOVABLE_ROLES, roleOf } from './staff';
 export { MAX_NOTES, recentNotes } from './notes';
 export { allowedDispositions, MODULES, moduleEnabled, MTO_BUFFER_MIN, mtoBoard, oversizedByOrder, PARCEL_GRACE_MIN, parcelTrips, returnBlocks, suggestParcelSlot, type ModuleId, type ReturnBlock } from './modules';
+export { CLIENT_RETAIN_MIN, clientProjection } from './projection';
+export { DEFAULT_DRIVER_CANCEL, driverCancelWindow, noShowWindow, type CancelWindow, type DriverCancelReason, type DriverCancelRules } from './driverCancel';
 export { adoptionRate, aiModeOf, canManageAi, MAX_RECS, openChecks, openRecs, recentRecs } from './ai';

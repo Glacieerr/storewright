@@ -18,7 +18,14 @@ export class StoreRuntime {
   /** 最近的事件，用于断线重连时快速补发 */
   private recent: AnyOpsEvent[] = [];
   private queue: Promise<unknown> = Promise.resolve();
+  /** 门店里的服务（AI、自动运营、客流仿真）：每条命令的事件立即收到 */
   private readonly listeners = new Set<(m: HubMessage) => void>();
+  /** 设备连接：推送合批 */
+  private readonly devices = new Set<(m: HubMessage) => void>();
+  /** 推送合批（决策记录 0014，只用于设备连接）：空闲时立即推送；忙的时候 batchMs 内的事件合成一条消息，设备多时消息数不随命令数增长 */
+  private pending: AnyOpsEvent[] = [];
+  private flushTimer: ReturnType<typeof setTimeout> | undefined;
+  private lastFlush = 0;
 
   constructor(
     readonly id: string,
@@ -26,6 +33,7 @@ export class StoreRuntime {
     readonly statics: StoreStatic,
     private readonly store: EventLog,
     private readonly recentLimit = 5000,
+    private readonly batchMs = 15,
   ) {}
 
   async init(): Promise<void> {
@@ -40,13 +48,15 @@ export class StoreRuntime {
     return run;
   }
 
-  subscribe(fn: (m: HubMessage) => void): () => void {
-    this.listeners.add(fn);
-    return () => this.listeners.delete(fn);
+  /** 订阅事件：门店里的服务立即收到；device = true 是设备连接，推送合批 */
+  subscribe(fn: (m: HubMessage) => void, opts: { device?: boolean } = {}): () => void {
+    const set = opts.device ? this.devices : this.listeners;
+    set.add(fn);
+    return () => set.delete(fn);
   }
 
   get subscribers(): number {
-    return this.listeners.size;
+    return this.listeners.size + this.devices.size;
   }
 
   /** seq 之后的事件；太旧（不在内存中）时返回 undefined，调用方改发快照 */
@@ -60,9 +70,12 @@ export class StoreRuntime {
   async reset(): Promise<void> {
     await this.queue;
     await this.store.reset(this.id);
+    if (this.flushTimer) clearTimeout(this.flushTimer);
+    this.flushTimer = undefined;
+    this.pending = [];
     this.state = emptyState();
     this.recent = [];
-    for (const l of this.listeners) l({ t: 'reset' });
+    for (const l of [...this.listeners, ...this.devices]) l({ t: 'reset' });
   }
 
   private async handle(env: CommandEnvelope, commandId?: string): Promise<SubmitResult> {
@@ -107,7 +120,30 @@ export class StoreRuntime {
   }
 
   private emit(events: AnyOpsEvent[]): void {
+    const now: HubMessage = { t: 'events', events };
+    for (const l of this.listeners) l(now);
+    if (this.batchMs <= 0) return this.deliver(events);
+    this.pending.push(...events);
+    // 合批有上限：一直没有机会触发定时器时（例如连续的同步提交）也不会攒成一条巨大的消息
+    if (this.pending.length >= 256) return this.flush();
+    if (this.flushTimer) return;
+    const wait = this.lastFlush + this.batchMs - Date.now();
+    if (wait <= 0) this.flush();
+    else this.flushTimer = setTimeout(() => this.flush(), wait);
+  }
+
+  /** 把合批中的事件立即推送出去（测试和关闭时用） */
+  flush(): void {
+    if (this.flushTimer) clearTimeout(this.flushTimer);
+    this.flushTimer = undefined;
+    this.lastFlush = Date.now();
+    const events = this.pending;
+    this.pending = [];
+    if (events.length) this.deliver(events);
+  }
+
+  private deliver(events: AnyOpsEvent[]): void {
     const m: HubMessage = { t: 'events', events };
-    for (const l of this.listeners) l(m);
+    for (const l of this.devices) l(m);
   }
 }

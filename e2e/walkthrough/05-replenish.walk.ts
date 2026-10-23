@@ -49,6 +49,8 @@ test('05 补货与幽灵库存', async ({ browser }) => {
   }, { shot: restock, device: '补货员手机' });
 
   let phantom = '';
+  // 商品名（选项文字是「名称 · 货位」）：购物仿真里别的商品也可能被 AI 标出来，按名字找这个商品的卡片
+  let phantomName = '';
   await r.step('开始顾客购物仿真（600 倍速），让一个卖得快、没有货架传感器的商品「系统不知道地」变空', async () => {
     await con.getByLabel('仿真速度').selectOption('600');
     await con.getByRole('button', { name: '开始顾客购物仿真' }).click();
@@ -58,6 +60,7 @@ test('05 补货与幽灵库存', async ({ browser }) => {
     const pick = opts.slice(2).find((o) => o.value && !/· (tof|weight)$/.test(o.label.trim())) ?? opts[2];
     phantom = pick?.value ?? '';
     const label = pick?.label ?? '';
+    phantomName = label.split(' · ')[0]?.trim() ?? '';
     await select.selectOption(phantom);
     await con.getByLabel('系统不知道（放错位置 / 损耗），等拣货员或传感器发现').check();
     await con.getByRole('button', { name: '让货架变空', exact: true }).click();
@@ -78,13 +81,13 @@ test('05 补货与幽灵库存', async ({ browser }) => {
     }
     await lead.getByRole('tab', { name: '建议' }).click();
     if (!found) throw new Error(`240 秒内没有出现这个商品的建议（仿真时间约 ${Math.round(((Date.now() - t0) / 1000) * 600 / 3600)} 小时）`);
-    const card = lead.locator('.ai-rec').filter({ hasText: '可能不在货架上' }).first();
+    const card = lead.locator('.ai-rec').filter({ hasText: '可能不在货架上' }).filter({ hasText: phantomName }).first();
     await card.scrollIntoViewIfNeeded();
     return `${Math.round((Date.now() - t0) / 1000)} 秒（仿真约 ${Math.round(((Date.now() - t0) / 1000) * 600 / 3600)} 小时）后出现；${(await card.innerText()).replace(/\n/g, ' ').slice(0, 300)}`;
   }, { shot: lead, device: '带班负责人手机' });
 
   await r.step('带班负责人采纳 → 生成「核对货架」任务', async () => {
-    const card = lead.locator('.ai-rec').filter({ hasText: '可能不在货架上' }).first();
+    const card = lead.locator('.ai-rec').filter({ hasText: '可能不在货架上' }).filter({ hasText: phantomName }).first();
     await card.getByRole('button', { name: '采纳' }).click();
     await until(lead, (s) => Object.values(s.checks as Record<string, AnyState>).some((c) => c.itemId === phantom && c.status === 'OPEN'));
   }, { shot: lead, device: '带班负责人手机' });
@@ -92,7 +95,7 @@ test('05 补货与幽灵库存', async ({ browser }) => {
   await r.step('补货员去核对：到货位，货架上实际 0 件 → 提交 → 系统修正估算并安排补货', async () => {
     await tab(restock, '库存');
     await restock.getByRole('tab', { name: /补货/ }).click();
-    await restock.locator('.card', { hasText: 'AI：可能不在货架上' }).first().getByRole('button', { name: '去核对' }).click();
+    await restock.locator('.card', { hasText: 'AI：可能不在货架上' }).filter({ hasText: phantomName }).first().getByRole('button', { name: '去核对' }).click();
     await restock.getByRole('button', { name: /手动确认已到货位/ }).click();
     const value = restock.locator('.stepper b, .stepper .mono').first();
     for (let i = 0; i < 300 && Number(await value.innerText()) > 0; i++) await restock.locator('.stepper button').first().click();

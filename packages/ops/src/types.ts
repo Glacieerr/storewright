@@ -38,6 +38,11 @@ export interface OrderInfo {
   lines: LineInfo[];
   /** 配送目的地相对门店的坐标（千米） */
   destinationKm?: { x: number; y: number };
+  /**
+   * 自动运营的订单（演示门店的虚拟员工和虚拟顾客处理）。与员工手里的订单分开生成拣货批次和配送行程，
+   * 员工手机上不显示；不设置时是普通订单。
+   */
+  track?: 'AUTO';
 }
 
 export type OrderStatus = 'CREATED' | 'LOCKED' | 'PICKING' | 'STAGED' | 'PREPPING' | 'READY' | 'HANDING_OFF' | 'COMPLETED' | 'CANCELLED';
@@ -76,6 +81,10 @@ export interface LiveOrder extends OrderInfo {
   cancelledAt?: number;
   cancelReason?: string;
   ageItemsRemoved?: boolean;
+  /** 配送司机取消后，系统通知顾客送达会延后的时间 */
+  delayNoticeAt?: number;
+  /** 设备快照里精简过：完成超过一小时的订单，商品明细只在服务端（决策记录 0014） */
+  trimmed?: boolean;
   lineResults: Record<string, LineResult>;
 }
 
@@ -130,6 +139,8 @@ export interface WalkInfo {
   estimatedSec: number;
   coldLimitSec?: number;
   dueAt: number;
+  /** 自动运营的批次（只含自动运营的订单） */
+  track?: 'AUTO';
 }
 
 export type WalkStatus = 'OPEN' | 'CLAIMED' | 'PICKING' | 'COMPLETED';
@@ -164,6 +175,7 @@ export interface HandoffSession {
   scanned: string[];
   verified?: 'CODE' | 'MANUAL';
   codeFailures: number;
+  /** 验证码错误达到次数后提供人工核验入口；验证码仍可继续输入（决策记录 0014，字段名沿用） */
   manualRequired: boolean;
   ageVerified: boolean;
   completedAt?: number;
@@ -182,6 +194,25 @@ export interface LiveTrip {
   bay?: string;
   vehicle?: string;
   completedAt?: number;
+  /** 司机取消（或门店因司机没来而改派）的记录；有记录时行程重新派单（决策记录 0014） */
+  cancellations?: TripCancellation[];
+  /** 最近一次重新派单的时间 */
+  redispatchedAt?: number;
+}
+
+export interface TripCancellation {
+  at: number;
+  by: 'DRIVER' | 'STORE';
+  reason: 'BEFORE_PREP' | 'WAITED_TOO_LONG' | 'NO_SHOW';
+  driverName?: string;
+  /** 到店后等了多少分钟（等待过久时） */
+  waitedMin?: number;
+  /** 取消时正在交付准备的员工 */
+  sessionOwner?: string;
+  /** 已经从暂存区取出、需要放回的框和放回的格位 */
+  returns: Array<{ toteId: string; slotCode: string }>;
+  /** 订单可能赶不上承诺的时间 */
+  atRisk: boolean;
 }
 
 export type ExceptionStatus = 'OPEN' | 'ASSIGNED' | 'FOUND' | 'NOT_FOUND' | 'DELIVERED' | 'VOID';
@@ -527,6 +558,25 @@ export interface SlotInfo {
   capacity: number;
   area: 'PICKUP' | 'DELIVERY' | 'ANY';
   purpose: string;
+  /** 所在的暂存区域（决策记录 0013） */
+  areaId?: string;
+}
+
+/** 区域（决策记录 0013）：收货、后仓存储、暂存的每一块地面；种类和单位见 store-config 的 AREA_KINDS */
+export interface AreaInfo {
+  id: string;
+  kind: string;
+  group: 'RECEIVING' | 'STORAGE' | 'STAGING';
+  floorId: string;
+  x0: number;
+  z0: number;
+  x1: number;
+  z1: number;
+  tempZone: TempZone;
+  capacity: number;
+  unit: 'PALLET' | 'CASE' | 'TOTE' | 'ITEM' | 'PARCEL';
+  alertAt: number;
+  label?: string;
 }
 
 export type AssociateRole = 'PICK' | 'STAGE' | 'HANDOFF' | 'LEAD' | 'BACKROOM' | 'RESTOCK' | 'DELI';
@@ -546,7 +596,11 @@ export interface StoreStatic {
   rules: {
     approachingMin: number;
     longWaitMin: number;
+    /** 验证码连续错几次后提供人工核验（不锁定） */
     codeAttempts: number;
+    /** 配送司机取消的准备期和等待阈值（分钟，没有时都是 10；决策记录 0014） */
+    driverCancelLockMin?: number;
+    driverCancelWaitMin?: number;
     occupancyAlert: number;
     slotLengthMin: number;
     lockLeadMin: number;
@@ -566,6 +620,12 @@ export interface StoreStatic {
   parcelSlots?: ParcelSlot[];
   /** 大件暂存区（区域级位置） */
   oversizedAreas?: string[];
+  /** 区域（决策记录 0013）；旧快照没有时界面不显示区域管理 */
+  areas?: AreaInfo[];
+  /** 卸货门 */
+  docks?: Array<{ id: string; x: number; kind: 'DOCK' | 'GRADE'; reefer: boolean }>;
+  /** 线上取货车位编号（配置里明确给出时）；顾客到店时只能用这些编号 */
+  pickupBays?: string[];
 }
 
 export interface MtoMenuItem {

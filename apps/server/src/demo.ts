@@ -2,7 +2,7 @@ import { shortCode, type Item, type Order } from '@storewright/domain';
 import { codeHashInput, type AssociateInfo, type OrderInfo, type StoreStatic } from '@storewright/ops';
 import { buildBins, buildPlanogram, initialInventory, orderInfoFrom, type OpsContext } from '@storewright/ops/server';
 import { DEFAULT_REPLENISH_RULES } from '@storewright/algorithms';
-import { createTemplate, StoreModel, type TemplateName } from '@storewright/store-config';
+import { createTemplate, storeAreas, StoreModel, type StoreConfig, type TemplateName } from '@storewright/store-config';
 import { DEFAULT_DEMAND, DELI_MENU, generateCatalog, generateOrders } from '@storewright/synth';
 import { randomInt, toHex, type HubPlatform } from './platform';
 
@@ -44,28 +44,73 @@ const ROSTER: AssociateInfo[] = [
 /** 建材店没有熟食区：第 11 位员工在后仓（板材和建材的装车也归后仓） */
 const HARDWARE_ROSTER: AssociateInfo[] = ROSTER.map((a) => (a.role === 'DELI' ? { ...a, role: 'BACKROOM' as const } : a));
 
+const FIRST = ['Alex', 'Blake', 'Cameron', 'Dakota', 'Emery', 'Finley', 'Gray', 'Harper', 'Indy', 'Jules', 'Kai', 'Logan', 'Marlowe', 'Noel', 'Oakley', 'Parker', 'Reese', 'Sage', 'Tatum', 'Urban', 'Val', 'Wren', 'Yael', 'Zion'];
+// 大型店的岗位比例（合计 1）：拣货最多，其次交付、补货
+const ROLE_SHARE: Array<[AssociateInfo['role'], number]> = [
+  ['PICK', 0.38],
+  ['HANDOFF', 0.18],
+  ['RESTOCK', 0.14],
+  ['STAGE', 0.1],
+  ['BACKROOM', 0.09],
+  ['DELI', 0.07],
+  ['LEAD', 0.04],
+];
+
+/**
+ * 大型店的员工名单（决策记录 0014）：前 11 位与演示门店相同，其余按岗位比例生成，编号 A012 起。
+ * 名字确定生成（同样的人数得到同样的名单）；带班负责人和后仓员工有后仓补取权限。
+ */
+export function largeRoster(size: number, hardware = false): AssociateInfo[] {
+  const base = hardware ? HARDWARE_ROSTER : ROSTER;
+  const out = base.slice(0, Math.min(size, base.length));
+  const counts = ROLE_SHARE.map(([role, share]) => [role, Math.round(share * size)] as const);
+  const pool: AssociateInfo['role'][] = [];
+  for (const [role, n] of counts) {
+    const have = out.filter((a) => a.role === role).length;
+    for (let i = have; i < n; i++) pool.push(hardware && role === 'DELI' ? 'BACKROOM' : role);
+  }
+  for (let i = 0; out.length < size; i++) {
+    const n = out.length + 1;
+    const role = pool[i] ?? 'PICK';
+    out.push({ id: `A${String(n).padStart(3, '0')}`, name: `${FIRST[n % FIRST.length]} ${String.fromCharCode(65 + (Math.floor(n / FIRST.length) % 26))}.`, role, exceptionAuthorized: role === 'LEAD' || role === 'BACKROOM' });
+  }
+  return out;
+}
+
 export interface DemoStore {
   id: string;
   ctx: OpsContext;
   statics: StoreStatic;
   catalog: ReadonlyMap<string, Item>;
-  /** 生成一张演示订单（不含大件），时段从 slotStart 开始 */
-  makeOrder(opts: { index: number; type: 'PICKUP' | 'DELIVERY'; slotStart: number; maxLines?: number; oversized?: boolean }): { info: OrderInfo; code: string; codeHash: string };
+  /** 生成一张演示订单（不含大件），时段从 slotStart 开始；code 不给时随机生成；track = AUTO 是自动运营的订单 */
+  makeOrder(opts: { index: number; type: 'PICKUP' | 'DELIVERY'; slotStart: number; maxLines?: number; oversized?: boolean; code?: string; track?: 'AUTO' }): { info: OrderInfo; code: string; codeHash: string };
   hashCode(key: string, code: string): string;
+  /** 自动运营用的取货码 / 司机验证码：由门店的盐和编号算出，中枢重启后虚拟员工仍然知道 */
+  autoCode(key: string): string;
   /** 期初库存（建店时载入一次） */
   openingInventory(at: number): ReturnType<typeof initialInventory>;
 }
 
-export function createDemoStore(opts: { id: string; template?: TemplateName; seed?: number; salt: string; platform: HubPlatform }): DemoStore {
-  // 演示门店打开全部扩展模块（模板默认值不变，Phase 1 的仿真不受影响）；建材店没有熟食现做
-  const template = opts.template ?? 'medium';
-  const config = createTemplate(template);
+export function createDemoStore(opts: { id: string; template?: TemplateName; config?: StoreConfig; seed?: number; salt: string; platform: HubPlatform; staff?: number }): DemoStore {
+  // 演示门店打开全部扩展模块（模板默认值不变，Phase 1 的仿真不受影响）；建材店没有熟食现做。
+  // 给了 config（「你的商店」）时按这份配置建店，模块开关按配置；需求形态按行业选模板
+  const config: StoreConfig = opts.config ? (JSON.parse(JSON.stringify(opts.config)) as StoreConfig) : createTemplate(opts.template ?? 'medium');
   const hw = config.industry === 'HARDWARE';
-  config.modules = { ...config.modules, mto: !hw, parcelHub: true, returns: true, gm: true };
+  const template: TemplateName = opts.config ? (hw ? 'hardware' : 'medium') : (opts.template ?? 'medium');
+  if (!opts.config) config.modules = { ...config.modules, mto: !hw, parcelHub: true, returns: true, gm: true };
   const model = new StoreModel(config);
   const catalog = generateCatalog(model, { seed: opts.seed ?? 7 });
   const hash = makeHasher(opts.platform, opts.salt);
   const rules = model.config.rules;
+  // 区域（决策记录 0013）：暂存格位、库位都带区域编号
+  const sa = storeAreas(model.config);
+  const rackArea = new Map<string, string>();
+  for (const r of sa.racks) {
+    const inside = r.areaId ?? sa.areas.find((a) => a.group === 'STAGING' && r.x >= a.x0 && r.x <= a.x1 && r.z >= a.z0 && r.z <= a.z1)?.id;
+    if (inside) rackArea.set(r.rackId, inside);
+  }
+  const explicit = !!model.config.areas;
+  const areaIds = (kind: string) => sa.areas.filter((a) => a.kind === kind);
   const statics: StoreStatic = {
     storeId: opts.id,
     name: model.config.name,
@@ -73,23 +118,33 @@ export function createDemoStore(opts: { id: string; template?: TemplateName; see
       approachingMin: rules.handoff.approachingMin,
       longWaitMin: rules.handoff.longWaitMin,
       codeAttempts: rules.handoff.codeAttempts,
+      ...(rules.handoff.driverCancelLockMin !== undefined ? { driverCancelLockMin: rules.handoff.driverCancelLockMin } : {}),
+      ...(rules.handoff.driverCancelWaitMin !== undefined ? { driverCancelWaitMin: rules.handoff.driverCancelWaitMin } : {}),
       occupancyAlert: rules.staging.occupancyAlert,
       slotLengthMin: rules.slotLengthMin,
       lockLeadMin: rules.lockLeadMin,
     },
-    slots: model.stagingSlots.map((s) => ({ code: s.code, tempZone: s.tempZone, capacity: s.capacityTotes, area: s.area, purpose: s.purpose })),
-    roster: hw ? HARDWARE_ROSTER : ROSTER,
+    slots: model.stagingSlots.map((s) => {
+      const areaId = rackArea.get(s.rackId);
+      return { code: s.code, tempZone: s.tempZone, capacity: s.capacityTotes, area: s.area, purpose: s.purpose, ...(areaId ? { areaId } : {}) };
+    }),
+    roster: opts.staff && opts.staff > ROSTER.length ? largeRoster(opts.staff, hw) : hw ? HARDWARE_ROSTER : ROSTER,
     bins: buildBins(model),
     planogram: buildPlanogram(model, catalog.byId),
     replenish: DEFAULT_REPLENISH_RULES,
     modules: { mto: model.config.modules.mto, returns: model.config.modules.returns, oversized: model.config.modules.gm, parcel: model.config.modules.parcelHub },
-    ...(hw ? {} : { mtoMenu: DELI_MENU.map((d) => ({ ...d })), hotSlots: ['H-01', 'H-02', 'H-03', 'H-04'] }),
-    parcelSlots: [
-      ...['P01', 'P02', 'P03', 'P04'].map((code) => ({ code, capacity: 6, size: 'S' as const })),
-      ...['P05', 'P06', 'P07', 'P08', 'P09'].map((code) => ({ code, capacity: 4, size: 'M' as const })),
-      ...['P10', 'P11', 'P12'].map((code) => ({ code, capacity: 2, size: 'L' as const })),
-    ],
-    oversizedAreas: hw ? ['BULK-1', 'BULK-2', 'BULK-3', 'YARD-1', 'YARD-2'] : ['BULK-1', 'BULK-2', 'BULK-3'],
+    ...(model.config.modules.mto
+      ? { mtoMenu: DELI_MENU.map((d) => ({ ...d })), hotSlots: explicit && areaIds('HOT_HOLD').length ? hotSlotsFrom(areaIds('HOT_HOLD')) : ['H-01', 'H-02', 'H-03', 'H-04'] }
+      : {}),
+    parcelSlots: explicit && areaIds('PARCEL').length ? parcelSlotsFrom(areaIds('PARCEL')) : DEFAULT_PARCEL_SLOTS,
+    oversizedAreas: explicit && areaIds('STAGING_OVERSIZED').length ? areaIds('STAGING_OVERSIZED').map((a) => a.id) : hw ? ['BULK-1', 'BULK-2', 'BULK-3', 'YARD-1', 'YARD-2'] : ['BULK-1', 'BULK-2', 'BULK-3'],
+    areas: sa.areas.map((a) => {
+      const out: NonNullable<StoreStatic['areas']>[number] = { id: a.id, kind: a.kind, group: a.group, floorId: a.floorId, x0: a.x0, z0: a.z0, x1: a.x1, z1: a.z1, tempZone: a.tempZone, capacity: a.capacity, unit: a.unit, alertAt: a.alertAt };
+      if (a.label) out.label = a.label;
+      return out;
+    }),
+    docks: sa.docks.map((d) => ({ id: d.id, x: d.x, kind: d.kind, reefer: d.reefer })),
+    ...(model.config.parking?.pickupBays?.length ? { pickupBays: model.config.parking.pickupBays.map((b) => b.id) } : {}),
   };
   const bigItems = catalog.items.filter((i) => i.handling.includes('OVERSIZED') || i.weightKg > 14);
   const pool: Order[] = generateOrders(model, catalog, DEFAULT_DEMAND[template], { seed: (opts.seed ?? 7) + 1 }).filter(
@@ -102,7 +157,7 @@ export function createDemoStore(opts: { id: string; template?: TemplateName; see
     openingInventory: (at) => initialInventory(statics.planogram, statics.bins, catalog.byId, (opts.seed ?? 7) + 2, at),
     statics,
     catalog: catalog.byId,
-    makeOrder({ index, type, slotStart, maxLines, oversized }) {
+    makeOrder({ index, type, slotStart, maxLines, oversized, code: given, track }) {
       const list = byType[type].length ? byType[type] : pool;
       const src = list[index % list.length] as Order;
       const id = `D${String(index + 1).padStart(4, '0')}`;
@@ -112,9 +167,42 @@ export function createDemoStore(opts: { id: string; template?: TemplateName; see
       const lines = big ? [...base, { lineId: 'x', itemId: big.id, qty: 2, allowSubstitution: false }] : base;
       const order: Order = { ...src, id, shortCode: shortCode(`${opts.salt}:${opts.id}:${id}`), type, lines: lines.map((l, i) => ({ ...l, lineId: `${id}-L${i + 1}` })) };
       const info = orderInfoFrom(order, catalog.byId, slotStart, rules.slotLengthMin);
-      const code = randomCode(opts.platform);
+      if (track) info.track = track;
+      const code = given ?? randomCode(opts.platform);
       return { info, code, codeHash: hash(codeHashInput(id, code)) };
     },
     hashCode: (key, code) => hash(codeHashInput(key, code)),
+    autoCode(key) {
+      const h = hash(`auto-code:${key}`);
+      let out = '';
+      for (let i = 0; i < 4; i++) out += CODE_ALPHABET[parseInt(h.slice(i * 2, i * 2 + 2), 16) % CODE_ALPHABET.length];
+      return out;
+    },
   };
+}
+
+const DEFAULT_PARCEL_SLOTS = [
+  ...['P01', 'P02', 'P03', 'P04'].map((code) => ({ code, capacity: 6, size: 'S' as const })),
+  ...['P05', 'P06', 'P07', 'P08', 'P09'].map((code) => ({ code, capacity: 4, size: 'M' as const })),
+  ...['P10', 'P11', 'P12'].map((code) => ({ code, capacity: 2, size: 'L' as const })),
+];
+
+/** 明确给出的熟食保温区：每份一个格位 */
+function hotSlotsFrom(areas: ReadonlyArray<{ capacity: number }>): string[] {
+  const out: string[] = [];
+  for (const a of areas) for (let k = 0; k < Math.max(1, Math.round(a.capacity / 6)); k++) out.push(`H-${String(out.length + 1).padStart(2, '0')}`);
+  return out;
+}
+
+/** 明确给出的包裹区：按容量切成小、中、大格位（各约三分之一） */
+function parcelSlotsFrom(areas: ReadonlyArray<{ capacity: number }>): Array<{ code: string; capacity: number; size: 'S' | 'M' | 'L' }> {
+  const out: Array<{ code: string; capacity: number; size: 'S' | 'M' | 'L' }> = [];
+  for (const a of areas) {
+    const n = Math.max(3, Math.round(a.capacity / 4));
+    for (let k = 0; k < n; k++) {
+      const size = k < n / 3 ? 'S' : k < (2 * n) / 3 ? 'M' : 'L';
+      out.push({ code: `P${String(out.length + 1).padStart(2, '0')}`, capacity: size === 'S' ? 6 : size === 'M' ? 4 : 2, size });
+    }
+  }
+  return out;
 }

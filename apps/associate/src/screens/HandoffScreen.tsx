@@ -17,7 +17,8 @@ export function HandoffScreen() {
   const st = client.statics as StoreStatic | undefined;
   if (!st) return null;
   if (open) return <SessionView sessionKey={open} onBack={() => setOpen(undefined)} />;
-  const rows = handoffBoard(client.state, st, now);
+  // 自动运营的订单和行程由虚拟员工交付，不在员工的交付看板上
+  const rows = handoffBoard(client.state, st, now).filter((r) => r.orderIds.every((id) => client.state.orders[id]?.track !== 'AUTO'));
   const onScan = (raw: string) => {
     const r = resolveScan(client.state, st, raw);
     if (r.kind === 'label') return setOpen(sessionKeyFor(client.state, r.orderId));
@@ -132,6 +133,8 @@ function SessionView({ sessionKey, onBack }: { sessionKey: string; onBack: () =>
         </p>
       </header>
 
+      {trip && <TripCancelNotice tripId={trip.id} />}
+
       {!ss && (
         <section className="phase">
           {staged ? (
@@ -192,9 +195,9 @@ function SessionView({ sessionKey, onBack }: { sessionKey: string; onBack: () =>
           <h3 className="section-title">{t('核验验证码')}</h3>
           {arrivedAt === undefined ? (
             <p className="banner warn">{t('顾客还没有到达。到达后先核对姓名或车位，再输入验证码。')}</p>
-          ) : ss.manualRequired || (trip && !trip.codeHash) ? (
+          ) : trip && !trip.codeHash ? (
             <>
-              <p className="banner warn">{trip && !trip.codeHash ? t('司机没有验证码') : t('验证码错误次数已用完')}</p>
+              <p className="banner warn">{t('司机没有验证码')}</p>
               <p>{t('请人工核验：核对证件和订单信息。')}</p>
               <button className="primary block" onClick={() => void run({ type: 'VerifyManually', key: sessionKey })}>
                 {t('已人工核验')}
@@ -212,7 +215,16 @@ function SessionView({ sessionKey, onBack }: { sessionKey: string; onBack: () =>
               <button className="primary" type="submit" disabled={code.length < 4}>
                 {t('核验')}
               </button>
-              {ss.codeFailures > 0 && <p className="error-text">{t('验证码不正确，还可以尝试 {0} 次', Math.max(0, st.rules.codeAttempts - ss.codeFailures))}</p>}
+              {/* 输错不限次数（决策记录 0014）；错到一定次数后另外提供人工核验 */}
+              {ss.codeFailures > 0 && <p className="error-text">{t('验证码不正确（已错 {0} 次），请顾客再核对一遍', ss.codeFailures)}</p>}
+              {ss.manualRequired && (
+                <div className="manual-alt">
+                  <p className="muted">{t('也可以改用人工核验：核对证件和订单信息。')}</p>
+                  <button type="button" onClick={() => void run({ type: 'VerifyManually', key: sessionKey })}>
+                    {t('已人工核验')}
+                  </button>
+                </div>
+              )}
             </form>
           )}
         </section>
@@ -284,5 +296,43 @@ function SessionView({ sessionKey, onBack }: { sessionKey: string; onBack: () =>
         </section>
       )}
     </div>
+  );
+}
+
+/** 司机取消或门店改派后的提示：放回暂存区的框，以及行程正在重新派单（决策记录 0014） */
+function TripCancelNotice({ tripId }: { tripId: string }) {
+  const { client, auth } = useLive();
+  const s = client.state;
+  const tr = s.trips[tripId];
+  const last = tr?.cancellations?.at(-1);
+  if (!tr || !last || tr.acceptedAt !== undefined) return null;
+  const reason = last.reason === 'WAITED_TOO_LONG' ? t('司机等待 {0} 分钟后取消', last.waitedMin ?? 0) : last.reason === 'NO_SHOW' ? t('司机没来，门店已改派') : t('司机取消了接单');
+  const mine = last.sessionOwner === auth.actor;
+  return (
+    <section className="phase trip-cancel">
+      <p className="banner warn">
+        {reason} · {t('行程正在重新派单（第 {0} 次）', tr.cancellations?.length ?? 1)}
+        {last.atRisk ? ` · ${t('可能赶不上送达时段，请通知带班负责人')}` : ''}
+      </p>
+      {last.returns.length > 0 && (
+        <>
+          <p>{mine ? t('请把你取出的 {0} 个框放回暂存区：', last.returns.length) : t('{0} 个已取出的框要放回暂存区：', last.returns.length)}</p>
+          <ul className="return-list">
+            {last.returns.map((r) => {
+              const tote = s.totes[r.toteId];
+              const o = tote ? s.orders[tote.orderId] : undefined;
+              return (
+                <li key={r.toteId}>
+                  <span className="mono">{o?.shortCode ?? ''} · {tote ? `${tote.index}/${tote.count}` : r.toteId}</span>
+                  <span>→</span>
+                  <b className="mono">{r.slotCode}</b>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
+      <p className="muted">{t('顾客已收到送达延后的通知。新司机接单后照常准备和交付。')}</p>
+    </section>
   );
 }

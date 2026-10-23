@@ -145,16 +145,20 @@ test('02 自取订单全流程（四台设备）', async ({ browser }) => {
     return `${s.orders[order.orderId].toteIds.length} 个框`;
   }, { shot: handoff, device: '交付员手机' });
 
-  await r.step('输入错误的取货码：被拒绝并提示剩余次数', async () => {
-    await handoff.getByLabel('验证码').fill('ZZZZ');
-    await handoff.getByRole('button', { name: '核验' }).click();
-    await expect(handoff.getByText(/验证码不正确/)).toBeVisible();
-    return (await handoff.getByText(/验证码不正确/).innerText()).trim();
+  await r.step('输入错误的取货码 4 次：不限次数、不锁定（决策记录 0014），错 3 次后多一个「人工核验」入口，验证码仍可继续输入', async () => {
+    for (let i = 1; i <= 4; i++) {
+      await handoff.getByLabel('验证码').fill(`ZZZ${i}`);
+      await handoff.getByRole('button', { name: '核验', exact: true }).click();
+      await expect(handoff.getByText(new RegExp(`已错 ${i} 次`))).toBeVisible();
+    }
+    await expect(handoff.locator('.manual-alt')).toBeVisible();
+    await expect(handoff.getByLabel('验证码')).toBeEnabled();
+    return `${(await handoff.getByText(/验证码不正确/).innerText()).trim()}；${(await handoff.locator('.manual-alt').innerText()).replace(/\n/g, ' ')}`;
   }, { shot: handoff, device: '交付员手机' });
 
   await r.step('输入正确的取货码；有年龄限制商品时核验证件；显示缺货与替代清单', async () => {
     await handoff.getByLabel('验证码').fill(order.code);
-    await handoff.getByRole('button', { name: '核验' }).click();
+    await handoff.getByRole('button', { name: '核验', exact: true }).click();
     await expect(handoff.getByRole('button', { name: '完成交付' })).toBeVisible();
     let age = '';
     if (await handoff.getByRole('button', { name: '已核验证件' }).isVisible()) {

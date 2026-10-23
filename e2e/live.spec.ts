@@ -84,7 +84,7 @@ test('一张自取订单在四台设备上走完：下单 → 拣货 → 暂存 
   const s = await state(handoff);
   for (const id of s.orders[order.orderId]?.toteIds ?? []) await scan(handoff, '逐框扫描', s.totes[id]?.labelId ?? '');
   await handoff.getByLabel('验证码').fill(order.code);
-  await handoff.getByRole('button', { name: '核验' }).click();
+  await handoff.getByRole('button', { name: '核验', exact: true }).click();
   if (s.orders[order.orderId]?.lines.some((l) => l.ageRestricted)) await handoff.getByRole('button', { name: /确认/ }).first().click();
   await handoff.getByRole('button', { name: '完成交付' }).click();
 

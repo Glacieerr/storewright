@@ -684,6 +684,40 @@ export function applyEvent(s: OpsState, e: AnyOpsEvent, st?: StoreStatic): OpsSt
       if (tr) tr.completedAt = e.at;
       break;
     }
+    case 'TripDriverCancelled': {
+      // 行程回到待接单（重新派单），司机、验证码、到店信息清空；交付准备结束，已取出的框放回暂存区（决策记录 0014）
+      const p = e.payload;
+      const tr = s.trips[p.tripId];
+      if (!tr) break;
+      (tr.cancellations ??= []).push({ at: e.at, by: p.by, reason: p.reason, returns: p.returns, atRisk: p.atRisk, ...(p.driverName ? { driverName: p.driverName } : {}), ...(p.waitedMin !== undefined ? { waitedMin: p.waitedMin } : {}), ...(p.sessionOwner ? { sessionOwner: p.sessionOwner } : {}) });
+      tr.redispatchedAt = e.at;
+      delete tr.driverName;
+      delete tr.codeHash;
+      delete tr.acceptedAt;
+      delete tr.etaAt;
+      delete tr.arrivedAt;
+      delete tr.bay;
+      delete tr.vehicle;
+      for (const r of p.returns) {
+        const t = s.totes[r.toteId];
+        if (!t) continue;
+        t.status = 'STAGED';
+        t.slotCode = r.slotCode;
+        (s.slots[r.slotCode] ??= []).push(t.id);
+        touch(undefined, r.slotCode);
+      }
+      const hadSession = !!s.sessions[p.tripId];
+      delete s.sessions[p.tripId];
+      forOrders(s, tr.orderIds, (o) => {
+        delete o.arrivedAt;
+        delete o.etaAt;
+        if (o.status === 'CANCELLED' || o.status === 'COMPLETED') return;
+        o.delayNoticeAt = e.at;
+        if (hadSession) o.status = 'STAGED';
+      });
+      touch();
+      break;
+    }
   }
   return s;
 }

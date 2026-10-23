@@ -61,11 +61,12 @@ export async function buildApp(opts: AppOptions): Promise<{ app: FastifyInstance
 
   // 实时推送
   app.get('/api/stores/:storeId/ws', { websocket: true }, async (socket, req) => {
-    const q = req.query as { after?: string; token?: string };
-    const send = (m: unknown) => {
-      if (socket.readyState === 1) socket.send(JSON.stringify(m));
+    const q = req.query as { after?: string; token?: string; statics?: string };
+    // 中枢给的是已经序列化好的文本（同一条推送所有设备共用一份）
+    const send = (frame: string) => {
+      if (socket.readyState === 1) socket.send(frame);
     };
-    const conn = await hub.connect((req.params as { storeId: string }).storeId, q.token, Number(q.after ?? 0), send);
+    const conn = await hub.connect((req.params as { storeId: string }).storeId, q.token, Number(q.after ?? 0), send, q.statics);
     if (!conn) {
       socket.close(4401, 'unauthorized');
       return;

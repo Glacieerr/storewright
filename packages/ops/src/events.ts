@@ -58,6 +58,17 @@ export interface OpsEventPayloads {
   TripProposed: { tripId: string; orderIds: string[]; placements: Record<string, VehiclePosition> };
   TripAccepted: { tripId: string; driverName: string; codeHash: string };
   TripCompleted: { tripId: string };
+  /** 司机取消或门店改派：行程回到待接单；已取出的框放回暂存区；顾客收到延后通知（决策记录 0014） */
+  TripDriverCancelled: {
+    tripId: string;
+    by: 'DRIVER' | 'STORE';
+    reason: 'BEFORE_PREP' | 'WAITED_TOO_LONG' | 'NO_SHOW';
+    driverName?: string;
+    waitedMin?: number;
+    sessionOwner?: string;
+    returns: Array<{ toteId: string; slotCode: string }>;
+    atRisk: boolean;
+  };
   // 后仓库存（决策 I-01～I-05）
   InventoryLoaded: { cases: Array<{ caseId: string; itemId: string; gtin: string; name: string; packQty: number; units: number; binCode: string }> };
   AsnReceived: { receiptId: string; supplier: string; expected: AsnLine[] };

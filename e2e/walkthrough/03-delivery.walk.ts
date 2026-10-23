@@ -48,12 +48,40 @@ test('03 配送行程', async ({ browser }) => {
     return `司机验证码 ${driverCode}`;
   }, { shot: con, device: '控制台' });
 
+  // 司机取消的规则（决策记录 0014）：预计到店前 10 分钟以外可以取消；准备期内不能取消；到店等满 10 分钟后可以取消
+  const row = () => con.locator('.trip-list li', { hasText: tripId });
+  await r.step('司机上报预计 15 分钟后到店：还没进入到店前 10 分钟的准备期，控制台显示还能取消多久', async () => {
+    await row().getByRole('button', { name: '预计 15 分钟后到店' }).click();
+    await expect(row().locator('.trip-window')).toContainText('分钟内可以取消');
+    return (await row().innerText()).replace(/\n/g, ' ');
+  }, { shot: con, device: '控制台' });
+
+  await r.step('司机取消接单：行程回到「等待司机接单」并标记重新派单，顾客收到送达延后的通知', async () => {
+    await row().getByRole('button', { name: '司机取消接单' }).click();
+    await expect(row()).toContainText('重新派单 · 已取消 1 次');
+    await expect(row()).toContainText('等待司机接单');
+    const s = await state(con);
+    return `${(await row().innerText()).replace(/\n/g, ' ')}；顾客延后通知 ${ids.filter((id) => s.orders[id].delayNoticeAt).length} / ${ids.length} 单`;
+  }, { shot: con, device: '控制台' });
+
+  await r.step('第二位司机接单：新的司机验证码（旧的作废）', async () => {
+    await row().getByRole('button', { name: '司机接单' }).click();
+    await expect(row()).toContainText('司机验证码');
+    driverCode = /司机验证码 (\S+)/.exec(await row().innerText())?.[1] ?? '';
+    return `司机验证码 ${driverCode}`;
+  }, { shot: con, device: '控制台' });
+
   await r.step('司机到店：交付看板显示这个行程（多单一起）', async () => {
     await con.locator('.trip-list li', { hasText: tripId }).getByRole('button', { name: '司机到店' }).click();
     await tab(handoff, '交付');
     await expect(handoff.locator('.board-row', { hasText: '行程' }).first()).toBeVisible();
     return (await handoff.locator('.board-row', { hasText: '行程' }).first().innerText()).replace(/\n/g, ' ');
   }, { shot: handoff, device: '交付员手机' });
+
+  await r.step('司机刚到店（等待不满 10 分钟）：「司机取消接单」不可用，并说明还要等多久；等满 10 分钟后才可以取消', async () => {
+    await expect(row().getByRole('button', { name: '司机取消接单' })).toBeDisabled();
+    return (await row().locator('.trip-window').innerText()).trim();
+  }, { shot: con, device: '控制台' });
 
   await r.step('打开行程，开始准备，逐框扫描', async () => {
     await handoff.locator('.board-row', { hasText: '行程' }).first().click();
@@ -70,7 +98,7 @@ test('03 配送行程', async ({ browser }) => {
   await r.step('核验司机验证码（整个行程一次）；系统已按目的地建议每单在车里的位置，员工可以改', async () => {
     await expect(handoff.getByLabel('验证码')).toBeVisible();
     await handoff.getByLabel('验证码').fill(driverCode);
-    await handoff.getByRole('button', { name: '核验' }).click();
+    await handoff.getByRole('button', { name: '核验', exact: true }).click();
     if (await handoff.getByRole('button', { name: '已核验证件' }).isVisible()) await handoff.getByRole('button', { name: '已核验证件' }).click();
     const groups = handoff.getByRole('radiogroup', { name: '车内位置' });
     await expect(groups.first()).toBeVisible();

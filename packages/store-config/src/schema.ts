@@ -73,6 +73,46 @@ export const StagingRackSchema = z.object({
   totesPerSlot: z.number().int().positive(),
   /** 货架中心相对暂存点的步行距离（米） */
   distanceFromStagingM: z.number().nonnegative(),
+  /** 所在的暂存区域（决策记录 0013）；不给时按原来的规则从暂存点排开 */
+  areaId: z.string().optional(),
+  /** 货架中心位置（米）；给了就按这个位置摆放 */
+  x: z.number().optional(),
+  z: z.number().optional(),
+});
+
+const AREA_KIND = z.enum(['UNLOAD', 'RECEIVING_HOLD', 'QA', 'RTV', 'RETURNS', 'PALLETS', 'BALER', 'RACKS', 'COOLER', 'FREEZER', 'OVERSTOCK', 'BULK', 'CAGE', 'CHEM', 'CHARGING', 'STAGING', 'STAGING_DELIVERY', 'STAGING_OVERSIZED', 'HOT_HOLD', 'PARCEL', 'RECOVERY']);
+
+/** 区域（决策记录 0013）：收货、后仓存储、暂存的每一块地面，矩形，单位米 */
+export const AreaSchema = z.object({
+  id: z.string().min(1),
+  kind: AREA_KIND,
+  floorId: z.string(),
+  x0: z.number(),
+  z0: z.number(),
+  x1: z.number(),
+  z1: z.number(),
+  tempZone: TempZone.optional(),
+  /** 容量（单位按区域类型：托盘位 / 箱 / 框 / 件 / 包裹）；不给时按面积和货架推算 */
+  capacity: z.number().int().positive().optional(),
+  /** 占用超过这个比例时提醒，默认 0.85 */
+  alertAt: z.number().gt(0).max(1).optional(),
+  label: z.string().optional(),
+});
+
+/** 卸货门：一楼后墙上的位置（米） */
+export const DockSchema = z.object({
+  id: z.string().min(1),
+  x: z.number(),
+  kind: z.enum(['DOCK', 'GRADE']).optional(),
+  reefer: z.boolean().optional(),
+});
+
+/** 线上取货车位：编号、车位中心（米，门店坐标，店外 y 为负）和车头朝向（度） */
+export const PickupBaySchema = z.object({
+  id: z.string().min(1),
+  x: z.number(),
+  z: z.number(),
+  heading: z.number(),
 });
 
 export const CategorySchema = z.object({
@@ -130,7 +170,12 @@ export const RulesSchema = z.object({
     approachingMin: z.number().positive(),
     longWaitMin: z.number().positive(),
     maxOrdersPerTrip: z.number().int().min(1).max(4),
+    /** 验证码连续错几次后提供「人工核验」入口（不锁定，验证码仍可继续输入；决策记录 0014） */
     codeAttempts: z.number().int().positive(),
+    /** 配送司机取消：预计到店前多少分钟起进入准备期、不能取消（默认 10；决策记录 0014） */
+    driverCancelLockMin: z.number().positive().optional(),
+    /** 配送司机取消：到店后等待多少分钟起可以取消（默认 10） */
+    driverCancelWaitMin: z.number().positive().optional(),
     /** 配送订单需要在时段起点之前多久就绪 */
     deliveryReadyLeadMin: z.number().nonnegative(),
     /** 位置上报固定间隔（秒） */
@@ -256,6 +301,12 @@ export const StoreConfigSchema = z.object({
       palletJacks: z.number().int().min(0).max(6).default(2),
     })
     .default({ extraDepthM: 0, rackRows: 0, rackLevels: 3, docks: 3, forklifts: 1, palletJacks: 2 }),
+  /** 区域（决策记录 0013）；不给时按门店尺寸自动生成 */
+  areas: z.array(AreaSchema).optional(),
+  /** 卸货门；不给时按 backroom.docks 自动排在后墙右侧 */
+  docks: z.array(DockSchema).optional(),
+  /** 停车：线上取货车位的明确位置；不给时按门店宽度自动生成 */
+  parking: z.object({ pickupBays: z.array(PickupBaySchema).optional() }).optional(),
   modules: z.object({
     gm: z.boolean(),
     mto: z.boolean(),
@@ -275,6 +326,9 @@ export type RunConfig = z.infer<typeof RunSchema>;
 export type CorridorConfig = z.infer<typeof CorridorSchema>;
 export type ConnectorConfig = z.infer<typeof ConnectorSchema>;
 export type StagingRackConfig = z.infer<typeof StagingRackSchema>;
+export type AreaConfig = z.infer<typeof AreaSchema>;
+export type DockConfig = z.infer<typeof DockSchema>;
+export type PickupBayConfig = z.infer<typeof PickupBaySchema>;
 export type CategoryConfig = z.infer<typeof CategorySchema>;
 export type RulesConfig = z.infer<typeof RulesSchema>;
 export type SizeRule = Rule<SizeClass>;

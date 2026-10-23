@@ -7,9 +7,11 @@ import type { OpsCommand } from './commands';
 import type { AnyOpsEvent } from './events';
 import { resolveScan } from './scan';
 import { buildBins, buildPlanogram, execute, orderInfoFrom, type OpsContext } from './server';
+import { decide } from './decide';
 import { DEFAULT_REPLENISH_RULES } from '@storewright/algorithms';
 import { emptyState, type OpsState, type StoreStatic } from './types';
-import { codeHashInput, handoffBoard, openWalks, orderShortages, pickRows, stagingOccupancy, suggestSlots } from './views';
+import { codeHashInput, handoffBoard, openWalks, orderShortages, pickRows, stagingOccupancy, suggestSlots, summary } from './views';
+import { clientProjection } from './projection';
 
 const model = new StoreModel(createTemplate('medium'));
 const catalog = generateCatalog(model, { seed: 7 });
@@ -305,6 +307,48 @@ describe('暂存规则', () => {
   });
 });
 
+describe('设备快照（决策记录 0014）', () => {
+  it('完成超过一小时的作业不随快照发出，订单只留摘要；之后的事件照常应用，统计不变', () => {
+    const st = new Store();
+    const done = st.create(pickOrder((x) => x.type === 'PICKUP', 3));
+    st.ok({ type: 'LockOrder', orderId: done.id });
+    st.ok({ type: 'ReleaseWalks' });
+    for (const w of st.walksOf(done.id)) st.pickWalk(w, 'A1');
+    st.stageOrder(done.id, 'A2');
+    st.ok({ type: 'CheckIn', orderId: done.id }, 'customer');
+    st.ok({ type: 'StartPrep', key: done.id }, 'A3');
+    for (const id of st.s.orders[done.id]?.toteIds ?? []) st.ok({ type: 'ScanPrepTote', key: done.id, labelId: st.s.totes[id]?.labelId ?? '' }, 'A3');
+    st.ok({ type: 'VerifyCode', key: done.id, code: 'K7Q2' }, 'A3');
+    st.ok({ type: 'CompleteHandoff', key: done.id, removeAgeItems: true }, 'A3');
+    const doneTotes = st.s.orders[done.id]?.toteIds ?? [];
+    // 90 分钟后来了一张新订单
+    st.now += 90 * MIN;
+    const live = st.create(pickOrder((x) => x.type === 'PICKUP', 5));
+    st.ok({ type: 'LockOrder', orderId: live.id });
+    st.ok({ type: 'ReleaseWalks' });
+    const proj = clientProjection(st.s, st.now);
+    expect(proj).not.toBe(st.s);
+    expect(doneTotes.every((t) => !proj.totes[t])).toBe(true);
+    expect(Object.values(proj.walks).every((w) => w.status !== 'COMPLETED')).toBe(true);
+    expect(proj.sessions[done.id]).toBeUndefined();
+    expect(proj.orders[done.id]).toMatchObject({ status: 'COMPLETED', trimmed: true, lines: [] });
+    expect(proj.orders[live.id]).toEqual(st.s.orders[live.id]);
+    expect(summary(proj, st.now)).toEqual(summary(st.s, st.now));
+    // 服务端状态不变
+    expect(st.s.orders[done.id]?.lines.length).toBeGreaterThan(0);
+    // 设备拿到精简快照后继续应用之后的事件，和服务端的进行中作业一致
+    const device = JSON.parse(JSON.stringify(proj)) as typeof proj;
+    const from = st.log.length;
+    for (const w of st.walksOf(live.id)) st.pickWalk(w, 'A1');
+    st.stageOrder(live.id, 'A2');
+    for (const e of st.log.slice(from)) applyEvent(device, e, statics);
+    expect(device.orders[live.id]).toEqual(st.s.orders[live.id]);
+    expect(device.slots).toEqual(st.s.slots);
+    // 刚完成的（不到一小时）照常发出
+    expect(clientProjection(st.s, st.now - 85 * MIN).totes[doneTotes[0] ?? '']).toBeDefined();
+  });
+});
+
 describe('交付看板与核验', () => {
   it('已到达按到达先后排在前面，等待过久变红；未到达按时段排列', () => {
     const st = new Store();
@@ -339,10 +383,13 @@ describe('交付看板与核验', () => {
     expect(st.code({ type: 'VerifyCode', key: o.id, code: 'K7Q2' }, 'A3')).toBe('NOT_READY');
     for (const id of st.s.orders[o.id]?.toteIds ?? []) st.ok({ type: 'ScanPrepTote', key: o.id, labelId: st.s.totes[id]?.labelId ?? '' }, 'A3');
     expect(st.code({ type: 'VerifyManually', key: o.id }, 'A3')).toBe('MANUAL_NOT_ALLOWED');
-    for (let i = 0; i < rules.handoff.codeAttempts; i++) st.ok({ type: 'VerifyCode', key: o.id, code: `BAD${i}` }, 'A3');
+    // 输错不限次数、不锁定（决策记录 0014）：错到 codeAttempts 次后多一个人工核验入口，验证码仍可继续输入
+    for (let i = 0; i < rules.handoff.codeAttempts + 3; i++) st.ok({ type: 'VerifyCode', key: o.id, code: `BAD${i}` }, 'A3');
+    expect(st.s.sessions[o.id]?.codeFailures).toBe(rules.handoff.codeAttempts + 3);
     expect(st.s.sessions[o.id]?.manualRequired).toBe(true);
-    expect(st.code({ type: 'VerifyCode', key: o.id, code: 'K7Q2' }, 'A3')).toBe('MANUAL_REQUIRED');
-    st.ok({ type: 'VerifyManually', key: o.id }, 'A3');
+    expect(decide(st.s, { cmd: { type: 'VerifyManually', key: o.id }, actor: 'A3', at: st.now }, ctx).ok).toBe(true);
+    st.ok({ type: 'VerifyCode', key: o.id, code: 'K7Q2' }, 'A3');
+    expect(st.s.sessions[o.id]?.verified).toBe('CODE');
     expect(st.code({ type: 'CompleteHandoff', key: o.id }, 'A9')).toBe('NOT_IN_SESSION');
   });
 
@@ -390,6 +437,73 @@ describe('配送行程', () => {
     expect(out.filter((e) => e.type === 'OrderHandedOff')).toHaveLength(trip.orderIds.length);
     expect(out.at(-1)?.type).toBe('TripCompleted');
     expect(trip.orderIds.every((id) => st.s.orders[id]?.status === 'COMPLETED')).toBe(true);
+  });
+
+  it('司机取消接单：准备期以外可以取消，准备期内和到店不满 10 分钟不能取消，等待超过 10 分钟可以取消；系统的应对', () => {
+    const st = new Store();
+    const ids = [0, 1, 2, 3].map((i) => st.create(pickOrder((x) => x.type === 'DELIVERY', i), 150).id);
+    for (const id of ids) st.ok({ type: 'LockOrder', orderId: id });
+    st.ok({ type: 'ReleaseWalks' });
+    for (const w of Object.keys(st.s.walks)) st.pickWalk(w, 'A1');
+    for (const id of ids) st.stageOrder(id, 'A2');
+    st.ok({ type: 'Tick', release: false });
+    const trip = Object.values(st.s.trips)[0];
+    if (!trip) throw new Error('trip');
+    const accept = (name: string) => st.ok({ type: 'AcceptTrip', tripId: trip.id, driverName: name, codeHash: hash(codeHashInput(trip.id, 'TR77')) }, 'driver');
+    expect(st.code({ type: 'CancelTripDriver', tripId: trip.id }, 'driver')).toBe('TRIP_NOT_ACCEPTED');
+
+    // 1) 预计 30 分钟后到店：还没进准备期，可以取消；行程回到待接单，顾客收到延后通知
+    accept('Driver 1');
+    st.ok({ type: 'UpdateEta', tripId: trip.id, etaAt: st.now + 30 * MIN }, 'driver');
+    expect(st.code({ type: 'CancelTripDriver', tripId: trip.id }, 'A3')).toBe('NOT_AUTHORIZED');
+    const first = st.ok({ type: 'CancelTripDriver', tripId: trip.id }, 'driver');
+    expect(first[0]).toMatchObject({ type: 'TripDriverCancelled', payload: { by: 'DRIVER', reason: 'BEFORE_PREP', driverName: 'Driver 1', returns: [] } });
+    expect(st.s.trips[trip.id]).toMatchObject({ redispatchedAt: st.now, cancellations: [{ reason: 'BEFORE_PREP' }] });
+    expect(st.s.trips[trip.id]?.acceptedAt).toBeUndefined();
+    expect(trip.orderIds.every((id) => st.s.orders[id]?.delayNoticeAt === st.now)).toBe(true);
+
+    // 2) 第二位司机：进入预计到店前 10 分钟的准备期后不能取消
+    accept('Driver 2');
+    st.ok({ type: 'UpdateEta', tripId: trip.id, etaAt: st.now + 15 * MIN }, 'driver');
+    st.now += 6 * MIN;
+    expect(st.code({ type: 'CancelTripDriver', tripId: trip.id }, 'driver')).toBe('CANCEL_LOCKED');
+    // 到店、员工开始准备并取出框；到店不满 10 分钟也不能取消
+    st.ok({ type: 'CheckIn', tripId: trip.id, vehicle: 'Blue hatchback' }, 'driver');
+    st.ok({ type: 'StartPrep', key: trip.id }, 'A3');
+    const pulled = trip.orderIds.flatMap((id) => st.s.orders[id]?.toteIds ?? []);
+    const slotOf = new Map(pulled.map((t) => [t, st.s.totes[t]?.slotCode]));
+    for (const t of pulled) st.ok({ type: 'ScanPrepTote', key: trip.id, labelId: st.s.totes[t]?.labelId ?? '' }, 'A3');
+    st.now += 5 * MIN;
+    expect(st.run({ type: 'CancelTripDriver', tripId: trip.id }, 'driver').decision).toMatchObject({ ok: false, reject: { code: 'CANCEL_WAIT', params: { waitedMin: 5 } } });
+    // 等了 11 分钟：可以取消，记为等待过久；框放回原格位，交付准备结束，订单回到已暂存
+    st.now += 6 * MIN;
+    const second = st.ok({ type: 'CancelTripDriver', tripId: trip.id }, 'driver');
+    expect(second[0]).toMatchObject({ payload: { reason: 'WAITED_TOO_LONG', waitedMin: 11, sessionOwner: 'A3' } });
+    expect(st.s.sessions[trip.id]).toBeUndefined();
+    expect(pulled.every((t) => st.s.totes[t]?.status === 'STAGED' && st.s.totes[t]?.slotCode === slotOf.get(t))).toBe(true);
+    expect(pulled.every((t) => st.s.slots[slotOf.get(t) ?? '']?.includes(t))).toBe(true);
+    expect(trip.orderIds.every((id) => st.s.orders[id]?.status === 'STAGED' && st.s.orders[id]?.arrivedAt === undefined)).toBe(true);
+    expect(st.s.trips[trip.id]?.cancellations?.map((c) => c.reason)).toEqual(['BEFORE_PREP', 'WAITED_TOO_LONG']);
+
+    // 3) 第三位司机没来：预计到店后再过 10 分钟，带班负责人或控制台可以改派
+    accept('Driver 3');
+    st.ok({ type: 'UpdateEta', tripId: trip.id, etaAt: st.now + 10 * MIN }, 'driver');
+    st.now += 15 * MIN;
+    expect(st.code({ type: 'RedispatchTrip', tripId: trip.id }, 'console')).toBe('NOT_NO_SHOW');
+    st.now += 6 * MIN;
+    expect(st.code({ type: 'RedispatchTrip', tripId: trip.id }, 'A3')).toBe('NOT_AUTHORIZED');
+    expect(st.ok({ type: 'RedispatchTrip', tripId: trip.id }, 'console')[0]).toMatchObject({ payload: { by: 'STORE', reason: 'NO_SHOW' } });
+
+    // 4) 重新派单后，新司机接单，整趟照常交付
+    accept('Driver 4');
+    st.ok({ type: 'CheckIn', tripId: trip.id }, 'driver');
+    st.ok({ type: 'StartPrep', key: trip.id }, 'A3');
+    for (const t of pulled) st.ok({ type: 'ScanPrepTote', key: trip.id, labelId: st.s.totes[t]?.labelId ?? '' }, 'A3');
+    st.ok({ type: 'VerifyCode', key: trip.id, code: 'TR77' }, 'A3');
+    st.ok({ type: 'CompleteHandoff', key: trip.id, removeAgeItems: true }, 'A3');
+    expect(trip.orderIds.every((id) => st.s.orders[id]?.status === 'COMPLETED')).toBe(true);
+    // 重放事件得到同样的状态
+    expect(replay(st.log, undefined, statics)).toEqual(st.s);
   });
 
   it('时段临近时先等同一时段还在拣货的订单，凑成一趟（全流程走查发现）', () => {
@@ -459,5 +573,19 @@ describe('扫码解析与事件流', () => {
     for (const e of more) applyEvent(snap, e, statics);
     expect(snap).toEqual(st.s);
     expect(st.log.map((e) => e.seq)).toEqual(st.log.map((_, i) => i + 1));
+  });
+});
+
+describe('取货车位（决策记录 0013）', () => {
+  it('配置了明确的取货车位时，顾客到店只能用这些编号', () => {
+    const st = new Store();
+    const o = st.create(pickOrder((x) => x.type === 'PICKUP', 3));
+    const withBays = { ...ctx, statics: { ...statics, pickupBays: ['P1', 'P2'] } };
+    const r = execute(st.s, { cmd: { type: 'CheckIn', orderId: o.id, bay: '7' }, actor: 'customer', at: st.now }, withBays);
+    expect(r.decision.ok ? 'OK' : r.decision.reject.code).toBe('BAY_NOT_FOUND');
+    const ok = execute(st.s, { cmd: { type: 'CheckIn', orderId: o.id, bay: 'P2' }, actor: 'customer', at: st.now }, withBays);
+    expect(ok.decision.ok).toBe(true);
+    // 没有配置车位时不检查
+    expect(st.code({ type: 'CheckIn', orderId: o.id, bay: '7' }, 'customer')).toBe('OK');
   });
 });

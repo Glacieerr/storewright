@@ -2,10 +2,11 @@ import { assignTotes, composeTrips, planPickWalks, type BatchingOptions, type Pl
 import { gtin14, opaqueLabelId, type Item, type Order, type ToteAssignment } from '@storewright/domain';
 import type { StoreModel } from '@storewright/store-config';
 import type { CommandEnvelope, OpsCommand, RejectCode, Rejection } from './commands';
-import { ev, type PendingEvent } from './events';
+import { ev, type OpsEventPayloads, type PendingEvent } from './events';
 import type { LiveOrder, LiveTote, LiveWalk, OpsState, OrderInfo, StoreStatic, ToteInfo, WalkInfo } from './types';
 import { decideInventory, inventoryTick, isInventoryCommand, planogramByItem, replTaskEvent, sellableCases, type InventoryContext } from './inventory';
 import { codeHashInput, needsAgeCheck, pickRows, walkRemaining } from './views';
+import { DEFAULT_DRIVER_CANCEL, driverCancelWindow, noShowWindow, type DriverCancelReason } from './driverCancel';
 import { aiTick, canManageAi, decideAi, isAiCommand } from './ai';
 import { decideStaff, isStaffCommand } from './staff';
 import { decideNote, isNoteCommand } from './notes';
@@ -169,6 +170,8 @@ export function decide(s: OpsState, env: CommandEnvelope, ctx: OpsContext): Deci
       }
       const ref: { orderId?: string; tripId?: string } = cmd.tripId ? { tripId: cmd.tripId } : { orderId: cmd.orderId as string };
       if (cmd.type === 'UpdateEta') return yes([ev('EtaUpdated', { ...ref, etaAt: cmd.etaAt })]);
+      // 配置了明确的取货车位时，车位编号必须是其中之一（决策记录 0013）
+      if (cmd.bay && ctx.statics.pickupBays && !ctx.statics.pickupBays.includes(cmd.bay)) return no('BAY_NOT_FOUND', { bay: cmd.bay });
       const p: { orderId?: string; tripId?: string; bay?: string; vehicle?: string } = { ...ref };
       if (cmd.bay) p.bay = cmd.bay;
       if (cmd.vehicle) p.vehicle = cmd.vehicle;
@@ -180,6 +183,9 @@ export function decide(s: OpsState, env: CommandEnvelope, ctx: OpsContext): Deci
       if (tr.acceptedAt) return no('TRIP_ACCEPTED');
       return yes([ev('TripAccepted', { tripId: tr.id, driverName: cmd.driverName, codeHash: cmd.codeHash })]);
     }
+    case 'CancelTripDriver':
+    case 'RedispatchTrip':
+      return cancelTrip(s, cmd.tripId, cmd.type === 'CancelTripDriver' ? 'DRIVER' : 'STORE', env, ctx);
     case 'StartPrep':
       return startPrep(s, cmd.key, actor);
     case 'JoinPrep': {
@@ -219,10 +225,10 @@ export function decide(s: OpsState, env: CommandEnvelope, ctx: OpsContext): Deci
         return yes([ev('CodeVerified', { key: ss.key, method: 'MANUAL' })]);
       }
       if (!codeHash) return no('NO_CODE');
-      if (ss.manualRequired) return no('MANUAL_REQUIRED');
       if (ctx.hash(codeHashInput(ss.key, cmd.code)) === codeHash) return yes([ev('CodeVerified', { key: ss.key, method: 'CODE' })]);
+      // 输错不限次数、不锁定（决策记录 0014）；错到 codeAttempts 次后另外提供人工核验入口
       const attempt = ss.codeFailures + 1;
-      return yes([ev('CodeFailed', { key: ss.key, attempt, manualRequired: attempt >= ctx.model.config.rules.handoff.codeAttempts })]);
+      return yes([ev('CodeFailed', { key: ss.key, attempt, manualRequired: ss.manualRequired || attempt >= ctx.model.config.rules.handoff.codeAttempts })]);
     }
     case 'VerifyAge': {
       const ss = s.sessions[cmd.key];
@@ -369,11 +375,10 @@ function releaseEvents(s: OpsState, fresh: ReadonlyArray<{ tote: ToteInfo; order
   }
   if (!pending.length) return [];
   const options: BatchingOptions = { strategy: 'ZONE_PARTITION', routing: 'TSP', enforceColdLimit: true, unit: 'ORDER', ...ctx.batching };
-  const planned = planPickWalks(
-    planning(ctx),
-    pending.map((p) => toAssignment(ctx, p.tote, p.order)),
-    options,
-    'tmp-',
+  // 自动运营的订单单独分批：虚拟员工的批次里不会混进员工手里的订单
+  const groups = [pending.filter((p) => p.order.track !== 'AUTO'), pending.filter((p) => p.order.track === 'AUTO')];
+  const planned = groups.flatMap((g, i) =>
+    g.length ? planPickWalks(planning(ctx), g.map((p) => toAssignment(ctx, p.tote, p.order)), options, 'tmp-').map((w) => ({ ...w, auto: i === 1 })) : [],
   );
   const out: PendingEvent[] = [];
   let n = s.counters.walks;
@@ -389,6 +394,7 @@ function releaseEvents(s: OpsState, fresh: ReadonlyArray<{ tote: ToteInfo; order
       dueAt: w.dueAt * 1000,
     };
     if (w.coldLimitSec !== undefined) walk.coldLimitSec = w.coldLimitSec;
+    if (w.auto) walk.track = 'AUTO';
     out.push(ev('PickWalkCreated', { walk }));
     for (const id of w.toteAssignmentIds) {
       const version = (s.totes[id]?.labelVersion ?? 0) + 1;
@@ -434,8 +440,15 @@ function tick(s: OpsState, at: number, release: boolean, ctx: OpsContext): Pendi
 }
 
 function tripEvents(s: OpsState, at: number, ctx: OpsContext): PendingEvent[] {
+  // 自动运营的订单单独组行程
+  const manual = tripEventsFor(s, at, ctx, false, s.counters.trips);
+  return [...manual, ...tripEventsFor(s, at, ctx, true, s.counters.trips + manual.length)];
+}
+
+function tripEventsFor(s: OpsState, at: number, ctx: OpsContext, auto: boolean, counter: number): PendingEvent[] {
   const rules = ctx.model.config.rules.handoff;
-  const ready = Object.values(s.orders).filter((o) => o.type === 'DELIVERY' && o.status === 'STAGED' && !o.tripId);
+  const sameTrack = (o: LiveOrder) => (o.track === 'AUTO') === auto;
+  const ready = Object.values(s.orders).filter((o) => o.type === 'DELIVERY' && o.status === 'STAGED' && !o.tripId && sameTrack(o));
   if (!ready.length) return [];
   // 离必须出发还剩多少时间（时段开始 − 提前量）
   const slack = Math.min(...ready.map((o) => o.slotStart - rules.deliveryReadyLeadMin * 60_000 - at));
@@ -444,7 +457,7 @@ function tripEvents(s: OpsState, at: number, ctx: OpsContext): PendingEvent[] {
     // 同一时段里还在拣货、暂存的配送订单：时间还够（超过 5 分钟）就先等它们暂存，
     // 否则先暂存好的那一单会单独成行，整趟只装一单（全流程走查发现）
     const first = ready.reduce((a, o) => (o.slotStart < a.slotStart ? o : a));
-    const companions = Object.values(s.orders).some((o) => o.type === 'DELIVERY' && !o.tripId && (o.status === 'LOCKED' || o.status === 'PICKING') && o.slotStart <= first.slotStart + first.slotLengthMin * 60_000);
+    const companions = Object.values(s.orders).some((o) => o.type === 'DELIVERY' && sameTrack(o) && !o.tripId && (o.status === 'LOCKED' || o.status === 'PICKING') && o.slotStart <= first.slotStart + first.slotLengthMin * 60_000);
     if (companions && slack > 5 * 60_000) return [];
   }
   const candidates: TripCandidate[] = ready.map((o) => {
@@ -454,7 +467,7 @@ function tripEvents(s: OpsState, at: number, ctx: OpsContext): PendingEvent[] {
   });
   const v = ctx.vehicle ?? { totes: 12, maxKg: 300 };
   const trips = composeTrips(candidates, { maxOrders: rules.maxOrdersPerTrip, vehicleTotes: v.totes, vehicleMaxKg: v.maxKg }, 'tmp-');
-  let n = s.counters.trips;
+  let n = counter;
   return trips.map((tr) => {
     n += 1;
     return ev('TripProposed', { tripId: `TR${String(n).padStart(3, '0')}`, orderIds: tr.orderIds, placements: tr.placements });
@@ -565,6 +578,63 @@ function sessionToteIds(s: OpsState, orderIds: readonly string[]): string[] {
     for (const tid of o.toteIds) if (s.totes[tid]?.status !== 'RECOVERY') ids.push(tid);
   }
   return ids;
+}
+
+/**
+ * 司机取消接单 / 门店因司机没来而改派（决策记录 0014）。时间窗口见 driverCancel.ts。系统的应对：
+ * 行程回到待接单并标记重新派单；正在进行的交付准备结束，已取出的框放回原格位（满了就放同温区有空位的格位）；
+ * 顾客收到送达延后的通知；离送达时段结束不足 20 分钟（重新派单大约要这么久）时标记为可能超时，提醒带班负责人。
+ */
+const REDISPATCH_BUFFER_MS = 20 * 60_000;
+function cancelTrip(s: OpsState, tripId: string, by: 'DRIVER' | 'STORE', env: CommandEnvelope, ctx: OpsContext): Decision {
+  const tr = s.trips[tripId];
+  if (!tr) return no('TRIP_NOT_FOUND');
+  const h = ctx.model.config.rules.handoff;
+  const rules = { lockMin: h.driverCancelLockMin ?? DEFAULT_DRIVER_CANCEL.lockMin, waitMin: h.driverCancelWaitMin ?? DEFAULT_DRIVER_CANCEL.waitMin };
+  let reason: DriverCancelReason;
+  let waitedMin: number | undefined;
+  if (by === 'DRIVER') {
+    // 只有司机本人（经平台或控制台代为操作）可以取消
+    if (env.actor !== 'driver' && env.actor !== 'console' && !env.actor.startsWith('V-D')) return no('NOT_AUTHORIZED');
+    const w = driverCancelWindow(tr, env.at, rules);
+    if (!w.allowed) return no(w.code, w.opensAt !== undefined ? { opensAt: w.opensAt, waitedMin: w.waitedMin ?? 0 } : undefined);
+    reason = w.reason;
+    waitedMin = w.waitedMin;
+  } else {
+    if (!canManageAi(ctx.statics, env.actor)) return no('NOT_AUTHORIZED');
+    if (tr.completedAt !== undefined) return no('ALREADY_DONE');
+    if (tr.acceptedAt === undefined) return no('TRIP_NOT_ACCEPTED');
+    const w = noShowWindow(tr, env.at, rules);
+    if (!w.allowed) return no('NOT_NO_SHOW', w.opensAt !== undefined ? { opensAt: w.opensAt } : undefined);
+    reason = 'NO_SHOW';
+  }
+  // 已取出的框放回暂存区：优先原格位，满了就找同温区有空位的格位
+  const ss = s.sessions[tripId];
+  const returns: Array<{ toteId: string; slotCode: string }> = [];
+  if (ss && ss.status !== 'COMPLETED') {
+    const used = new Map<string, number>();
+    const free = (code: string) => {
+      const slot = ctx.model.stagingSlots.find((x) => x.code === code);
+      return !!slot && (s.slots[code]?.length ?? 0) + (used.get(code) ?? 0) < slot.capacityTotes;
+    };
+    for (const id of ss.scanned) {
+      const t = s.totes[id];
+      if (!t || t.status !== 'PULLED') continue;
+      const target = t.slotCode && free(t.slotCode) ? t.slotCode : ctx.model.stagingSlots.find((x) => x.tempZone === t.tempZone && free(x.code))?.code;
+      if (!target) continue;
+      used.set(target, (used.get(target) ?? 0) + 1);
+      returns.push({ toteId: id, slotCode: target });
+    }
+  }
+  const atRisk = tr.orderIds.some((id) => {
+    const o = s.orders[id];
+    return !!o && o.status !== 'CANCELLED' && o.status !== 'COMPLETED' && env.at + REDISPATCH_BUFFER_MS > o.slotStart + o.slotLengthMin * 60_000;
+  });
+  const p: OpsEventPayloads['TripDriverCancelled'] = { tripId, by, reason, returns, atRisk };
+  if (tr.driverName) p.driverName = tr.driverName;
+  if (waitedMin !== undefined) p.waitedMin = waitedMin;
+  if (ss && ss.status !== 'COMPLETED') p.sessionOwner = ss.owner;
+  return yes([ev('TripDriverCancelled', p)]);
 }
 
 /** 员工扫描订单的任意一个框，订单立即标记为「准备中」并加锁；第二个员工只能加入协助（决策 D-05） */

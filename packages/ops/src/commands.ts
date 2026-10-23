@@ -40,6 +40,10 @@ export type OpsCommand =
   | { type: 'UpdateEta'; orderId?: string; tripId?: string; etaAt: number }
   | { type: 'CheckIn'; orderId?: string; tripId?: string; bay?: string; vehicle?: string }
   | { type: 'AcceptTrip'; tripId: string; driverName: string; codeHash: string }
+  /** 司机取消接单（只在允许的时间窗口内，决策记录 0014） */
+  | { type: 'CancelTripDriver'; tripId: string }
+  /** 司机没来：带班负责人或控制台改派，行程重新派单 */
+  | { type: 'RedispatchTrip'; tripId: string }
   // 交付
   | { type: 'StartPrep'; key: string }
   | { type: 'JoinPrep'; key: string }
@@ -151,9 +155,14 @@ export type RejectCode =
   | 'SLOT_ZONE_MISMATCH'
   | 'SLOT_FULL'
   | 'SAME_SLOT'
+  | 'BAY_NOT_FOUND'
   | 'NOT_CANCELLED'
   | 'TRIP_NOT_FOUND'
   | 'TRIP_ACCEPTED'
+  | 'TRIP_NOT_ACCEPTED'
+  | 'CANCEL_LOCKED'
+  | 'CANCEL_WAIT'
+  | 'NOT_NO_SHOW'
   | 'ORDER_IN_TRIP'
   | 'NOT_STAGED'
   | 'PREP_LOCKED'
@@ -165,7 +174,6 @@ export type RejectCode =
   | 'NOT_ARRIVED'
   | 'ALREADY_VERIFIED'
   | 'NO_CODE'
-  | 'MANUAL_REQUIRED'
   | 'MANUAL_NOT_ALLOWED'
   | 'CODE_WRONG'
   | 'NOT_VERIFIED'

@@ -1,4 +1,4 @@
-# 持续集成：类型检查、单元与属性测试、Phase 1 结果可复现、多浏览器端到端测试
+# 持续集成：类型检查、单元与属性测试、Phase 1 结果可复现、多浏览器端到端测试（Chromium、WebKit、Firefox、不支持 SharedWorker 的浏览器、iPhone、安卓）
 name: CI
 
 on:
@@ -35,9 +35,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build:all
-      - run: npx playwright install --with-deps chromium
-      - name: End-to-end tests (real backend + in-browser demo site)
-        run: npm run e2e
+      - run: npx playwright install --with-deps chromium webkit firefox
+      - name: End-to-end tests on Chromium, WebKit (Safari), Firefox, no-SharedWorker browsers, iPhone and Android (real backend + in-browser demo site)
+        run: npm run e2e:browsers
         env:
           CI: 'true'
           PW_CHANNEL: ''

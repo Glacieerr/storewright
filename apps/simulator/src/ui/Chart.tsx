@@ -77,7 +77,7 @@ export function LineChart({ title, series, t0, step, now, yMax, format = (v) => 
         <span>{title}</span>
         <span className="chart-values">
           {series.map((s, i) => (
-            <span key={s.label} className="chart-value" style={{ color: s.color }}>
+            <span key={s.label} className="chart-value">
               <i style={{ background: s.color, opacity: s.dashed ? 0.5 : 1 }} />
               {translate(s.label)} <b className="mono">{format(current[i] ?? 0)}</b>
             </span>

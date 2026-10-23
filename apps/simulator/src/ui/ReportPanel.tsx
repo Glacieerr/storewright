@@ -4,8 +4,9 @@ import { useApp } from '../state/store';
 import { digestOf, economicsInput, type ScenarioDigest } from '../state/scenarios';
 import { captureScene } from '../scene/capture';
 import { POLICY_SHORT, TEMPLATE_LABEL } from './format';
-import { delta, ROWS } from './metricRows';
+import { delta, rowsFor } from './metricRows';
 import { downloadDataUrl, downloadText, MULTI_KEYS, reportHTML, reportMarkdown, type ReportColumn } from './report';
+import { yourStoreNow } from '../extensions';
 import { getLang, t, translate } from '../i18n';
 
 const money = (v: number) => `${v < 0 ? '−' : ''}$${Math.abs(v).toFixed(0)}`;
@@ -98,15 +99,23 @@ export function ReportPanel() {
   const ab = useApp((s) => s.ab);
   const costs = useApp((s) => s.costs);
   const multi = useApp((s) => s.multiDay);
+  // 「你的商店」的门店项目：完整报告（导出、连续多天模拟）是专业版功能；演示门店不受影响
+  const project = useApp((s) => s.project);
+  const paid = (fn: () => void) => () => {
+    const ext = yourStoreNow();
+    if (project && ext && !ext.request('fullReport')) return;
+    fn();
+  };
   const app = useApp.getState;
   const [name, setName] = useState('');
   const [withShot, setWithShot] = useState(true);
 
   const current = useMemo<ScenarioDigest | undefined>(() => (timeline ? digestOf(timeline, config) : undefined), [timeline, config]);
   const column = (id: string): ReportColumn | undefined => {
-    if (id === 'current') return current ? { name: t('当前方案'), template, policy, digest: current, pnl: dayPnL(economicsInput(current), costs) } : undefined;
+    if (id === 'current') return current ? { name: t('当前方案'), template, policy, digest: current, pnl: dayPnL(economicsInput(current), costs), ...(config.industry ? { industry: config.industry } : {}) } : undefined;
     const s = scenarios.find((x) => x.id === id);
-    return s ? { name: s.name, template: s.settings.template, policy: s.settings.policy, thumb: s.thumb, digest: s.digest, pnl: dayPnL(economicsInput(s.digest), costs) } : undefined;
+    const industry = s?.settings.config?.industry;
+    return s ? { name: s.name, template: s.settings.template, policy: s.settings.policy, thumb: s.thumb, digest: s.digest, pnl: dayPnL(economicsInput(s.digest), costs), ...(industry ? { industry } : {}) } : undefined;
   };
   const A = column(ab[0]);
   const B = column(ab[1]);
@@ -273,7 +282,7 @@ export function ReportPanel() {
                     <th>{t('B 相对 A')}</th>
                   </tr>
                 </thead>
-                {ROWS.map((g) => (
+                {rowsFor(A.industry === 'HARDWARE' && B.industry === 'HARDWARE' ? 'HARDWARE' : undefined).map((g) => (
                   <tbody key={g.group}>
                     <tr className="group">
                       <td colSpan={4}>{t(g.group)}</td>
@@ -311,7 +320,7 @@ export function ReportPanel() {
         <p className="hint">{t('用当前设置连续模拟多天：每天换一组随机订单，订单量按星期几浮动（周五到周日偏高），看结果的波动范围，而不是只看一天。在后台计算，不影响播放。')}</p>
         <div className="row">
           {[7, 14, 30].map((n) => (
-            <button key={n} onClick={() => void app().runMultiDay(n)} disabled={multi.status === 'running'}>
+            <button key={n} onClick={paid(() => void app().runMultiDay(n))} disabled={multi.status === 'running'}>
               {t('{0} 天', n)}
             </button>
           ))}
@@ -398,10 +407,10 @@ export function ReportPanel() {
           {t('附上当前画面截图')}
         </label>
         <div className="row">
-          <button className="primary" onClick={() => exportReport('html')}>
+          <button className="primary" onClick={paid(() => exportReport('html'))}>
             {t('导出 HTML 报告')}
           </button>
-          <button onClick={() => exportReport('md')}>{t('导出 Markdown')}</button>
+          <button onClick={paid(() => exportReport('md'))}>{t('导出 Markdown')}</button>
         </div>
         <p className="hint">{t('报告包含当前方案和对比中选中的 A / B 方案的指标、经营账，以及最近一次多天模拟的分布。HTML 报告是单个文件，可以离线打开、直接发给别人。')}</p>
       </div>

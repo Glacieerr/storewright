@@ -4,6 +4,8 @@
   --sc-muted: #5b6b64;
   --sc-line: #d5ddd9;
   --sc-brand: #0f6e56;
+  /* 品牌绿底色上的字 */
+  --sc-brand-ink: #ffffff;
   --sc-surface: #ffffff;
   color-scheme: light dark;
 }
@@ -14,6 +16,9 @@
     --sc-muted: #9aaba3;
     --sc-line: #24302b;
     --sc-surface: #161e1b;
+    /* 深色背景上的品牌绿要亮一些（原来的深绿只有 2.98；决策记录 0015） */
+    --sc-brand: #3fbf96;
+    --sc-brand-ink: #062a20;
   }
 }
 * {
@@ -30,7 +35,7 @@ body {
   gap: 16px;
   align-items: flex-start;
   justify-content: space-between;
-  padding: 14px 20px 8px;
+  padding: 10px 20px 6px;
 }
 .sc-head h1 {
   margin: 0;
@@ -67,14 +72,68 @@ body {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 16px;
   padding: 8px 20px 12px;
-  height: calc(100vh - 210px);
-  min-height: 640px;
+  /* 笔记本屏幕上也要能完整操作：左栏和手机至少 560 像素高，不够时整页滚动 */
+  height: max(560px, calc(100vh - 140px));
 }
 .sc-left {
   display: grid;
-  grid-template-rows: minmax(0, 1.25fr) minmax(0, 1fr);
-  gap: 12px;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 8px;
   min-width: 0;
+}
+.sc-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.sc-switch button {
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--sc-line);
+  background: var(--sc-surface);
+  color: var(--sc-ink);
+  cursor: pointer;
+}
+.sc-switch button[aria-selected='true'] {
+  background: var(--sc-brand);
+  border-color: var(--sc-brand);
+  color: var(--sc-brand-ink);
+}
+.sc-open {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--sc-brand);
+  text-decoration: none;
+}
+/* 左栏：几个画面叠在同一格里，只显示选中的那个；隐藏的画面保持尺寸，继续在后台运行 */
+.sc-stage {
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  gap: 12px;
+  min-height: 0;
+}
+.sc-stage > iframe {
+  grid-area: 1 / 1;
+  visibility: hidden;
+}
+.sc-left[data-layout='console'] .sc-console,
+.sc-left[data-layout='live'] .sc-sim,
+.sc-left[data-layout='auto'] .sc-auto {
+  visibility: visible;
+}
+.sc-left[data-layout='split'] .sc-stage {
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1.1fr);
+}
+.sc-left[data-layout='split'] .sc-sim {
+  grid-area: 1 / 1;
+  visibility: visible;
+}
+.sc-left[data-layout='split'] .sc-console {
+  grid-area: 2 / 1;
+  visibility: visible;
 }
 .sc-left iframe,
 .phone iframe {
@@ -120,7 +179,7 @@ body {
     height: auto;
   }
   .sc-left {
-    grid-template-rows: 70vh 60vh;
+    grid-template-rows: auto 75vh;
   }
   .sc-phones {
     flex-wrap: wrap;
@@ -203,7 +262,7 @@ body {
 }
 .sc-steps li.current .n {
   background: var(--sc-brand);
-  color: #fff;
+  color: var(--sc-brand-ink);
 }
 .sc-steps li.done {
   color: var(--sc-brand);
@@ -255,7 +314,7 @@ body {
   .sc-tabs button[aria-selected='true'] {
     background: var(--sc-brand);
     border-color: var(--sc-brand);
-    color: #fff;
+    color: var(--sc-brand-ink);
   }
   .sc-main {
     display: block;
@@ -264,8 +323,16 @@ body {
     padding: 6px 16px 10px;
   }
   .sc-left,
+  .sc-stage,
   .sc-phones {
     display: contents;
+  }
+  .sc-switch,
+  .sc-auto {
+    display: none;
+  }
+  .sc-stage > iframe {
+    visibility: visible;
   }
   .pane {
     display: none;
@@ -290,4 +357,12 @@ body {
   .sc-head p {
     display: none;
   }
+}
+
+/* 键盘操作时清楚地看到焦点（决策记录 0015） */
+button:focus-visible,
+select:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--sc-brand);
+  outline-offset: 2px;
 }

@@ -19,7 +19,7 @@ export interface HubLinkResponse {
 
 export type ToHub =
   | { k: 'req'; id: number; req: HubLinkRequest }
-  | { k: 'open'; sid: number; storeId: string; token: string; after: number }
+  | { k: 'open'; sid: number; storeId: string; token: string; after: number; statics?: string }
   | { k: 'send'; sid: number; data: string }
   | { k: 'close'; sid: number }
   /** 把另一个 MessagePort 交给中枢（展示页、模拟器的桥接页面） */
@@ -71,7 +71,11 @@ export function createHubLink(getPort: () => Promise<HubPort>): HubLink {
   const base = (): string => (globalThis as { location?: { href: string } }).location?.href ?? 'http://local/';
 
   const port = (): Promise<HubPort> => {
-    ready ??= getPort().then((p) => {
+    // 拿端口失败（例如桥接页面没有及时回应）时不缓存失败结果，下一次请求重新去拿（决策记录 0015）
+    ready ??= getPort().catch((e: unknown) => {
+      ready = undefined;
+      throw e;
+    }).then((p) => {
       p.onmessage = (ev) => {
         const m = ev.data;
         if (m.k === 'res') {
@@ -102,7 +106,8 @@ export function createHubLink(getPort: () => Promise<HubPort>): HubLink {
         if (this.readyState === 3) return;
         this.readyState = 1;
         this.onopen?.({});
-        p.postMessage({ k: 'open', sid: this.sid, storeId, token: u.searchParams.get('token') ?? '', after: Number(u.searchParams.get('after') ?? 0) });
+        const statics = u.searchParams.get('statics') ?? undefined;
+        p.postMessage({ k: 'open', sid: this.sid, storeId, token: u.searchParams.get('token') ?? '', after: Number(u.searchParams.get('after') ?? 0), ...(statics ? { statics } : {}) });
       });
     }
 

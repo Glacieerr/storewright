@@ -38,7 +38,7 @@ export function ScanBox({ onScan, label, hint }: { onScan: (code: string) => voi
           autoCorrect="off"
           autoCapitalize="characters"
           spellCheck={false}
-          placeholder={hint ?? t('扫码或输入后按回车')}
+          placeholder={hint ?? t('扫码或输入')}
           aria-label={label}
         />
         <button type="button" className="icon-btn" onClick={() => setKeyboard((k) => !k)} aria-pressed={keyboard} title={t('手动输入')}>

@@ -50,6 +50,15 @@ export const ROWS: Array<{ group: string; rows: Row[] }> = [
   },
 ];
 
+/**
+ * 按行业取指标行（决策记录 0015）：建材店的商品都不是食品，「化学品与食品混装」永远为 0，不显示；
+ * 门口停留对建材店不涉及冷链，标题去掉「冷链风险」。
+ */
+export function rowsFor(industry?: string): typeof ROWS {
+  if (industry !== 'HARDWARE') return ROWS;
+  return ROWS.map((g) => ({ ...g, rows: g.rows.filter((r) => r.key !== 'chemicalMixTotePct').map((r) => (r.key === 'avgReadyDwellMin' ? { ...r, label: '门口停留' } : r)) }));
+}
+
 export function delta(row: Row, base: number, v: number): { text: string; tone: 'good' | 'bad' | 'flat' } {
   let d: number;
   let text: string;

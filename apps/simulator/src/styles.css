@@ -3,9 +3,10 @@
   --panel: #ffffff;
   --panel-2: #f7f7f4;
   --text: #22272b;
-  --muted: #6c757d;
+  --muted: #626b72;
   --border: #e3e3dc;
-  --accent: #3fa36b;
+  /* 绿色按钮上的白字对比度 ≥ 4.5（原来 #3fa36b 只有 3.15；决策记录 0015） */
+  --accent: #2b7d52;
   --accent-ink: #ffffff;
   --warn: #c2410c;
   --alert: #b91c1c;
@@ -25,6 +26,8 @@
     --muted: #9aa3ab;
     --border: #30363c;
     --accent: #52b981;
+    /* 深色主题里绿色按钮用深色字（白字只有 2.44） */
+    --accent-ink: #0b1a12;
     --warn: #f59e5b;
     --alert: #f87171;
     --info: #7fb0e8;
@@ -41,6 +44,7 @@
   --muted: #9aa3ab;
   --border: #30363c;
   --accent: #52b981;
+  --accent-ink: #0b1a12;
   --warn: #f59e5b;
   --alert: #f87171;
   --info: #7fb0e8;
@@ -89,8 +93,12 @@ input {
 .app {
   display: grid;
   height: 100%;
-  grid-template-rows: auto minmax(0, 1fr) 56px;
-  grid-template-areas: 'top' 'work' 'time';
+  grid-template-rows: auto auto minmax(0, 1fr) 56px;
+  grid-template-areas: 'top' 'project' 'work' 'time';
+}
+/* 「你的商店」的项目栏：没有打开项目时这一行高度为 0 */
+.project-bar {
+  grid-area: project;
 }
 .topbar {
   grid-area: top;
@@ -684,7 +692,8 @@ details.generator:not([open]) summary::after {
   color: #3a2c00;
 }
 .scene-label.pickup-label {
-  background: #ee8a35;
+  /* 白字对比度 5.2（原来的橙色只有 2.5） */
+  background: #c2410c;
   color: #fff;
 }
 .chips {
@@ -1014,6 +1023,10 @@ ol.steps li {
 }
 
 /* ---------- 场景标签 ---------- */
+/* 和更重要的标签重叠时暂时隐藏（scene/declutter.ts） */
+.scene-label.declutter-hidden {
+  visibility: hidden;
+}
 .scene-label {
   pointer-events: none;
   user-select: none;
@@ -1075,8 +1088,8 @@ ol.steps li {
 /* ---------- 窄屏：上下堆叠，场景在上 ---------- */
 @media (max-width: 960px) {
   .app {
-    grid-template-rows: auto auto auto;
-    grid-template-areas: 'top' 'work' 'time';
+    grid-template-rows: auto auto auto auto;
+    grid-template-areas: 'top' 'project' 'work' 'time';
     height: auto;
     min-height: 100%;
   }
@@ -1119,10 +1132,83 @@ ol.steps li {
     display: none;
   }
 }
+.scene-label .label-short {
+  display: none;
+}
 @media (max-width: 600px) {
-  /* 窄屏上通道标签会互相重叠，只保留区域标签 */
-  .scene-label.run-label {
+  /* 窄屏上通道标签会互相重叠，只保留主要区域的标签；字号缩小，小区域、容量说明、「后仓」（和托盘货架区重叠）和熟食柜台不标注（编辑、看区域占用时小区域照常） */
+  .scene-label.run-label,
+  .scene-label.area-label.minor,
+  .scene-label.backroom-label,
+  .scene-label.deli-label,
+  .scene-label .label-extra,
+  .scene-label .label-full {
     display: none;
+  }
+  .scene-label {
+    font-size: 10px;
+    padding: 0 5px;
+  }
+  .scene-label.area-label {
+    font-size: 10px;
+    padding: 1px 6px;
+  }
+  .scene-label .label-short {
+    display: inline;
+  }
+  /* 没有键盘：快捷键按钮不显示 */
+  .view-tools .vt-keys {
+    display: none;
+  }
+  /* 场景占屏幕高度的约 2/3（顶栏和项目栏已收成一行） */
+  .app:not(.embedded) .stage {
+    height: 66vh;
+    height: 66svh;
+  }
+}
+
+/* 手机上的顶栏：第一行只留品牌、「你的商店」和「设置」开关，其余控件（.tb-more）点开关后显示在下面；
+   嵌在展示页里时不用（那里的顶栏只有视角和建筑切换） */
+.topbar-toggle {
+  display: none;
+}
+@media (max-width: 600px) {
+  .app:not(.embedded) .topbar {
+    gap: 8px 10px;
+    min-height: 0;
+    padding: 6px 12px;
+  }
+  .app:not(.embedded) .topbar .brand {
+    margin-right: 0;
+  }
+  .app:not(.embedded) .topbar .brand > .muted,
+  .app:not(.embedded) .topbar .spacer,
+  .app:not(.embedded) .topbar:not(.open) .tb-more {
+    display: none;
+  }
+  .app:not(.embedded) .topbar-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+    padding: 4px 10px;
+    font-size: 13px;
+  }
+  .app:not(.embedded) .topbar .tb-finish {
+    order: 1;
+  }
+  /* 编辑布局时第一行还有「完成编辑」：品牌只留图标 */
+  .app.mode-edit:not(.embedded) .topbar .brand strong {
+    display: none;
+  }
+  /* 展开后控件在第一行下面换行排列 */
+  .app:not(.embedded) .topbar.open .tb-more {
+    order: 2;
+  }
+  .app:not(.embedded) .topbar.open .field:first-of-type {
+    flex-basis: 100%;
+    padding-top: 6px;
+    border-top: 1px solid var(--border);
   }
 }
 
@@ -1257,7 +1343,8 @@ kbd {
 }
 @media (max-width: 960px) {
   .map-dock,
-  .camera-presets {
+  .camera-presets,
+  .view-tools .vt-map {
     display: none;
   }
 }
@@ -1694,7 +1781,10 @@ kbd {
 
 /* 自动巡游：收起界面，只留场景 */
 .app.cinematic {
-  grid-template-rows: 0 minmax(0, 1fr) 0;
+  grid-template-rows: 0 0 minmax(0, 1fr) 0;
+}
+.app.cinematic .project-bar {
+  display: none;
 }
 .app.cinematic .topbar,
 .app.cinematic .timeline,
@@ -1950,4 +2040,102 @@ kbd {
 .live-chip.offline i,
 .live-chip.connecting i {
   background: var(--warn, #c98a00);
+}
+
+/* 区域与卸货门编辑（决策记录 0013） */
+.area-editor h4 {
+  margin: 10px 0 4px;
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+.area-group-edit ul,
+.dock-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+.area-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  align-items: baseline;
+  width: 100%;
+  padding: 5px 6px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.area-row:hover,
+.area-group-edit li.open > .area-row {
+  border-color: var(--border);
+  background: var(--panel-2);
+}
+.area-row .mono {
+  font-size: 11px;
+}
+.area-row .muted {
+  margin-left: auto;
+  font-size: 12px;
+}
+.area-fields {
+  display: grid;
+  gap: 6px;
+  margin: 4px 0 8px 6px;
+  padding-left: 10px;
+  border-left: 2px solid var(--accent);
+}
+.area-fields .coords input {
+  width: 64px;
+}
+.dock-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  font-size: 13px;
+}
+.dock-list input[type='number'] {
+  width: 70px;
+}
+.link.danger {
+  color: var(--alert);
+}
+.scene-label.area-label.alert {
+  background: var(--alert);
+  color: #fff;
+}
+
+/* 「你的商店」的入口按钮（页面本身在线上版的私有模块里，决策记录 0013） */
+.your-store-btn {
+  margin-left: 8px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.app.embedded .your-store-btn {
+  display: none;
+}
+
+/* 键盘操作时清楚地看到焦点（决策记录 0015） */
+button:focus-visible,
+select:focus-visible,
+input:focus-visible,
+a:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }

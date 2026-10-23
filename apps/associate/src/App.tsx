@@ -69,9 +69,19 @@ export function App() {
 /** 演示模式：第一次打开某家店时，中枢要建店并用本店的仿真历史训练 AI 模型 */
 function DemoBanner() {
   const [training, setTraining] = useState(false);
-  useEffect(() => link.onStatus((x) => setTraining(x === 'training')), []);
-  if (!training) return null;
-  return <div className="demo-banner">{t('正在浏览器里建店，并用本店的仿真历史训练 AI 模型（第一次需要几秒）…')}</div>;
+  // 不支持 SharedWorker 的浏览器、并且另一个标签页已经在用演示门店：这个标签页的门店是单独的（决策记录 0015）
+  const [isolated, setIsolated] = useState(false);
+  useEffect(
+    () =>
+      link.onStatus((x) => {
+        if (x === 'isolated') setIsolated(true);
+        else setTraining(x === 'training');
+      }),
+    [],
+  );
+  if (training) return <div className="demo-banner">{t('正在浏览器里建店，并用本店的仿真历史训练 AI 模型（第一次需要几秒）…')}</div>;
+  if (isolated) return <div className="demo-banner isolated">{t('这个浏览器不能让多个标签页共用演示门店：这个标签页里的门店是单独的，关闭后不保存。想看多部设备同步，请用展示页（一个页面里同时有控制台、手机和模拟器）。')}</div>;
+  return null;
 }
 
 function StatusBar({ onSignOut }: { onSignOut?: () => void }) {

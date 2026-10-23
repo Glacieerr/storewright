@@ -4,7 +4,7 @@ import { useClock } from '../state/clock';
 import type { PolicyDigest, PolicyName } from '../sim/protocol';
 import { LineChart, type ChartSeries } from './Chart';
 import { POLICY_COLOR, POLICY_LABEL, POLICY_SHORT } from './format';
-import { delta, ROWS } from './metricRows';
+import { delta, rowsFor } from './metricRows';
 import { t } from '../i18n';
 
 const ORDER: PolicyName[] = ['baseline', 'optimized', 'efficiency'];
@@ -13,6 +13,7 @@ const ORDER: PolicyName[] = ['baseline', 'optimized', 'efficiency'];
 export function ComparePanel() {
   const tm = useClock(4);
   const compare = useApp((s) => s.compare);
+  const industry = useApp((s) => s.config.industry);
   const policy = useApp((s) => s.policy);
   const app = useApp.getState;
 
@@ -72,7 +73,7 @@ export function ComparePanel() {
               ))}
             </tr>
           </thead>
-          {ROWS.map((g) => (
+          {rowsFor(industry).map((g) => (
             <tbody key={g.group}>
               <tr className="group">
                 <td colSpan={4}>{t(g.group)}</td>

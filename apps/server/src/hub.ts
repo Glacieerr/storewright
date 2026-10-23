@@ -1,6 +1,6 @@
-import { caseLabelSvg, caseLabelZpl, locationLabelSvg, locationLabelZpl, slotLabelSvg, slotLabelZpl, toteLabelSvg, toteLabelZpl, type ToteLabelData } from '@storewright/labels';
-import { locationIndex, sellableCases, type OpsCommand, type OpsCommandType, type OpsState } from '@storewright/ops';
-import type { TemplateName } from '@storewright/store-config';
+import type { ToteLabelData } from '@storewright/labels';
+import { clientProjection, locationIndex, sellableCases, type OpsCommand, type OpsCommandType, type OpsState } from '@storewright/ops';
+import type { StoreConfig, TemplateName } from '@storewright/store-config';
 import { AiService } from './ai';
 import { Assistant, type LlmConfig } from './assistant';
 import { buildEvalSet, runEval } from './assistant/eval';
@@ -10,6 +10,7 @@ import { StoreRuntime, type HubMessage } from './runtime';
 import { sensorCommand } from './sensing';
 import type { HubStorage, SessionRole, SessionRow } from './storage';
 import { StoreSim } from './storeSim';
+import { AutoPilot } from './autopilot';
 
 /**
  * 门店中枢：全部接口的处理逻辑，与传输方式无关。
@@ -67,8 +68,28 @@ export interface StoreEntry {
   demo: DemoStore;
   lastRelease: number;
   sim: StoreSim;
+  /** 自动运营（虚拟顾客与虚拟员工，和员工手机上的操作双线并行） */
+  auto: AutoPilot;
   ai: AiService;
   assistant: Assistant;
+  /** 发给设备的快照缓存（同一序号、同一分钟内的新连接共用一次序列化；决策记录 0014） */
+  snap?: { ref: OpsState; seq: number; bucket: number; json: string };
+  /** 门店静态数据的 JSON 和哈希（设备已有同一版本时不再发送） */
+  staticsJson?: { json: string; hash: string };
+}
+
+/**
+ * 推送消息只序列化一次（决策记录 0014）：同一条消息推给所有设备时共用同一段 JSON 文本，
+ * 设备几百台时序列化的开销不再乘以设备数。
+ */
+const frames = new WeakMap<object, string>();
+export function frameOf(m: object): string {
+  let f = frames.get(m);
+  if (f === undefined) {
+    f = JSON.stringify(m);
+    frames.set(m, f);
+  }
+  return f;
 }
 
 export interface HubConnection {
@@ -89,6 +110,8 @@ export const ASSOCIATE_COMMANDS = new Set<OpsCommandType>([
   'StageTote',
   'RecoverTote',
   'StartPrep',
+  // 司机没来时改派（只有带班负责人，作业核心里检查）
+  'RedispatchTrip',
   'JoinPrep',
   'ScanPrepTote',
   'VerifyCode',
@@ -143,7 +166,17 @@ export const ASSOCIATE_COMMANDS = new Set<OpsCommandType>([
 ]);
 
 /** 控制台（演示中代替订单平台、顾客和司机）可以提交的命令 */
-export const CONSOLE_COMMANDS = new Set<OpsCommandType>(['CancelOrder', 'LockOrder', 'ReleaseWalks', 'UpdateEta', 'CheckIn', 'CreateAsn', 'ArriveTruck', 'RecordSales', 'RequestReplenishment', 'CreateCount', 'AcceptRecommendation', 'OverrideRecommendation', 'DismissRecommendation', 'SetAiMode', 'ChangeRole', 'LockAssociate', 'AddNote', 'RemoveNote', 'CreateMtoTicket', 'DiscardMto', 'StartReturn', 'CreateParcelAsn', 'HandOffParcels', 'InductParcel']);
+/**
+ * 按需加载（决策记录 0015）：标签生成（含二维码库）只在打印标签时、门店配置的完整校验（含 zod）只在访客提交自己的门店时才用到，
+ * 浏览器里的门店中枢因此小一些、打开快一些。
+ */
+const labelsLib = () => import('@storewright/labels');
+const configValidator = () => import('@storewright/store-config/validate');
+
+/** 大型店（门店编号 large）的员工人数 */
+export const LARGE_STORE_STAFF = 300;
+
+export const CONSOLE_COMMANDS = new Set<OpsCommandType>(['CancelOrder', 'LockOrder', 'ReleaseWalks', 'UpdateEta', 'CheckIn', 'CancelTripDriver', 'RedispatchTrip', 'CreateAsn', 'ArriveTruck', 'RecordSales', 'RequestReplenishment', 'CreateCount', 'AcceptRecommendation', 'OverrideRecommendation', 'DismissRecommendation', 'SetAiMode', 'ChangeRole', 'LockAssociate', 'AddNote', 'RemoveNote', 'CreateMtoTicket', 'DiscardMto', 'StartReturn', 'CreateParcelAsn', 'HandOffParcels', 'InductParcel']);
 
 /** 各命令必填的字段与类型（其余校验在 decide 中） */
 const FIELDS: Partial<Record<OpsCommandType, Record<string, 'string' | 'number' | 'boolean' | 'array'>>> = {
@@ -284,6 +317,8 @@ interface Route {
 
 export class Hub {
   readonly stores = new Map<string, StoreEntry>();
+  /** 「你的商店」：按配置建的门店（编号 my-<配置哈希前 10 位>，演示模式才有） */
+  private readonly customConfigs = new Map<string, StoreConfig>();
   private readonly creating = new Map<string, Promise<StoreEntry>>();
   private readonly sessions = new Map<string, SessionRow>();
   private readonly routes: Route[] = [];
@@ -310,7 +345,7 @@ export class Hub {
   async store(id: string): Promise<StoreEntry | undefined> {
     const have = this.stores.get(id);
     if (have) return have;
-    if (!this.storeIds.includes(id)) return undefined;
+    if (!this.storeIds.includes(id) && !this.customConfigs.has(id)) return undefined;
     let p = this.creating.get(id);
     if (!p) {
       p = this.createStore(id);
@@ -321,9 +356,10 @@ export class Hub {
 
   private async createStore(id: string): Promise<StoreEntry> {
     const { storage, platform } = this.opts;
-    // 门店编号 hardware 使用家居建材模板（第二个行业，决策记录 0011），其他使用中型超市模板
-    const template: TemplateName | undefined = id === 'hardware' ? 'hardware' : undefined;
-    const demo = createDemoStore({ id, salt: this.salt, platform, ...(template ? { template } : {}) });
+    // 门店编号 hardware 使用家居建材模板（第二个行业，决策记录 0011）；large 是两层的大型店、300 名员工（容量测试，决策记录 0014）；其他使用中型超市模板
+    const template: TemplateName | undefined = id === 'hardware' ? 'hardware' : id === 'large' ? 'large' : undefined;
+    const custom = this.customConfigs.get(id);
+    const demo = createDemoStore({ id, salt: this.salt, platform, ...(custom ? { config: custom } : template ? { template } : {}), ...(id === 'large' ? { staff: LARGE_STORE_STAFF } : {}) });
     const runtime = new StoreRuntime(id, demo.ctx, demo.statics, storage.events);
     await runtime.init();
     // 建店时载入期初库存（只载入一次）
@@ -331,7 +367,7 @@ export class Hub {
     // 每店的 AI 服务：载入模型仓库，没有当前版本时做仿真预训练
     const ai = new AiService(runtime, demo, storage);
     await ai.init();
-    const e: StoreEntry = { runtime, demo, lastRelease: 0, sim: new StoreSim(runtime), ai, assistant: new Assistant(runtime, demo, ai, this.opts.llm) };
+    const e: StoreEntry = { runtime, demo, lastRelease: 0, sim: new StoreSim(runtime), auto: new AutoPilot(runtime, demo), ai, assistant: new Assistant(runtime, demo, ai, this.opts.llm) };
     this.stores.set(id, e);
     if (this.timers.length) void ai.tick().catch((x: unknown) => this.log('error', x));
     return e;
@@ -356,6 +392,18 @@ export class Hub {
   async handle(req: HubRequest): Promise<HubResponse> {
     try {
       if (req.method === 'GET' && req.path === '/api/health') return ok({ ok: true, db: this.opts.storage.kind, stores: [...this.stores.keys()], time: Date.now() });
+      // 「你的商店」（决策记录 0013）：按访客自己搭的门店配置建一家实时门店；同样的配置得到同一个门店编号，
+      // 改过布局就是新的门店（旧的作业记录不会和新布局混在一起）
+      if (req.method === 'POST' && req.path === '/api/custom-stores') {
+        if (!this.opts.demo) return err(403, 'forbidden');
+        const { validateStoreConfig } = await configValidator();
+        const v = validateStoreConfig((req.body as { config?: unknown } | undefined)?.config);
+        if (!v.ok) return ok({ ok: false, issues: v.issues.slice(0, 20) }, 400);
+        const id = `my-${this.opts.platform.sha256Hex(JSON.stringify(v.config)).slice(0, 10)}`;
+        if (!this.customConfigs.has(id)) this.customConfigs.set(id, v.config);
+        await this.store(id);
+        return ok({ ok: true, storeId: id });
+      }
       const segs = req.path.split('/').filter(Boolean);
       for (const r of this.routes) {
         if (r.method !== req.method || r.parts.length !== segs.length) continue;
@@ -388,19 +436,23 @@ export class Hub {
    * 实时连接：先发 hello 和快照（或补发的事件），之后推送新事件。
    * 返回 undefined 表示门店不存在或令牌无效（调用方关闭连接，代码 4401）。
    */
-  async connect(storeId: string, token: string | undefined, after: number, send: (m: unknown) => void): Promise<HubConnection | undefined> {
+  async connect(storeId: string, token: string | undefined, after: number, send: (frame: string) => void, knownStatics?: string): Promise<HubConnection | undefined> {
     const e = await this.store(storeId);
     const s = e ? await this.sessionOf(token, storeId) : undefined;
     if (!e || !s) return undefined;
     const rt = e.runtime;
+    const statics = this.staticsOf(e);
+    let known = knownStatics;
     const sync = (a: number) => {
       const missing = a > rt.state.seq ? undefined : rt.eventsAfter(a);
-      if (!missing || a === 0) send({ t: 'snapshot', state: rt.state, statics: rt.statics, serverTime: Date.now() });
-      else if (missing.length) send({ t: 'events', events: missing });
+      if (!missing || a === 0) {
+        send(this.snapshotFrame(e, known === statics.hash));
+        known = statics.hash;
+      } else if (missing.length) send(frameOf({ t: 'events', events: missing }));
     };
-    send({ t: 'hello', storeId, seq: rt.state.seq, serverTime: Date.now(), actor: s.actor });
+    send(JSON.stringify({ t: 'hello', storeId, seq: rt.state.seq, serverTime: Date.now(), actor: s.actor, staticsHash: statics.hash }));
     sync(after);
-    const unsubscribe = rt.subscribe((m: HubMessage) => (m.t === 'reset' ? sync(0) : send(m)));
+    const unsubscribe = rt.subscribe((m: HubMessage) => (m.t === 'reset' ? sync(0) : send(frameOf(m))), { device: true });
     return {
       receive(raw) {
         let m: { t?: string; id?: number; after?: number };
@@ -409,11 +461,33 @@ export class Hub {
         } catch {
           return;
         }
-        if (m.t === 'ping') send({ t: 'pong', id: m.id, serverTime: Date.now() });
+        if (m.t === 'ping') send(JSON.stringify({ t: 'pong', id: m.id, serverTime: Date.now() }));
         else if (m.t === 'resync') sync(Number(m.after ?? 0));
       },
       close: unsubscribe,
     };
+  }
+
+  private staticsOf(e: StoreEntry): { json: string; hash: string } {
+    if (!e.staticsJson) {
+      const json = JSON.stringify(e.runtime.statics);
+      e.staticsJson = { json, hash: this.opts.platform.sha256Hex(json).slice(0, 16) };
+    }
+    return e.staticsJson;
+  }
+
+  /** 设备快照：精简后的状态（完成超过一小时的作业不发）+ 静态数据（设备已有同一版本时省略） */
+  private snapshotFrame(e: StoreEntry, skipStatics: boolean): string {
+    const rt = e.runtime;
+    const now = Date.now();
+    const bucket = Math.floor(now / 60_000);
+    let c = e.snap;
+    if (!c || c.ref !== rt.state || c.seq !== rt.state.seq || c.bucket !== bucket) {
+      c = { ref: rt.state, seq: rt.state.seq, bucket, json: JSON.stringify(clientProjection(rt.state, now)) };
+      e.snap = c;
+    }
+    const st = this.staticsOf(e);
+    return `{"t":"snapshot","state":${c.json}${skipStatics ? '' : `,"statics":${st.json}`},"staticsHash":"${st.hash}","serverTime":${now}}`;
   }
 
   /** 传感器入口（MQTT 等）：直接提交命令 */
@@ -443,7 +517,10 @@ export class Hub {
   stop(): void {
     for (const t of this.timers) clearInterval(t);
     this.timers.length = 0;
-    for (const e of this.stores.values()) e.sim.stop();
+    for (const e of this.stores.values()) {
+      e.sim.stop();
+      e.auto.stop();
+    }
   }
 
   private on(method: 'GET' | 'POST', path: string, handler: Handler): void {
@@ -502,8 +579,9 @@ export class Hub {
         const cmd = body.cmd;
         const allowed = s.role === 'associate' ? ASSOCIATE_COMMANDS.has(cmd.type) : s.role === 'console' ? CONSOLE_COMMANDS.has(cmd.type) : false;
         if (!allowed) return err(403, 'command_not_allowed');
-        // 控制台代替顾客 / 司机签到和上报到达时间
-        const actor = s.role === 'console' && (cmd.type === 'CheckIn' || cmd.type === 'UpdateEta') ? ('tripId' in cmd && cmd.tripId ? 'driver' : 'customer') : s.actor;
+        // 控制台代替顾客 / 司机签到、上报到达时间，以及司机取消接单
+        const asDriverOrCustomer = s.role === 'console' && (cmd.type === 'CheckIn' || cmd.type === 'UpdateEta' || cmd.type === 'CancelTripDriver');
+        const actor = asDriverOrCustomer ? ('tripId' in cmd && cmd.tripId ? 'driver' : 'customer') : s.actor;
         const id = typeof body.id === 'string' && body.id.length <= 64 ? body.id : undefined;
         const r = await e.runtime.submit({ cmd, actor, at: Date.now() }, id);
         return ok(r, r.ok ? 200 : 409);
@@ -522,7 +600,8 @@ export class Hub {
         const m = file(params.file);
         const data = m ? toteLabelData(e.runtime.state, m[1] as string, max(e)) : undefined;
         if (!m || !data) return err(404, 'label_not_found');
-        return m[2] === 'svg' ? svg(toteLabelSvg(data)) : zpl(toteLabelZpl(data));
+        const L = await labelsLib();
+        return m[2] === 'svg' ? svg(L.toteLabelSvg(data)) : zpl(L.toteLabelZpl(data));
       }),
     );
     this.on(
@@ -532,7 +611,8 @@ export class Hub {
         const m = file(params.file);
         const data = m ? oversizedLabelData(e.runtime.state, m[1] as string, max(e)) : undefined;
         if (!m || !data) return err(404, 'label_not_found');
-        return m[2] === 'svg' ? svg(toteLabelSvg(data)) : zpl(toteLabelZpl(data));
+        const L = await labelsLib();
+        return m[2] === 'svg' ? svg(L.toteLabelSvg(data)) : zpl(L.toteLabelZpl(data));
       }),
     );
     this.on(
@@ -541,16 +621,21 @@ export class Hub {
       labelAuthed(async ({ e, params }) => {
         const w = e.runtime.state.walks[params.walkId ?? ''];
         if (!w) return err(404, 'walk_not_found');
-        const svgs = w.toteIds.map((id) => toteLabelData(e.runtime.state, id, max(e))).filter((d): d is ToteLabelData => !!d).map(toteLabelSvg);
+        const L = await labelsLib();
+        const svgs = w.toteIds.map((id) => toteLabelData(e.runtime.state, id, max(e))).filter((d): d is ToteLabelData => !!d).map((d) => L.toteLabelSvg(d));
         return html(sheet(`Labels ${w.id}`, svgs));
       }),
     );
-    this.on('GET', '/api/stores/:storeId/labels/slots', async ({ e }) => html(sheet('Staging slot labels', e.runtime.statics.slots.map((s) => slotLabelSvg(s.code, s.tempZone)))));
+    this.on('GET', '/api/stores/:storeId/labels/slots', async ({ e }) => {
+      const L = await labelsLib();
+      return html(sheet('Staging slot labels', e.runtime.statics.slots.map((s) => L.slotLabelSvg(s.code, s.tempZone))));
+    });
     this.on('GET', '/api/stores/:storeId/labels/slot/:file', async ({ e, params }) => {
       const m = file(params.file);
       const slot = m ? e.runtime.statics.slots.find((s) => s.code === m[1]) : undefined;
       if (!m || !slot) return err(404, 'slot_not_found');
-      return m[2] === 'svg' ? svg(slotLabelSvg(slot.code, slot.tempZone)) : zpl(slotLabelZpl(slot.code, slot.tempZone));
+      const L = await labelsLib();
+      return m[2] === 'svg' ? svg(L.slotLabelSvg(slot.code, slot.tempZone)) : zpl(L.slotLabelZpl(slot.code, slot.tempZone));
     });
 
     // 演示接口
@@ -703,6 +788,18 @@ export class Hub {
       return ok(await c.e.runtime.submit({ cmd: { type: 'RecordSales', lines: clean }, actor: 'pos', at: Date.now() }));
     });
 
+    // 演示：自动运营（双线并行）
+    this.on('GET', '/api/stores/:storeId/demo/autopilot', consoleOnly(async ({ e }) => ok(e.auto.status)));
+    this.on(
+      'POST',
+      '/api/stores/:storeId/demo/autopilot',
+      consoleOnly(async ({ e, body }) => {
+        if (body.action === 'stop') e.auto.stop();
+        else e.auto.start({ ordersPerHour: Number(body.ordersPerHour ?? e.auto.status.ordersPerHour), deliveryShare: Number(body.deliveryShare ?? e.auto.status.deliveryShare), pace: Number(body.pace ?? e.auto.status.pace) });
+        return ok(e.auto.status);
+      }),
+    );
+
     // 演示：门店客流与传感器仿真、让货架变空、到货通知
     this.on('GET', '/api/stores/:storeId/demo/sim', consoleOnly(async ({ e }) => ok(e.sim.status)));
     this.on(
@@ -743,14 +840,19 @@ export class Hub {
       const c = m ? e.runtime.state.cases[m[1] as string] : undefined;
       if (!m || !c) return err(404, 'case_not_found');
       const data = { caseId: c.id, gtin: c.gtin, name: c.name, packQty: c.packQty, receivedAt: c.receivedAt };
-      return m[2] === 'svg' ? svg(caseLabelSvg(data)) : zpl(caseLabelZpl(data));
+      const L = await labelsLib();
+      return m[2] === 'svg' ? svg(L.caseLabelSvg(data)) : zpl(L.caseLabelZpl(data));
     });
     this.on('GET', '/api/stores/:storeId/labels/receipt/:receiptId', async ({ e, params }) => {
       const id = params.receiptId ?? '';
       const cases = Object.values(e.runtime.state.cases).filter((c) => c.receiptId === id);
-      return html(sheet(`Case labels ${id}`, cases.map((c) => caseLabelSvg({ caseId: c.id, gtin: c.gtin, name: c.name, packQty: c.packQty, receivedAt: c.receivedAt }))));
+      const L = await labelsLib();
+      return html(sheet(`Case labels ${id}`, cases.map((c) => L.caseLabelSvg({ caseId: c.id, gtin: c.gtin, name: c.name, packQty: c.packQty, receivedAt: c.receivedAt }))));
     });
-    this.on('GET', '/api/stores/:storeId/labels/bins', async ({ e }) => html(sheet('Backroom bin labels', e.runtime.statics.bins.map((b) => locationLabelSvg(b.code, `${b.status === 'SELLABLE' ? 'BACKROOM' : b.status} · ${b.tempZone}`)))));
+    this.on('GET', '/api/stores/:storeId/labels/bins', async ({ e }) => {
+      const L = await labelsLib();
+      return html(sheet('Backroom bin labels', e.runtime.statics.bins.map((b) => L.locationLabelSvg(b.code, `${b.status === 'SELLABLE' ? 'BACKROOM' : b.status} · ${b.tempZone}`))));
+    });
     this.on('GET', '/api/stores/:storeId/labels/location/:file', async ({ e, params }) => {
       const m = file(params.file);
       const code = m?.[1]?.toUpperCase() ?? '';
@@ -758,7 +860,8 @@ export class Hub {
       const items = locationIndex(e.runtime.statics).get(code);
       if (!m || (!bin && !items)) return err(404, 'location_not_found');
       const caption = bin ? `${bin.status === 'SELLABLE' ? 'BACKROOM' : bin.status} · ${bin.tempZone}` : `SHELF · ${items?.length ?? 0} ITEMS`;
-      return m[2] === 'svg' ? svg(locationLabelSvg(code, caption)) : zpl(locationLabelZpl(code, caption));
+      const L = await labelsLib();
+      return m[2] === 'svg' ? svg(L.locationLabelSvg(code, caption)) : zpl(L.locationLabelZpl(code, caption));
     });
   }
 }

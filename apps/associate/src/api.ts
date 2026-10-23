@@ -41,10 +41,26 @@ export const demo = {
   reset: (auth: Auth) => post<unknown>(auth, '/demo/reset', {}),
   asn: (auth: Auth, items: number) => post<{ ok: boolean; events?: Array<{ payload: { receiptId: string } }> }>(auth, '/demo/asn', { items }),
   sim: (auth: Auth, action: 'start' | 'stop', speed: number) => post<SimStatus>(auth, '/demo/sim', { action, speed }),
+  autopilot: (auth: Auth, body: { action: 'start' | 'stop'; ordersPerHour?: number; pace?: number }) => post<AutoPilotStatus>(auth, '/demo/autopilot', body),
+  autopilotStatus: (auth: Auth) => fetch(`/api/stores/${auth.storeId}/demo/autopilot`, { headers: { authorization: `Bearer ${auth.token}` } }).then((r) => json<AutoPilotStatus>(r)),
   autoRestock: (auth: Auth, on: boolean) => post<SimStatus>(auth, '/demo/sim', { action: 'autoRestock', on }),
   simStatus: (auth: Auth) => fetch(`/api/stores/${auth.storeId}/demo/sim`, { headers: { authorization: `Bearer ${auth.token}` } }).then((r) => json<SimStatus>(r)),
   shelfEmpty: (auth: Auth, itemId: string, silent: boolean) => post<{ ok: boolean }>(auth, '/demo/shelf-empty', { itemId, silent }),
 };
+
+/** 自动运营（双线并行）的状态 */
+export interface AutoPilotStatus {
+  running: boolean;
+  ordersPerHour: number;
+  deliveryShare: number;
+  pace: number;
+  created: number;
+  completed: number;
+  open: number;
+  avgMinutes?: number;
+  trips: number;
+  workers: Array<{ id: string; role: 'PICK' | 'STAGE' | 'HANDOFF' | 'DRIVER'; task?: string }>;
+}
 
 export interface SimStatus {
   running: boolean;
@@ -57,6 +73,8 @@ export interface SimStatus {
   autoRestock?: boolean;
   autoRestocked?: number;
   drift: Array<{ itemId: string; name: string; locationId: string; truth: number; est: number; capacity: number; sensor?: string }>;
+  /** 仿真里的门店时间（小时） */
+  storeHour?: number;
 }
 
 /** 替代候选；AI 排序时带预计接受概率、理由和模型版本 */

@@ -44,7 +44,10 @@ export async function connectLive(url: string, storeId: string): Promise<void> {
 
 let demoLink: HubLink | undefined;
 
-/** 浏览器内演示：经过员工端的桥接页面（隐藏 iframe）连到浏览器里的门店中枢，与员工端的手机画面看到同一家店 */
+/**
+ * 浏览器内演示：经过员工端的桥接页面（隐藏 iframe）连到浏览器里的门店中枢，与员工端的手机画面看到同一家店。
+ * 桥接页面没有及时回应时，去掉这个 iframe、下一次重新建一个（决策记录 0015：原来失败一次就只能刷新页面）。
+ */
 function linkVia(bridgeUrl: string): HubLink {
   demoLink ??= createHubLink(
     () =>
@@ -54,7 +57,11 @@ function linkVia(bridgeUrl: string): HubLink {
         frame.title = 'hub bridge';
         frame.style.display = 'none';
         frame.onload = () => {
-          if (frame.contentWindow) requestHubPort(frame.contentWindow).then(resolve, reject);
+          if (!frame.contentWindow) return;
+          requestHubPort(frame.contentWindow).then(resolve, (e: unknown) => {
+            frame.remove();
+            reject(e);
+          });
         };
         document.body.appendChild(frame);
       }),
@@ -62,12 +69,28 @@ function linkVia(bridgeUrl: string): HubLink {
   return demoLink;
 }
 
+/** 连接失败后自动重试的等待时间（毫秒）；全部失败才显示错误 */
+const DEMO_RETRY_MS = [1500, 4000, 8000];
+
 export async function connectDemoLive(bridgeUrl: string, storeId: string): Promise<void> {
   disconnectLive();
   useApp.setState({ live: { status: 'connecting', url: 'demo', storeId } });
   try {
     const l = linkVia(bridgeUrl);
-    const res = await l.fetch(`/api/stores/${encodeURIComponent(storeId)}/session`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ role: 'viewer' }) });
+    let res: Response | undefined;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        res = await l.fetch(`/api/stores/${encodeURIComponent(storeId)}/session`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ role: 'viewer' }) });
+        break;
+      } catch (e) {
+        const wait = DEMO_RETRY_MS[attempt];
+        if (wait === undefined) throw e;
+        await new Promise((r) => setTimeout(r, wait));
+        // 期间又切换了门店或断开了：不再重试
+        const live = useApp.getState().live;
+        if (live.status !== 'connecting' || live.storeId !== storeId) return;
+      }
+    }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const { token } = (await res.json()) as { token: string };
     const c = new LiveClient({

@@ -24,18 +24,24 @@ export const DEMO = typeof window !== 'undefined' && detect();
 
 let dedicated: Worker | undefined;
 
-/** 本页的中枢端口：优先 SharedWorker；不支持时，iframe 向上层窗口要一个端口，否则在本页开一个专用 Worker */
+/**
+ * 本页的中枢端口：优先 SharedWorker；不支持时（较旧的安卓浏览器、部分 App 内置浏览器），iframe 先向最上层的窗口要端口
+ * （展示页里嵌着模拟器、模拟器里又嵌着桥接页面，要问的是展示页），再问直接的上层窗口；都不提供时在本页开一个专用 Worker
+ */
 export async function hubPort(): Promise<HubPort> {
   if (typeof SharedWorker !== 'undefined') {
     const w = new SharedWorker(new URL('./hubWorker.ts', import.meta.url), { type: 'module', name: 'storewright-demo-hub' });
     w.port.start();
     return w.port as unknown as HubPort;
   }
-  if (window.parent !== window) {
+  const asked = new Set<Window>();
+  for (const target of [window.top, window.parent]) {
+    if (!target || target === window || asked.has(target)) continue;
+    asked.add(target);
     try {
-      return await requestHubPort(window.parent, 5000);
+      return await requestHubPort(target, target === window.top && window.top !== window.parent ? 2500 : 5000);
     } catch {
-      // 上层窗口不提供：退回到本页的专用 Worker
+      // 这一层不提供：再问下一层，最后退回到本页的专用 Worker
     }
   }
   dedicated ??= new Worker(new URL('./hubWorker.ts', import.meta.url), { type: 'module', name: 'storewright-demo-hub' });

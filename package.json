@@ -31,6 +31,7 @@
     "build:all": "npm run build:sim && npm run build:associate && npm run build:demo",
     "build:site": "npm run build:sim && npm run build:demo && node scripts/build-site.mjs",
     "e2e": "playwright test",
+    "e2e:browsers": "PW_ALL=1 playwright test",
     "walkthrough": "playwright test -c playwright.walkthrough.config.ts; node scripts/walkthrough-report.mjs",
     "demo:site": "node e2e/static-server.mjs"
   },

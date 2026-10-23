@@ -1,7 +1,7 @@
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { defineConfig } from '@playwright/test';
+import { defineConfig, devices, type Project } from '@playwright/test';
 
 /**
  * 多浏览器端到端测试（决策记录 0010 第 7 节：代替真机验收）。
@@ -9,8 +9,12 @@ import { defineConfig } from '@playwright/test';
  * - demo：浏览器内演示站点（静态文件），同一个上下文里的几个页面共用浏览器里的门店中枢。
  * 先构建：npm run build:associate && npm run build:demo && npm run build:sim
  * 本机默认用已安装的 Chrome（不下载浏览器）；持续集成里设置 PW_CHANNEL= 使用 Playwright 自带的 Chromium。
+ * PW_ALL=1（npm run e2e:browsers）时再加：Safari 内核（WebKit）、Firefox、不支持 SharedWorker 的浏览器（较旧的安卓 Chrome），
+ * 以及 iPhone 和安卓手机上的窄屏场景（需要先 npx playwright install webkit firefox）。
  */
 const channel = process.env.PW_CHANNEL ?? 'chrome';
+// 本机的 Chrome 只用于 Chromium 项目（WebKit、Firefox 不能指定 channel）
+const chrome = channel ? { channel } : {};
 const dataDir = mkdtempSync(join(tmpdir(), 'storewright-e2e-'));
 
 export default defineConfig({
@@ -21,7 +25,6 @@ export default defineConfig({
   workers: 1,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never', outputFolder: 'experiments/results/e2e-report' }]] : 'list',
   use: {
-    ...(channel ? { channel } : {}),
     viewport: { width: 420, height: 860 },
     locale: 'zh-CN',
     trace: 'retain-on-failure',
@@ -44,7 +47,25 @@ export default defineConfig({
     },
   ],
   projects: [
-    { name: 'live', testMatch: /live\.spec\.ts/, use: { baseURL: 'http://127.0.0.1:8799' } },
-    { name: 'demo', testMatch: /demo\.spec\.ts/, use: { baseURL: 'http://127.0.0.1:4177' } },
+    { name: 'live', testMatch: /live\.spec\.ts/, use: { ...chrome, baseURL: 'http://127.0.0.1:8799' } },
+    { name: 'demo', testMatch: /demo\.spec\.ts/, use: { ...chrome, baseURL: 'http://127.0.0.1:4177' } },
+    { name: 'a11y', testMatch: /a11y\.spec\.ts/, use: { ...chrome, baseURL: 'http://127.0.0.1:4177' } },
+    ...(process.env.PW_ALL ? otherBrowsers() : []),
   ],
 });
+
+/** 其他浏览器和手机（不用本机的 Chrome，用 Playwright 自带的浏览器） */
+function otherBrowsers(): Project[] {
+  const live = { testMatch: /live\.spec\.ts/, use: { baseURL: 'http://127.0.0.1:8799' } };
+  const demo = { testMatch: /demo\.spec\.ts/, use: { baseURL: 'http://127.0.0.1:4177' } };
+  const narrow = /窄屏|手机宽度/;
+  return [
+    { name: 'live-webkit', ...live, use: { ...live.use, browserName: 'webkit' } },
+    { name: 'demo-webkit', ...demo, use: { ...demo.use, browserName: 'webkit' } },
+    { name: 'live-firefox', ...live, use: { ...live.use, browserName: 'firefox' } },
+    { name: 'demo-firefox', ...demo, use: { ...demo.use, browserName: 'firefox' } },
+    { name: 'demo-no-sharedworker', ...demo, metadata: { noSharedWorker: true }, use: { ...chrome, ...demo.use } },
+    { name: 'iphone', ...demo, grep: narrow, use: { ...devices['iPhone 14'], ...demo.use } },
+    { name: 'android', ...demo, grep: narrow, metadata: { noSharedWorker: true }, use: { ...devices['Pixel 7'], ...chrome, ...demo.use } },
+  ];
+}

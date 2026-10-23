@@ -1,8 +1,8 @@
 # 私人目录（不上传）
 /private/
 
-# 本地工具配置
-.claude/settings.local.json
+# 本地工具配置（预览服务器、个人设置），不公开
+.claude/
 
 # 依赖与构建产物
 node_modules/

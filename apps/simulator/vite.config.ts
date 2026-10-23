@@ -1,5 +1,14 @@
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+
+// 「你的商店」是在线版的付费部分，代码在私有仓库（本机放在 private/your-store-app）；
+// 有就打包进来，没有就用空实现（公开仓库的构建照常，只是没有这个板块）
+const privateYourStore = fileURLToPath(new URL('../../private/your-store-app/src/index.tsx', import.meta.url));
+// SW_PUBLIC_ONLY=1：即使本机有私有模块，也按公开仓库的样子构建（检查公开版本、给 README 截图；决策记录 0015）
+const withPrivate = !process.env.SW_PUBLIC_ONLY && existsSync(privateYourStore);
+const yourStoreModule = withPrivate ? privateYourStore : fileURLToPath(new URL('./src/yourStoreStub.ts', import.meta.url));
 
 // 构建产物是纯静态文件，可以部署到任意子路径（base: './'）
 // 第三方库按用途分包：React 与状态管理、three.js、React Three Fiber 生态，便于浏览器缓存；
@@ -7,6 +16,12 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   base: './',
   plugins: [react()],
+  resolve: {
+    alias: [
+      { find: 'virtual:your-store', replacement: yourStoreModule },
+      { find: /^@sim\//, replacement: `${fileURLToPath(new URL('./src/', import.meta.url))}` },
+    ],
+  },
   worker: { format: 'es' },
   build: {
     target: 'es2022',

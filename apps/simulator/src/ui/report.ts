@@ -1,7 +1,7 @@
 import { COST_LABEL, distribution, PNL_GROUP_LABEL, WEEKDAY_LABEL, type CostParams, type DayPnL, type Distribution, type PnLGroup } from '@storewright/sim-engine';
 import type { DayDigest } from '../sim/protocol';
 import type { ScenarioDigest } from '../state/scenarios';
-import { ROWS } from './metricRows';
+import { rowsFor } from './metricRows';
 import { getLang, t, translate } from '../i18n';
 
 const locale = () => (getLang() === 'en' ? 'en-US' : 'zh-CN');
@@ -21,6 +21,8 @@ export interface ReportColumn {
   thumb?: string;
   digest: ScenarioDigest;
   pnl: DayPnL;
+  /** 门店的行业（建材店不显示和食品有关的指标） */
+  industry?: string;
 }
 
 export interface MultiDayKey {
@@ -72,7 +74,8 @@ function summaryRows(c: ReportColumn): Array<[string, string]> {
 function metricTable(columns: ReportColumn[]): { head: string[]; rows: Array<{ group?: string; cells: string[] }> } {
   const head = [t('指标'), ...columns.map((c) => c.name)];
   const rows: Array<{ group?: string; cells: string[] }> = [];
-  for (const g of ROWS) {
+  const industry = columns.length && columns.every((c) => c.industry === 'HARDWARE') ? 'HARDWARE' : undefined;
+  for (const g of rowsFor(industry)) {
     rows.push({ group: t(g.group), cells: [] });
     for (const r of g.rows) rows.push({ cells: [t(r.label), ...columns.map((c) => r.fmt(c.digest.metrics[r.key] as number))] });
   }

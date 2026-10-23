@@ -1,6 +1,6 @@
 import { createTemplate, type TemplateName } from '@storewright/store-config';
 import { handoffBoard, recentNotes, roleOf, sellableCases, shelfNow, stagingOccupancy, type LiveRec, type OpsState, type PlanogramEntry, type StoreStatic } from '@storewright/ops';
-import { aiAblationPolicies, defaultScenario, OPTIMIZED, runExperiment, type Policy, type SimScenario } from '@storewright/sim-engine';
+import type { Policy, SimScenario } from '@storewright/sim-engine';
 import type { AiService } from '../ai';
 import type { DemoStore } from '../demo';
 import type { StoreRuntime } from '../runtime';
@@ -349,7 +349,9 @@ const whatif: ToolDef = {
       demandFactor: { type: 'number', description: 'Demand multiplier, e.g. 1.2 for +20%' },
     },
   },
-  run(ctx, args) {
+  async run(ctx, args) {
+    // 仿真引擎只在问「如果……会怎样」时才加载（浏览器里的门店中枢因此小一些，决策记录 0015）
+    const { aiAblationPolicies, defaultScenario, OPTIMIZED, runExperiment } = await import('@storewright/sim-engine');
     const role = (['pick', 'stage', 'handoff'] as const).find((r) => r === String(args.role ?? '').toLowerCase());
     const delta = Number.isFinite(Number(args.delta)) ? Math.round(Number(args.delta)) : 0;
     const factor = Number.isFinite(Number(args.demandFactor)) && Number(args.demandFactor) > 0 ? Number(args.demandFactor) : 1;

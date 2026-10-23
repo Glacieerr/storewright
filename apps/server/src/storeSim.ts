@@ -32,6 +32,8 @@ export interface SimStatus {
   autoRestocked: number;
   /** 真实存量与系统估算差距最大的商品 */
   drift: Array<{ itemId: string; name: string; locationId: string; truth: number; est: number; capacity: number; sensor?: string }>;
+  /** 仿真里的门店时间（小时，0–24） */
+  storeHour?: number;
 }
 
 /** 每小时客流系数（相对日均） */
@@ -60,9 +62,20 @@ export class StoreSim {
     return this.truth.get(p.itemId) ?? Math.round(shelfNow(this.rt.state, p).est);
   }
 
+  /**
+   * 门店时间（小时）：客流按门店时间的钟点变化，跟着仿真加速走，不看墙上的时钟（决策记录 0015）。
+   * 原来用墙上时钟，深夜打开演示时客流只有白天的三成，演示和测试都受打开的时间影响。
+   */
+  private storeHour = 9;
+
   start(speed = 30): void {
     this.status.speed = Math.max(1, Math.min(600, speed));
     if (this.timer) return;
+    // 营业时间内打开：从现在的钟点开始；否则从早上 9 点开始
+    const d = new Date();
+    const h = d.getHours() + d.getMinutes() / 60;
+    this.storeHour = h >= 8 && h < 21 ? h : 9;
+    this.status.storeHour = this.storeHour;
     for (const p of this.rt.statics.planogram) if (!this.truth.has(p.itemId)) this.truth.set(p.itemId, Math.round(shelfNow(this.rt.state, p).est));
     this.unsub = this.rt.subscribe((m) => {
       if (m.t === 'events') this.observe(m.events);
@@ -116,8 +129,9 @@ export class StoreSim {
 
   private async tick(): Promise<void> {
     const dtH = (this.tickMs / 1000) * this.status.speed / 3600;
-    const hour = new Date(Date.now()).getHours();
-    const factor = HOURLY[hour] ?? 1;
+    const factor = HOURLY[Math.floor(this.storeHour) % 24] ?? 1;
+    this.storeHour = (this.storeHour + dtH) % 24;
+    this.status.storeHour = this.storeHour;
     const lines: Array<{ itemId: string; qty: number }> = [];
     for (const p of this.rt.statics.planogram) {
       const lambda = p.baseVelocity * factor * dtH;

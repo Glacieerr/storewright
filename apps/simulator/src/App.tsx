@@ -10,7 +10,9 @@ import { ShortcutHelp } from './ui/ShortcutHelp';
 import { IncidentBanner } from './ui/IncidentBanner';
 import { Tour, TourInvite } from './ui/Tour';
 import { CinematicOverlay } from './ui/CinematicOverlay';
+import { useYourStore } from './extensions';
 import { pendingMenu } from './scene/contextTarget';
+import { useLabelDeclutter } from './scene/declutter';
 import { useApp } from './state/store';
 import { clock, setPlaying, setSpeed } from './state/clock';
 import { copySelected, deleteSelected, duplicateSelected, nudgeSelected, paste, rotateSelected, selectAllOnFloor } from './state/editOps';
@@ -131,11 +133,17 @@ export function App() {
   const ratio = useApp((s) => s.ratio);
   const workspace = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLElement>(null);
+  // 重叠的场景标签只显示重要的那个（决策记录 0015）
+  useLabelDeclutter(stage);
   const view = useApp((s) => s.view);
   const minimap = useApp((s) => s.minimap);
   // 订阅界面语言：切换后整个界面（含场景里的标签）重新渲染
   useApp((s) => s.lang);
   const cinematic = useApp((s) => s.cinematic);
+  const yourStore = useApp((s) => s.yourStore);
+  const project = useApp((s) => s.project);
+  // 「你的商店」在私有模块里；公开仓库的构建没有它
+  const ext = useYourStore();
   const sound = useApp((s) => s.sound);
   // 环境音模块只在第一次打开声音时下载
   const soundLoaded = useRef(false);
@@ -240,6 +248,8 @@ export function App() {
   return (
     <div className={`app mode-${mode}${cinematic ? ' cinematic' : ''}${EMBEDDED ? ' embedded' : ''}`}>
       <TopBar />
+      {project && !EMBEDDED && ext && <ext.ProjectBar />}
+      {yourStore && !EMBEDDED && ext && <ext.Page />}
       <div ref={workspace} className={`workspace ${split}`} style={{ '--ratio': `${ratio}%` } as CSSProperties}>
         <main ref={stage} className="stage" aria-label={t('门店场景')}>
           <Suspense fallback={<div className="overlay-note loading">{t('正在加载三维场景…')}</div>}>
@@ -272,13 +282,13 @@ export function App() {
             <button aria-label={t('复位视角')} title={t('复位（H）')} onClick={() => useApp.getState().zoom('reset')}>
               ⟲
             </button>
-            <button aria-label={t('小地图')} title={t('小地图（M）')} className={minimap ? 'on' : ''} onClick={() => useApp.getState().toggle('minimap')}>
+            <button aria-label={t('小地图')} title={t('小地图（M）')} className={minimap ? 'vt-map on' : 'vt-map'} onClick={() => useApp.getState().toggle('minimap')}>
               ▦
             </button>
             <button aria-label={sound ? t('关闭环境音') : t('打开环境音')} title={t('环境音（车流、雨声、扫码、警报）')} className={sound ? 'on' : ''} onClick={() => useApp.getState().toggle('sound')}>
               {sound ? '🔊' : '🔈'}
             </button>
-            <button aria-label={t('快捷键')} title={t('快捷键（?）')} onClick={() => useApp.getState().toggle('help')}>
+            <button aria-label={t('快捷键')} title={t('快捷键（?）')} className="vt-keys" onClick={() => useApp.getState().toggle('help')}>
               ⌨
             </button>
           </div>

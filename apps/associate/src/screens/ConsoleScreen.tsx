@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { displayName, parcelTrips, planogramByItem, sellableCases, shelfNow, summary, type AnyOpsEvent, type LiveOrder } from '@storewright/ops';
-import { demo, labelUrl, type CreatedOrder, type SimStatus } from '../api';
+import { displayName, driverCancelWindow, noShowWindow, parcelTrips, planogramByItem, sellableCases, shelfNow, summary, type AnyOpsEvent, type LiveOrder, type LiveTrip } from '@storewright/ops';
+import { demo, labelUrl, type AutoPilotStatus, type CreatedOrder, type SimStatus } from '../api';
 import { clock, t } from '../i18n';
 import { useLive, useNow } from '../live';
+import { AreaBoard } from './inventory/AreaView';
 import { rejectText } from '../rejects';
 import { toast } from '../ui/Toasts';
 
@@ -31,6 +32,8 @@ const STATUS_TEXT: Record<LiveOrder['status'], string> = {
 /**
  * 演示控制台：代替订单平台、顾客和司机。创建测试订单（验证码只在这里显示）、上报「我在路上」、到店签到、司机接单。
  */
+const ACTIVE_ROWS = 150;
+
 export function ConsoleScreen() {
   const { client, auth, run } = useLive();
   const now = useNow(1000);
@@ -42,6 +45,8 @@ export function ConsoleScreen() {
   const [withMto, setWithMto] = useState(false);
   const [withBig, setWithBig] = useState(false);
   const [codes, setCodes] = useState(loadCodes);
+  // 自动运营的订单默认不列在这里（数量多，由虚拟员工处理）
+  const [showAuto, setShowAuto] = useState(false);
   const sum = summary(s, now);
 
   const remember = (key: string, code: string) => {
@@ -67,7 +72,10 @@ export function ConsoleScreen() {
     }
   };
 
-  const orders = Object.values(s.orders).sort((a, b) => b.createdAt - a.createdAt);
+  const autoCount = Object.values(s.orders).filter((o) => o.track === 'AUTO').length;
+  const orders = Object.values(s.orders)
+    .filter((o) => showAuto || o.track !== 'AUTO')
+    .sort((a, b) => b.createdAt - a.createdAt);
   const active = orders.filter((o) => o.status !== 'COMPLETED' && o.status !== 'CANCELLED');
   const done = orders.filter((o) => o.status === 'COMPLETED' || o.status === 'CANCELLED').slice(0, 8);
   const trips = Object.values(s.trips).filter((x) => !x.completedAt);
@@ -138,10 +146,18 @@ export function ConsoleScreen() {
         <p className="note">{t('姓名和商品都是合成数据。验证码只显示在控制台（相当于顾客手机上的取货码）。')}</p>
       </section>
 
+      <AutoPilotCard />
+
       <section className="card">
         <div className="row-head">
           <h2 className="section-title">{t('进行中的订单（{0}）', active.length)}</h2>
           <div className="actions">
+            {autoCount > 0 && (
+              <label className="toggle">
+                <input type="checkbox" checked={showAuto} onChange={(e) => setShowAuto(e.target.checked)} />
+                {t('显示自动运营的订单（{0}）', autoCount)}
+              </label>
+            )}
             <button onClick={() => void run({ type: 'ReleaseWalks' })}>{t('生成拣货批次')}</button>
             <button onClick={() => void demo.tick(auth, true)}>{t('排程一次')}</button>
           </div>
@@ -159,7 +175,8 @@ export function ConsoleScreen() {
               </tr>
             </thead>
             <tbody>
-              {active.map((o) => (
+              {/* 大型店高峰时进行中的订单可能有几百张：表格只渲染最新的 ACTIVE_ROWS 张（决策记录 0014） */}
+              {active.slice(0, ACTIVE_ROWS).map((o) => (
                 <tr key={o.id}>
                   <td className="mono">
                     {o.shortCode}
@@ -178,7 +195,7 @@ export function ConsoleScreen() {
                     {!o.tripId && o.arrivedAt === undefined && (
                       <>
                         <button onClick={() => void run({ type: 'UpdateEta', orderId: o.id, etaAt: client.now() + 4 * 60_000 })}>{t('我在路上')}</button>
-                        <button onClick={() => void run({ type: 'CheckIn', orderId: o.id, bay: String(1 + (o.id.charCodeAt(o.id.length - 1) % 8)) })}>{t('到店')}</button>
+                        <button onClick={() => void run({ type: 'CheckIn', orderId: o.id, bay: bayFor(client.statics?.pickupBays, o.id) })}>{t('到店')}</button>
                       </>
                     )}
                     <button className="danger" onClick={() => void run({ type: 'CancelOrder', orderId: o.id, reason: 'console' })}>
@@ -189,6 +206,7 @@ export function ConsoleScreen() {
               ))}
             </tbody>
           </table>
+          {active.length > ACTIVE_ROWS && <p className="muted">{t('还有 {0} 张进行中的订单没有列出（只列最新的 {1} 张）', active.length - ACTIVE_ROWS, ACTIVE_ROWS)}</p>}
         </div>
       </section>
 
@@ -197,25 +215,7 @@ export function ConsoleScreen() {
           <h2 className="section-title">{t('配送行程（{0}）', trips.length)}</h2>
           <ul className="trip-list">
             {trips.map((tr) => (
-              <li key={tr.id}>
-                <b className="mono">{tr.id}</b>
-                <span>{tr.orderIds.map((id) => s.orders[id]?.shortCode).join(' · ')}</span>
-                <span>{tr.acceptedAt ? t('司机验证码 {0}', codes[tr.id] ?? '?') : t('等待司机接单')}</span>
-                <span className="actions">
-                  {!tr.acceptedAt && (
-                    <button
-                      onClick={async () => {
-                        const r = await demo.acceptTrip(auth, tr.id);
-                        if (r.code) remember(tr.id, r.code);
-                        else if (r.reject) toast(rejectText(r.reject as never, (x) => x), 'error');
-                      }}
-                    >
-                      {t('司机接单')}
-                    </button>
-                  )}
-                  {tr.arrivedAt === undefined && <button onClick={() => void run({ type: 'CheckIn', tripId: tr.id, vehicle: 'Blue hatchback' })}>{t('司机到店')}</button>}
-                </span>
-              </li>
+              <TripRow key={tr.id} tr={tr} now={now} code={codes[tr.id]} remember={remember} />
             ))}
           </ul>
         </section>
@@ -234,6 +234,11 @@ export function ConsoleScreen() {
           </ul>
         </section>
       )}
+
+      <section className="card">
+        <h2 className="section-title">{t('区域管理')}</h2>
+        <AreaBoard />
+      </section>
 
       <BackroomConsole />
       {client.statics?.modules?.parcel && <ParcelConsole />}
@@ -300,6 +305,7 @@ const EVENT_TEXT: Record<string, string> = {
   OrderHandedOff: '交付完成',
   TripProposed: '组合配送行程',
   TripAccepted: '司机接单',
+  TripDriverCancelled: '司机取消接单',
   TripCompleted: '行程交给司机',
   ExceptionAssigned: '领取后仓补取',
   ExceptionItemFound: '后仓找到商品',
@@ -356,6 +362,87 @@ const EVENT_TEXT: Record<string, string> = {
   ParcelShort: '包裹短少',
   ParcelsHandedOff: '包裹交给司机',
 };
+
+/** 演示用的到店车位：门店配置了明确车位时从中选一个，否则用 1–8 号 */
+function bayFor(bays: readonly string[] | undefined, orderId: string): string {
+  const k = orderId.charCodeAt(orderId.length - 1);
+  return bays?.length ? (bays[k % bays.length] as string) : String(1 + (k % 8));
+}
+
+const AUTO_ROLE: Record<string, string> = { PICK: '拣货', STAGE: '暂存', HANDOFF: '交付', DRIVER: '司机' };
+
+/**
+ * 自动运营（双线并行）：虚拟顾客按设定的频率下单，虚拟员工把订单做完；和你在手机上的操作同时进行，
+ * 订单分开批次、分开行程，共用暂存区和货架。
+ */
+function AutoPilotCard() {
+  const { auth } = useLive();
+  const [st, setSt] = useState<AutoPilotStatus | undefined>();
+  const [rate, setRate] = useState(40);
+  const [pace, setPace] = useState(1);
+  useEffect(() => {
+    let alive = true;
+    const poll = () => void demo.autopilotStatus(auth).then((x) => alive && setSt(x)).catch(() => undefined);
+    poll();
+    const id = window.setInterval(poll, 2000);
+    return () => {
+      alive = false;
+      window.clearInterval(id);
+    };
+  }, [auth]);
+  const toggle = () => {
+    const action = st?.running ? 'stop' : 'start';
+    setSt((x) => (x ? { ...x, running: action === 'start' } : x));
+    void demo.autopilot(auth, { action, ordersPerHour: rate, pace }).then(setSt).catch((e: unknown) => toast(String(e), 'error'));
+  };
+  return (
+    <section className="card autopilot">
+      <div className="row-head">
+        <h2 className="section-title">{t('自动运营（双线并行）')}</h2>
+        <span className={`pill ${st?.running ? 'ok' : ''}`}>{st?.running ? t('运行中') : t('已停止')}</span>
+      </div>
+      <p className="note">{t('虚拟顾客按设定的频率下单，虚拟员工完成拣货、暂存、交付，虚拟司机接走配送行程。和你在手机上的操作同时进行：订单分开批次、分开行程，手机上不显示；共用同一个暂存区、货架和门店 AI。')}</p>
+      <div className="actions">
+        <label>
+          {t('每小时订单')}
+          <select value={rate} onChange={(e) => setRate(Number(e.target.value))} disabled={st?.running}>
+            {[20, 40, 80, 160].map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          {t('作业速度')}
+          <select value={pace} onChange={(e) => setPace(Number(e.target.value))} disabled={st?.running}>
+            <option value={1}>{t('正常')}</option>
+            <option value={2}>2×</option>
+            <option value={4}>4×</option>
+          </select>
+        </label>
+        <button className={st?.running ? '' : 'primary'} onClick={toggle}>
+          {st?.running ? t('停止自动运营') : t('开始自动运营')}
+        </button>
+      </div>
+      {st && st.created > 0 && (
+        <p className="note">
+          {t('自动运营订单 {0} 张 · 已完成 {1} · 进行中 {2} · 配送行程 {3}', st.created, st.completed, st.open, st.trips)}
+          {st.avgMinutes !== undefined ? ` · ${t('从下单到交付平均 {0} 分钟', st.avgMinutes)}` : ''}
+        </p>
+      )}
+      {st?.running && (
+        <ul className="auto-workers">
+          {st.workers.map((w) => (
+            <li key={w.id}>
+              <b>{t('虚拟员工 {0}', w.id.slice(2))}</b> · {t(AUTO_ROLE[w.role] ?? w.role)} · {w.task ?? t('空闲')}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
 
 function EventFeed() {
   const { client, nameOf } = useLive();
@@ -470,6 +557,7 @@ function BackroomConsole() {
       </label>
       {sim && (
         <p className="note">
+          {sim.storeHour !== undefined ? `${t('门店时间 {0}', `${String(Math.floor(sim.storeHour)).padStart(2, '0')}:${String(Math.floor((sim.storeHour % 1) * 60)).padStart(2, '0')}`)} · ` : ''}
           {t('已售 {0} 件 · 缺货少卖 {1} 件 · 损耗 {2} 件 · 传感器读数 {3} 条', sim.sold, sim.lost, sim.shrink, sim.readings)}
           {sim.autoRestock || sim.autoRestocked ? ` · ${t('自动补货 {0} 次', sim.autoRestocked ?? 0)}` : ''}
         </p>
@@ -567,5 +655,74 @@ function ParcelConsole() {
         ))}
       </ul>
     </section>
+  );
+}
+
+/**
+ * 演示控制台里的一个配送行程：代替司机接单、上报预计到店、到店、取消接单（按决策记录 0014 的时间窗口），
+ * 以及司机没来时由门店改派。
+ */
+function TripRow({ tr, now, code, remember }: { tr: LiveTrip; now: number; code?: string; remember: (key: string, code: string) => void }) {
+  const { client, auth, run } = useLive();
+  const s = client.state;
+  const r = client.statics?.rules;
+  const rules = { lockMin: r?.driverCancelLockMin ?? 10, waitMin: r?.driverCancelWaitMin ?? 10 };
+  const win = driverCancelWindow(tr, now, rules);
+  const noShow = noShowWindow(tr, now, rules);
+  const mins = (at: number) => Math.max(1, Math.ceil((at - now) / 60_000));
+  const winText = win.allowed
+    ? win.reason === 'WAITED_TOO_LONG'
+      ? t('司机已等 {0} 分钟，可以取消', win.waitedMin ?? 0)
+      : win.closesAt !== undefined
+        ? t('{0} 分钟内可以取消，之后进入准备期', mins(win.closesAt))
+        : t('到店前可以取消')
+    : win.code === 'CANCEL_LOCKED'
+      ? t('准备期内不能取消')
+      : win.code === 'CANCEL_WAIT' && win.opensAt !== undefined
+        ? t('到店等待满 {0} 分钟后可以取消（还差约 {1} 分钟）', rules.waitMin, mins(win.opensAt))
+        : '';
+  const last = tr.cancellations?.at(-1);
+  return (
+    <li>
+      <b className="mono">{tr.id}</b>
+      <span>{tr.orderIds.map((id) => s.orders[id]?.shortCode).join(' · ')}</span>
+      <span>
+        {tr.acceptedAt ? t('司机验证码 {0}', code ?? '?') : t('等待司机接单')}
+        {tr.etaAt !== undefined && tr.arrivedAt === undefined ? ` · ${t('预计 {0} 到店', clock(tr.etaAt))}` : ''}
+      </span>
+      {last && (
+        <span className="badge warn">
+          {t('重新派单 · 已取消 {0} 次', tr.cancellations?.length ?? 1)}
+          {last.reason === 'WAITED_TOO_LONG' ? ` · ${t('上次等待 {0} 分钟', last.waitedMin ?? 0)}` : last.reason === 'NO_SHOW' ? ` · ${t('上次司机没来')}` : ''}
+          {last.atRisk ? ` · ${t('可能超时')}` : ''}
+        </span>
+      )}
+      <span className="actions">
+        {!tr.acceptedAt && (
+          <button
+            onClick={async () => {
+              const res = await demo.acceptTrip(auth, tr.id);
+              if (res.code) remember(tr.id, res.code);
+              else if (res.reject) toast(rejectText(res.reject as never, (x) => x), 'error');
+            }}
+          >
+            {t('司机接单')}
+          </button>
+        )}
+        {tr.acceptedAt !== undefined && tr.arrivedAt === undefined && (
+          <>
+            <button onClick={() => void run({ type: 'UpdateEta', tripId: tr.id, etaAt: now + 15 * 60_000 })}>{t('预计 15 分钟后到店')}</button>
+            <button onClick={() => void run({ type: 'CheckIn', tripId: tr.id, vehicle: 'Blue hatchback' })}>{t('司机到店')}</button>
+          </>
+        )}
+        {tr.acceptedAt !== undefined && (
+          <button disabled={!win.allowed} title={winText} onClick={() => void run({ type: 'CancelTripDriver', tripId: tr.id })}>
+            {t('司机取消接单')}
+          </button>
+        )}
+        {noShow.allowed && <button onClick={() => void run({ type: 'RedispatchTrip', tripId: tr.id })}>{t('司机没来，改派')}</button>}
+      </span>
+      {tr.acceptedAt !== undefined && winText && <small className="muted trip-window">{winText}</small>}
+    </li>
   );
 }

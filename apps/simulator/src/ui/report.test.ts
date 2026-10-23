@@ -36,3 +36,14 @@ describe('方案报告', () => {
     expect(head.split(/(?<!\\)\|/).length).toBe(cells);
   });
 });
+
+describe('metric rows by industry (decision 0015)', () => {
+  it('hardware stores do not show the food/chemical mixing row and drop the cold-chain wording', async () => {
+    const { rowsFor, ROWS } = await import('./metricRows');
+    const keys = (rs: typeof ROWS) => rs.flatMap((g) => g.rows.map((r) => r.key));
+    expect(keys(rowsFor())).toContain('chemicalMixTotePct');
+    expect(keys(rowsFor('HARDWARE'))).not.toContain('chemicalMixTotePct');
+    expect(rowsFor('HARDWARE').flatMap((g) => g.rows).find((r) => r.key === 'avgReadyDwellMin')?.label).toBe('门口停留');
+    expect(rowsFor()).toBe(ROWS);
+  });
+});

@@ -9,6 +9,8 @@
   --muted: #5b6863;
   --line: #d8dfdc;
   --danger: #b42318;
+  /* 红色角标上的字：浅色主题白字，深色主题深色字（决策记录 0015） */
+  --danger-ink: #ffffff;
   --warn: #b54708;
   --ok: #067647;
   --info: #175cd3;
@@ -36,6 +38,7 @@
     --muted: #9db0a8;
     --line: #2e3a35;
     --danger: #f97066;
+    --danger-ink: #1a0d0c;
     --warn: #fdb022;
     --ok: #47cd89;
     --info: #84adff;
@@ -293,7 +296,7 @@ button:focus-visible {
   padding: 0 5px;
   border-radius: 9px;
   background: var(--danger);
-  color: #fff;
+  color: var(--danger-ink);
   font-size: 11px;
   font-style: normal;
   line-height: 18px;
@@ -882,6 +885,37 @@ li.done .check {
   flex-basis: 100%;
   margin: 4px 0 0;
 }
+/* 验证码输错不锁定；错到一定次数后多一个人工核验入口（决策记录 0014） */
+.code-form .manual-alt {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line);
+}
+.code-form .manual-alt p {
+  margin: 0;
+  flex: 1 1 200px;
+}
+/* 司机取消后要放回暂存区的框 */
+.return-list {
+  list-style: none;
+  margin: 6px 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.return-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
 .order-block {
   border-top: 1px solid var(--line);
   padding-top: 10px;
@@ -948,6 +982,38 @@ li.done .check {
   font-size: 13px;
   font-weight: 700;
   color: var(--muted);
+}
+/* 大型店的员工名单：搜索和按岗位筛选（决策记录 0014） */
+.roster-search {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.roster-search input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}
+.roster-search .chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.roster-search .chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  min-height: 0;
+}
+.roster-search .chip.on {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: var(--brand-ink);
 }
 .roster {
   display: grid;
@@ -1087,6 +1153,19 @@ td.actions button {
 .trip-list .actions {
   margin-left: auto;
 }
+/* 重新派单的标记和司机取消的时间窗口说明（决策记录 0014） */
+.trip-list .badge {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.trip-list .badge.warn {
+  background: color-mix(in srgb, var(--warn) 18%, var(--surface));
+  color: var(--ink);
+}
+.trip-list .trip-window {
+  flex-basis: 100%;
+}
 .trip-list .actions button {
   min-height: 40px;
 }
@@ -1128,7 +1207,7 @@ td.actions button {
 }
 .toast.error {
   background: var(--danger);
-  color: #fff;
+  color: var(--danger-ink);
 }
 .toast.ok {
   background: var(--ok);
@@ -1175,7 +1254,7 @@ td.actions button {
   line-height: 18px;
   border-radius: 9px;
   background: var(--danger);
-  color: #fff;
+  color: var(--danger-ink);
   padding: 0 5px;
 }
 .count-row {
@@ -1221,7 +1300,7 @@ td.actions button {
   padding: 0 5px;
   border-radius: 9px;
   background: var(--danger);
-  color: #fff;
+  color: var(--danger-ink);
   font-size: 11px;
   font-style: normal;
 }
@@ -1527,4 +1606,119 @@ body.embed .content.wide {
 }
 body.embed .console-views {
   margin-bottom: 8px;
+}
+
+/* 自动运营（双线并行） */
+.autopilot .pill {
+  font-size: 12px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--line, #d9e1dd);
+  color: var(--ink, #15201c);
+}
+.autopilot .pill.ok {
+  background: color-mix(in srgb, var(--brand, #0f6e56) 16%, transparent);
+  color: var(--brand, #0f6e56);
+}
+.auto-workers {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 4px 12px;
+  font-size: 13px;
+}
+
+/* 区域管理（决策记录 0013） */
+.area-board {
+  display: grid;
+  gap: 12px;
+}
+.area-board .note.warn {
+  color: var(--danger);
+  font-weight: 600;
+}
+.area-group ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 8px;
+}
+.area-group li {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.area-group li.alert {
+  border-color: var(--danger);
+}
+.area-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: baseline;
+}
+.area-head .mono {
+  font-size: 11px;
+}
+.area-group .bar {
+  height: 8px;
+  background: var(--surface-2);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.area-group .bar i {
+  display: block;
+  height: 100%;
+  background: var(--brand);
+}
+.area-group li.alert .bar i {
+  background: var(--danger);
+}
+.area-group small {
+  font-size: 12px;
+}
+.zone-chip {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+}
+.zone-chip.z-CHILLED {
+  color: var(--z-chl);
+}
+.zone-chip.z-FROZEN {
+  color: var(--z-frz);
+}
+.zone-chip.z-HOT {
+  color: var(--warn);
+}
+.pill.alert {
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  color: var(--danger);
+}
+
+/* 演示模式的提示条：第一次建店训练模型时；不支持 SharedWorker、标签页之间不能共用门店时（决策记录 0015） */
+.demo-banner {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  padding: 8px max(14px, env(safe-area-inset-right, 0px)) 8px max(14px, env(safe-area-inset-left, 0px));
+  background: color-mix(in srgb, var(--info) 14%, var(--surface));
+  color: var(--ink);
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.demo-banner.isolated {
+  background: color-mix(in srgb, var(--warn) 18%, var(--surface));
 }

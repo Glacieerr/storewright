@@ -145,7 +145,7 @@ export function TopBar() {
 
       <label className="field tb-more">
         <span>{t('画质')}</span>
-        <select value={quality} onChange={(e) => app().setQuality(e.target.value as Quality)} title={t('高：描边、实时阴影、泛光和草丛；中：描边和天空，无阴影；低：最简画面，适合性能较弱的设备')}>
+        <select value={quality} onChange={(e) => app().setQuality(e.target.value as Quality)} title={t('高：描边、实时阴影、泛光和草丛；中：描边和天空，无阴影；低：最简画面，适合性能较弱的设备（没有显卡加速时默认用低画质）')}>
           <option value="high">{t('高')}</option>
           <option value="medium">{t('中')}</option>
           <option value="low">{t('低')}</option>

@@ -13,7 +13,7 @@
 ## Summary
 
 - **What it is**: a store digital twin for mid-size regional chains and independent grocers. Associates pick, stage and hand off online orders on their phones and handle backroom, replenishment and staffing work; the 3D store stays in sync with live operations, replays any moment of the day and forecasts the next three hours; when equipment crosses a limit, an alert with its impact reaches the shift lead's phone; every store has its own AI trained on its own machine; changes are tried first in a planning twin (a 2.5D / 3D full-day simulation). The whole system can run in the browser.
-- **Size**: 4 apps and 9 shared packages, about 82,000 lines of TypeScript source; 382 unit and property tests, 83 end-to-end runs across browsers including accessibility checks, and a 221-step walkthrough; 16 design documents and 27 decision records.
+- **Size**: 4 apps and 9 shared packages, about 82,000 lines of TypeScript source; 383 unit and property tests, 83 end-to-end runs across browsers including accessibility checks, and a 221-step walkthrough; 16 design documents and 27 decision records.
 - **Results** (simulation, mid-size store, 30 replications): overweight, crush-risk and chemical-mix totes 11–19% → 0; average wait −15%; time orders sit at the door −81%; labor +4.9%. With all AI on and the same labor: average wait −13%, 90th-percentile wait −23%, late orders 2.41% → 0.69%. Tested as a 300-person store: 300 devices connect in 0.09 s, and at 50 commands a second every device sees each change within about 15 ms.
 - **My role**: product owner and domain designer. I defined the problem, business rules and acceptance criteria, made the design trade-offs and accepted each step on the phones and in the simulator. Code, tests and documents were written together with an AI coding assistant (section 3).
 
@@ -98,7 +98,7 @@ No profile wins on every measure: the default profile spends a little more labor
 
 ## 7. Quality
 
-- **Unit and property tests** (Vitest + fast-check): 382, covering every rule of the operations core, replay equality, algorithms, simulation, AI and the API.
+- **Unit and property tests** (Vitest + fast-check): 383, covering every rule of the operations core, replay equality, algorithms, simulation, AI and the API.
 - **End-to-end tests** (Playwright): the real backend, the in-browser demo (including real taps on the two phones in the showcase) and accessibility checks; 83 runs across Chromium, WebKit (Safari), Firefox, iPhone, Android and browsers without SharedWorker.
 - **Accessibility**: every control has an accessible name, text contrast meets WCAG 2.1 AA in light and dark themes, and sign-in works with the keyboard alone.
 - **Walkthrough**: 22 sections and 221 steps, each with a screenshot, assembled into an illustrated report and rerun after every major change.

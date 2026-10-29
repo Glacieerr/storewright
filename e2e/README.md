@@ -36,6 +36,12 @@ npx playwright install webkit firefox
 npm run e2e:browsers
 ```
 
+CI machines have no GPU, so browsers render WebGL on the CPU. To see the same slowness locally, run the Chromium projects with software rendering. · 持续集成的机器没有显卡，浏览器在 CPU 上软件渲染 WebGL；要在本机看到同样的慢，让 Chromium 项目也用软件渲染。
+
+```bash
+PW_SOFTWARE_GL=1 npm run e2e
+```
+
 Run the walkthrough (ports 8798 and 4178); the report is `experiments/results/walkthrough/report.html`. · 运行全流程走查（8798 和 4178 端口），报告在 `experiments/results/walkthrough/report.html`。
 
 ```bash

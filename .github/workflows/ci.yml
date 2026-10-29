@@ -9,12 +9,14 @@ on:
 permissions:
   contents: read
 
+# 运行环境固定为 Ubuntu 24.04：ubuntu-latest 从 2026 年 10 月起逐步换成 26.04，字体和浏览器依赖会跟着变，升级时改这里
+
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -26,10 +28,11 @@ jobs:
 
   e2e:
     needs: check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -41,7 +44,7 @@ jobs:
         env:
           CI: 'true'
           PW_CHANNEL: ''
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: e2e-report

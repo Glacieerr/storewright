@@ -46,7 +46,7 @@ No profile wins on every metric: a store picks its priorities and sees the trade
 - **Modules and a second industry**: made-to-order deli, returns, oversized items and parcel hub can each be switched on; the same core runs a home-improvement store.
 - **In-browser demo**: the store hub, including the twin service and an equipment simulation, runs in the browser; the showcase shows the console, two phones, the 3D digital twin and a full-day simulation; auto operations run a second, virtual track next to your own.
 - **Your Store** ([decision 0013](docs/decisions/0013-phase8-plan.md)): build a twin of your own store from an empty lot. Floor size, industry, floors, staging, docks, pickup bays, hours and facilities generate a working store, and then everything can be edited; a pre-opening check flags missing areas, cold storage and capacity; run a full-day simulation or open a live sandbox on it. Stores are saved in the browser and can be copied, exported and imported.
-- **Quality**: 382 unit and property tests; 83 end-to-end runs on Chromium, WebKit (Safari), Firefox, iPhone, Android and browsers without SharedWorker, including accessibility checks (names, contrast, keyboard); a 221-step walkthrough in 22 sections with screenshots.
+- **Quality**: 383 unit and property tests; 83 end-to-end runs on Chromium, WebKit (Safari), Firefox, iPhone, Android and browsers without SharedWorker, including accessibility checks (names, contrast, keyboard); a 221-step walkthrough in 22 sections with screenshots.
 
 <table>
 <tr>
@@ -97,7 +97,7 @@ Open http://localhost:8787 (phones on the same Wi-Fi can open the computer's LAN
 
 | Command | Purpose |
 |---|---|
-| `npm run check` | Type checks + all unit and property tests (382) |
+| `npm run check` | Type checks + all unit and property tests (383) |
 | `npm run e2e` | End-to-end tests (23: real backend, in-browser demo including real taps on the showcase phones, accessibility; run `npm run build:all` first; uses the installed Chrome) |
 | `npm run e2e:browsers` | The same plus WebKit (Safari), Firefox, browsers without SharedWorker, iPhone and Android (75; run `npx playwright install webkit firefox` first) |
 | `npm run loadtest -w @storewright/server` | Large-store capacity test: 300 staff, 300 devices, 1,200 orders a day, batched pushes at peak (~10 s; `DB=pglite` writes every command to a database) |

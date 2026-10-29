@@ -9,6 +9,7 @@ import type { CostParams } from '@storewright/sim-engine';
 import { buildGeometry, type StoreGeometry } from '../scene/layout';
 import type { SiteSettings } from '../scene/site';
 import type { MenuTarget } from '../scene/contextTarget';
+import { softwareWebGL } from '../scene/softwareGl';
 import { clock, setRange, setTime } from './clock';
 
 export type ViewMode = 'iso' | '3d' | 'top';
@@ -449,8 +450,8 @@ export const useApp = create<AppState>((set, get) => ({
     set({ weekday: w });
     void get().simulate();
   },
-  // 手机等触屏设备默认关闭实时阴影
-  quality: typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches ? 'medium' : 'high',
+  // 手机等触屏设备默认关闭实时阴影；没有显卡加速（软件渲染）时默认低画质
+  quality: softwareWebGL() ? 'low' : typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches ? 'medium' : 'high',
   setQuality(q) {
     set({ quality: q });
   },

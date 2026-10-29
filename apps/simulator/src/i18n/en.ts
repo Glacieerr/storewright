@@ -52,7 +52,7 @@ export const EN: Record<string, string> = {
   拣货热度: 'Pick heat',
   无: 'None',
   画质: 'Quality',
-  '高：描边、实时阴影、泛光和草丛；中：描边和天空，无阴影；低：最简画面，适合性能较弱的设备': 'High: outlines, real-time shadows, glow and grass; Medium: outlines and sky, no shadows; Low: simplest picture for slower devices',
+  '高：描边、实时阴影、泛光和草丛；中：描边和天空，无阴影；低：最简画面，适合性能较弱的设备（没有显卡加速时默认用低画质）': 'High: outlines, real-time shadows, glow and grass; Medium: outlines and sky, no shadows; Low: simplest picture for slower devices (the default without hardware graphics acceleration)',
   高: 'High',
   中: 'Medium',
   低: 'Low',
@@ -63,6 +63,7 @@ export const EN: Record<string, string> = {
   '布局编辑中 · 实时应用': 'Editing layout · applied live',
   完成编辑: 'Done',
   '三维场景出错：{0}': '3D scene error: {0}',
+  '这个浏览器现在不能显示三维场景（WebGL 不可用，可能关掉了硬件加速），其余功能照常可以用。': "This browser can't show the 3D scene right now (WebGL is unavailable; hardware acceleration may be turned off). Everything else still works.",
   重试: 'Retry',
 
   // —— 数据面板与标签页 ——

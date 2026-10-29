@@ -64,7 +64,7 @@ Along the way the project grew in directions that were not in the first plan:
 - **Workflow review and fixes**: every role's steps were reviewed, 18 states where work could get stuck were fixed, and 25 simplifications were implemented ([docs/16](../16-operation-flows.md)).
 - **Capacity**: tested as a 300-person store; 300 devices connect in 0.09 s, and at 50 commands a second every device sees each change within about 15 ms.
 
-Size: 4 apps and 9 shared packages, about 82,000 lines of TypeScript source; 382 unit and property tests, 83 end-to-end runs across browsers including accessibility checks, and a 221-step walkthrough in 22 sections; 16 design documents and 27 decision records.
+Size: 4 apps and 9 shared packages, about 82,000 lines of TypeScript source; 383 unit and property tests, 83 end-to-end runs across browsers including accessibility checks, and a 221-step walkthrough in 22 sections; 16 design documents and 27 decision records.
 
 ## 4. Not done, or simplified on purpose
 

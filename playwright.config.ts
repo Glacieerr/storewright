@@ -11,10 +11,12 @@ import { defineConfig, devices, type Project } from '@playwright/test';
  * 本机默认用已安装的 Chrome（不下载浏览器）；持续集成里设置 PW_CHANNEL= 使用 Playwright 自带的 Chromium。
  * PW_ALL=1（npm run e2e:browsers）时再加：Safari 内核（WebKit）、Firefox、不支持 SharedWorker 的浏览器（较旧的安卓 Chrome），
  * 以及 iPhone 和安卓手机上的窄屏场景（需要先 npx playwright install webkit firefox）。
+ * PW_SOFTWARE_GL=1：Chromium 关掉显卡加速、在 CPU 上软件渲染 WebGL，和持续集成的机器一样，用来在本机复现那里的慢。
  */
 const channel = process.env.PW_CHANNEL ?? 'chrome';
+const softwareGl = process.env.PW_SOFTWARE_GL ? { launchOptions: { args: ['--disable-gpu', '--enable-unsafe-swiftshader'] } } : {};
 // 本机的 Chrome 只用于 Chromium 项目（WebKit、Firefox 不能指定 channel）
-const chrome = channel ? { channel } : {};
+const chrome = { ...(channel ? { channel } : {}), ...softwareGl };
 const dataDir = mkdtempSync(join(tmpdir(), 'storewright-e2e-'));
 
 export default defineConfig({
@@ -23,6 +25,8 @@ export default defineConfig({
   expect: { timeout: 15_000 },
   fullyParallel: false,
   workers: 1,
+  // 持续集成的机器慢、波动大：失败的用例再跑一次，报告里标成 flaky（不稳定），方便以后查
+  retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never', outputFolder: 'experiments/results/e2e-report' }]] : 'list',
   use: {
     viewport: { width: 420, height: 860 },

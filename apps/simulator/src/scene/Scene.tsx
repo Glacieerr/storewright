@@ -249,9 +249,11 @@ class SceneBoundary extends Component<{ children: ReactNode }, { error?: string 
   }
   override render() {
     if (this.state.error) {
+      // 浏览器建不了 WebGL（关掉了硬件加速、没有显卡驱动，持续集成里的 Firefox 也是这样）：说明原因，不显示技术报错
+      const noWebGL = /webgl context/i.test(this.state.error);
       return (
         <div className="overlay-note error">
-          {t('三维场景出错：{0}', this.state.error)}
+          {noWebGL ? t('这个浏览器现在不能显示三维场景（WebGL 不可用，可能关掉了硬件加速），其余功能照常可以用。') : t('三维场景出错：{0}', this.state.error)}
           <button onClick={() => this.setState({ error: undefined })}>{t('重试')}</button>
         </div>
       );

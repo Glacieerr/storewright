@@ -14,7 +14,7 @@ async function open(page: Page): Promise<FrameLocator> {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/app/showcase.html');
   const con = page.frameLocator('iframe.sc-console');
-  await expect(con.getByRole('heading', { name: '创建测试订单' })).toBeVisible({ timeout: 60_000 });
+  await expect(con.getByRole('heading', { name: '创建测试订单' })).toBeVisible({ timeout: 90_000 });
   await expect(phone(page, 0).locator('.link-state.live')).toBeVisible({ timeout: 60_000 });
   await expect(phone(page, 1).locator('.link-state.live')).toBeVisible({ timeout: 60_000 });
   // 两部手机整个在屏幕里：底部的标签栏不用滚动整页就能点到（以前按「整屏减 140 像素」算高度，手机底部落在屏幕外）
@@ -55,6 +55,22 @@ async function pickOneWalk(p: FrameLocator): Promise<void> {
     await expect.poll(async () => (await done.isVisible()) || (await picked()) > before).toBe(true);
   }
   await done.click();
+}
+
+/** 逐框暂存：点框，再点建议的格位；等这个框从「待暂存」里消失再点下一个（慢的机器上列表还没更新，会再点到刚放好的框） */
+async function stageAll(p: FrameLocator): Promise<void> {
+  const totes = p.locator('main .tote-list .row-btn');
+  await expect(p.getByText(/待暂存（\d+）/)).toBeVisible();
+  for (let k = 0; k < 8; k++) {
+    const n = await totes.count();
+    const tote = totes.first();
+    if (!n || !(await tote.isVisible().catch(() => false))) return;
+    await tote.click();
+    // 正在暂存的框：「下一步」不该把格位挤到屏幕外
+    await expect(p.locator('.next-task')).toHaveCount(0);
+    await p.locator('.chip.mono').first().click();
+    await expect.poll(() => totes.count()).toBeLessThan(n);
+  }
 }
 
 test('手机：摄像头打开后能关闭（真实点击），没有摄像头时可以改成手动输入', async ({ page }) => {
@@ -102,14 +118,7 @@ test('手机：引导的整条流程（拣货 → 暂存 → 到店 → 交付�
   // 暂存：第一部手机换成暂存员，逐框点选、放进建议的格位
   await role(page, 0, 'A04');
   await tab(picker, '暂存');
-  for (let k = 0; k < 8; k++) {
-    const tote = picker.locator('main .tote-list .row-btn').first();
-    if (!(await tote.isVisible().catch(() => false))) break;
-    await tote.click();
-    // 正在暂存的框：「下一步」不该把格位挤到屏幕外
-    await expect(picker.locator('.next-task')).toHaveCount(0);
-    await picker.locator('.chip.mono').first().click();
-  }
+  await stageAll(picker);
   await expect(page.locator('.sc-steps li').nth(2)).toHaveClass(/done/);
 
   // 到店：控制台「我在路上」「到店」，读出验证码
@@ -260,12 +269,7 @@ test('手机：准备中取消订单——交付员的页面列出已取出的�
   }
   await role(page, 0, 'A04');
   await tab(picker, '暂存');
-  for (let k = 0; k < 8; k++) {
-    const tote = picker.locator('main .tote-list .row-btn').first();
-    if (!(await tote.isVisible().catch(() => false))) break;
-    await tote.click();
-    await picker.locator('.chip.mono').first().click();
-  }
+  await stageAll(picker);
   // 顾客到店，交付员开始准备并取出一个框
   const row = con.locator('tr').filter({ has: con.getByRole('button', { name: '到店' }) }).first();
   const short = ((await row.locator('td').first().innerText()).trim().split(/\s/)[0] ?? '').trim();
@@ -273,7 +277,12 @@ test('手机：准备中取消订单——交付员的页面列出已取出的�
   await tab(handoff, '交付');
   await handoff.locator('.board-row', { hasText: short }).click();
   await handoff.getByRole('button', { name: '开始准备' }).click();
-  await handoff.locator('main .prep-list .row-btn:not([disabled])').first().click();
+  // 等取出的框记上了（按钮变灰）再取消：慢的机器上取消可能先到，就没有要放回的框
+  const prep = handoff.locator('main .prep-list .row-btn:not([disabled])');
+  await expect(prep.first()).toBeVisible();
+  const left = await prep.count();
+  await prep.first().click();
+  await expect.poll(() => prep.count()).toBeLessThan(left);
   // 控制台取消这张订单
   await con.locator('tr', { hasText: short }).getByRole('button', { name: '取消' }).click();
   const notice = handoff.getByText('订单已取消：把已经取出的框放进对应温区的回收专区，放好后点一下。');

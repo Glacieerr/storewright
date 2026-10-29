@@ -100,11 +100,14 @@ test('带班负责人在 AI 页处理订单量预测建议，控制台同步看�
   await consolePage.getByRole('tab', { name: '模型' }).click();
   await consolePage.getByRole('button', { name: '立即预测' }).click();
   await lead.locator('.tabbar button').filter({ hasText: 'AI' }).click();
-  // 找建议卡片（.ai-rec）：营业时间里上面还有一张「订单量展望」卡片，也写着「接下来…」
-  const card = lead.locator('.ai-rec', { hasText: '接下来' }).first();
+  // 按标题找订单量预测的卡片：别的卡片也会写「接下来…」（上面的「订单量展望」；下午积压时排在前面的运营预警，理由里有「接下来 2 小时还会来约 N 单」）
+  const card = lead.locator('.ai-rec', { hasText: /接下来 \d+ 小时的订单量/ }).first();
   await expect(card).toBeVisible();
+  // 同一个后端上别的浏览器可能已经采纳过一条：要看这次多了一条
+  const accepted = async () => Object.values((await state(consolePage)).recs).filter((r) => r.module === 'FORECAST' && r.status === 'ACCEPTED').length;
+  const before = await accepted();
   await card.getByRole('button', { name: '有用' }).click();
-  await expect.poll(async () => Object.values((await state(consolePage)).recs).some((r) => r.module === 'FORECAST' && r.status === 'ACCEPTED')).toBe(true);
+  await expect.poll(accepted).toBe(before + 1);
 });
 
 test('补货闭环：控制台让货架变空 → 系统生成补货任务 → 补货员取箱上架 → 货架估算恢复', async ({ browser }) => {

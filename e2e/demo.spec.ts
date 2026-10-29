@@ -59,14 +59,21 @@ test('数字孪生：设备故障变成告警，带班负责人在手机上确�
   await expect(sim.locator('.live-chip', { hasText: '已连接' })).toBeVisible({ timeout: 90_000 });
   // 设备读数出现在控制台和三维孪生里
   await expect(con.locator('.twin-readings li', { hasText: '暂存冷藏柜' }).locator('b')).toHaveText(/°C/, { timeout: 60_000 });
-  // 场景小的时候设备牌按重要程度去重叠，暂存冷藏柜的牌可能暂时被别的牌挡住：只要求它在场景里、至少有一块设备牌看得见
-  await expect(sim.locator('.twin-label', { hasText: '暂存冷藏柜' })).toHaveCount(1, { timeout: 60_000 });
-  await expect(sim.locator('.twin-label:not(.declutter-hidden)').first()).toBeVisible();
+  // 没有 WebGL 的浏览器（持续集成里的 Firefox）：三维场景只说明原因，跳过设备牌；告警、手机、时间轴和孪生面板照常检查
+  const webgl = await page.evaluate(() => !!document.createElement('canvas').getContext('webgl2'));
+  if (webgl) {
+    // 场景小的时候设备牌按重要程度去重叠，暂存冷藏柜的牌可能暂时被别的牌挡住：只要求它在场景里、至少有一块设备牌看得见
+    await expect(sim.locator('.twin-label', { hasText: '暂存冷藏柜' })).toHaveCount(1, { timeout: 60_000 });
+    await expect(sim.locator('.twin-label:not(.declutter-hidden)').first()).toBeVisible();
+  } else {
+    await expect(sim.locator('.overlay-note', { hasText: 'WebGL' })).toBeVisible({ timeout: 60_000 });
+    test.info().annotations.push({ type: 'no-webgl', description: '这个浏览器没有 WebGL，跳过三维设备牌' });
+  }
 
   await con.getByRole('button', { name: '暂存冷藏柜故障' }).click();
   // 温度升过严重线（约 1 分钟）：孪生里设备牌变红，控制台出现告警
-  await expect(sim.locator('.twin-label.s-alarm', { hasText: '暂存冷藏柜' })).toBeVisible({ timeout: 150_000 });
-  await expect(con.locator('.twin-alert.alarm', { hasText: '暂存冷藏柜' })).toBeVisible();
+  if (webgl) await expect(sim.locator('.twin-label.s-alarm', { hasText: '暂存冷藏柜' })).toBeVisible({ timeout: 150_000 });
+  await expect(con.locator('.twin-alert.alarm', { hasText: '暂存冷藏柜' })).toBeVisible({ timeout: 150_000 });
 
   // 带班负责人的手机：顶部的告警条，确认
   await page.locator('.phone select').first().selectOption('A08');
@@ -227,7 +234,12 @@ test('手机宽度的模拟器：顶栏收成一行，点「设置」展开其�
   const toggle = bar.getByRole('button', { name: '设置' });
   await expect(toggle).toBeVisible();
   await expect(bar.getByRole('combobox', { name: '策略' })).toBeHidden();
-  expect((await bar.boundingBox())!.height).toBeLessThan(60);
+  // 收成一行：顶栏里看得见的控件上下范围互相重叠（不按像素高度判断，Linux 上字体的行高要高一点）
+  const oneRow = await bar.evaluate((el) => {
+    const rs = [...el.children].map((c) => c.getBoundingClientRect()).filter((r) => r.width > 0 && r.height > 0);
+    return Math.max(...rs.map((r) => r.top)) < Math.min(...rs.map((r) => r.bottom));
+  });
+  expect(oneRow).toBe(true);
   const stage = (await page.locator('.stage').boundingBox())!;
   expect(stage.height / 812).toBeGreaterThan(0.6);
   await toggle.click();

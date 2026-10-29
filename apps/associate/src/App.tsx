@@ -235,7 +235,7 @@ function AssociateShell({ onSignOut }: { onSignOut?: () => void }) {
         {tabs.map((x) => (
           <button key={x.id} className={current === x.id ? 'on' : ''} onClick={() => setTab(x.id)} aria-current={current === x.id ? 'page' : undefined}>
             <span className={`tab-icon icon-${x.id}`} aria-hidden />
-            {x.label}
+            <span className="tab-label">{x.label}</span>
             {x.badge !== undefined && <em>{x.badge}</em>}
           </button>
         ))}

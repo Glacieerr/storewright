@@ -313,7 +313,7 @@ type DraftArea = { id: string; kind: AreaKind; floorId: string; tempZone?: AreaT
  * 一条 3 米宽的连通通道从暂存区一直通到后面的收货区，通道旁边是放后仓溢出托盘的地面（溢流位）。
  * 暂存区和收货区之间放不下冷库时，冷库放到暂存货架右边；两者紧挨着时（很小的门店）不设通道。
  */
-function defaultOpd(config: StoreConfig, frame: BackroomFrame): { areas: DraftArea[]; assign: (r: StagingRackConfig) => string | undefined } {
+function defaultOnlineArea(config: StoreConfig, frame: BackroomFrame): { areas: DraftArea[]; assign: (r: StagingRackConfig) => string | undefined } {
   const sf = config.layout.points.staging.floorId;
   const cold = { STAGING_COOLER: [] as StagingRackConfig[], STAGING_FREEZER: [] as StagingRackConfig[] };
   for (const r of config.staging.racks) {
@@ -376,8 +376,8 @@ function defaultUpper(config: StoreConfig, frame: BackroomFrame): DraftArea[] {
   return out;
 }
 
-/** 没有明确给出区域时的默认区域（后仓、收货区与原来一致；线上订单区和二楼见 defaultOpd、defaultUpper） */
-export function defaultAreas(config: StoreConfig, frame = backroomFrame(config), opd = defaultOpd(config, frame), racks = stagingPlacement(config, opd.areas, opd.assign)): DraftArea[] {
+/** 没有明确给出区域时的默认区域（后仓、收货区与原来一致；线上订单区和二楼见 defaultOnlineArea、defaultUpper） */
+export function defaultAreas(config: StoreConfig, frame = backroomFrame(config), online = defaultOnlineArea(config, frame), racks = stagingPlacement(config, online.areas, online.assign)): DraftArea[] {
   const out: DraftArea[] = [];
   const f = frame.floorId;
   const z = frame.zone;
@@ -419,17 +419,17 @@ export function defaultAreas(config: StoreConfig, frame = backroomFrame(config),
   // 暂存区：常温货架网格里各温区（不含冷藏、冷冻）、配送、回收的货架交错排列，所以整体是一个暂存区；
   // 大件暂存是暂存区旁边的一块地面（明确划分配送暂存道、回收专区要在编辑器里画区域）
   const sf = config.layout.points.staging.floorId;
-  const ambient = racks.filter((p) => !p.areaId || !opd.areas.some((a) => a.id === p.areaId));
+  const ambient = racks.filter((p) => !p.areaId || !online.areas.some((a) => a.id === p.areaId));
   if (ambient.length) {
     const sb = bbox(ambient);
     out.push({ id: 'STAGING-1', kind: 'STAGING', floorId: sf, ...round1(sb) });
     if (config.modules.gm) {
       // 冷库放在暂存货架右边时，大件暂存区让到冷库右边
-      const right = Math.max(sb.x1, ...opd.areas.filter((a) => a.z0 < sb.z1 && a.x0 >= sb.x1 - 0.01).map((a) => a.x1));
+      const right = Math.max(sb.x1, ...online.areas.filter((a) => a.z0 < sb.z1 && a.x0 >= sb.x1 - 0.01).map((a) => a.x1));
       out.push({ id: 'OVS-1', kind: 'STAGING_OVERSIZED', floorId: sf, ...round1({ x0: right + 0.6, x1: right + 5.6, z0: sb.z0, z1: sb.z0 + Math.min(6, sb.z1 - sb.z0) }) });
     }
   }
-  out.push(...opd.areas);
+  out.push(...online.areas);
   // 包裹区和熟食保温区：交付门和暂存货架之间
   const sp = config.layout.points.staging;
   if (config.modules.parcelHub) out.push({ id: 'PARCEL-1', kind: 'PARCEL', floorId: sf, ...round1({ x0: sp.x + 3, x1: sp.x + 8, z0: sp.y - 4.4, z1: sp.y - 0.6 }) });
@@ -489,9 +489,9 @@ function defaultCapacity(kind: AreaKind, r: Rect, config: StoreConfig, racks: Pl
 export function storeAreas(config: StoreConfig): StoreAreas {
   const frame = backroomFrame(config);
   const given = config.areas;
-  const opd = given ? undefined : defaultOpd(config, frame);
-  const racks = given ? stagingPlacement(config, given) : stagingPlacement(config, opd?.areas, opd?.assign);
-  const raw = given ?? defaultAreas(config, frame, opd, racks);
+  const online = given ? undefined : defaultOnlineArea(config, frame);
+  const racks = given ? stagingPlacement(config, given) : stagingPlacement(config, online?.areas, online?.assign);
+  const raw = given ?? defaultAreas(config, frame, online, racks);
   const areas: ResolvedArea[] = raw.map((a) => {
     const meta = AREA_KINDS[a.kind];
     const rect = { x0: Math.min(a.x0, a.x1), x1: Math.max(a.x0, a.x1), z0: Math.min(a.z0, a.z1), z1: Math.max(a.z0, a.z1) };

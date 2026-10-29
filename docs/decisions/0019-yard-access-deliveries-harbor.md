@@ -97,7 +97,7 @@
 
 ## 9. 线上订单区：连通通道、冷藏库、冷冻库、溢流位
 
-默认布局（`defaultOpd`）：
+默认布局（`defaultOnlineArea`）：
 - 常温暂存货架网格在前（靠交付门口）；后面是**线上订单冷藏库**、**冷冻库**（步入式冷库，冷藏、冷冻订单货架和对应温区的回收货架在里面，门朝暂存区）；
 - 一条 3 米宽的**连通通道**从暂存区一直通到后面的收货区，地上画着指向暂存区的人字纹；
 - 通道旁、靠暂存区的一端是**溢流位**（地面堆放托盘）；
@@ -136,7 +136,7 @@
 
 ## 13. 文件
 
-- 门店配置：`schema.ts`（`outdoor.yard`、新的区域类型、卸货门上限）、`areas.ts`（`yardSettings`、`maxDocks`、货梯、`defaultOpd`、二楼区域）、`backroom.ts`（`upperStock`）、`templates.ts`；
+- 门店配置：`schema.ts`（`outdoor.yard`、新的区域类型、卸货门上限）、`areas.ts`（`yardSettings`、`maxDocks`、货梯、`defaultOnlineArea`、二楼区域）、`backroom.ts`（`upperStock`）、`templates.ts`；
 - 引擎：`deliveries.ts`（新）、`inbound.ts`（排班、溢流、货梯、两处修复）、`traffic.ts`（学校、铁路道口）；
 - 模拟器场景：`yardPlan.ts`、`yard.ts`（两侧进场、`fillet`）、`site.ts`（进场道路、喇叭口、出入口、铁路、学校）、`lot.ts`、`parking.ts`（进出分道）、`terrain/waterPlan.ts`、`terrain/harbor.ts`（新）、`terrain/Lakeside.tsx`（船只、开启桥、防波堤、栈桥坡道）、`terrain/Terrain.tsx`、`terrain/Diorama.tsx`（新）、`crossings.ts`（新）、`street/Railway.tsx`、`street/School.tsx`（新）、`street/Roads.tsx`、`Areas.tsx`（冷库、通道、货梯）、`layout.ts`、`Fixtures.tsx`、`crowd.ts`（二楼收银）、`Warehouse.tsx`、`Fleet.tsx`；
 - 界面：`ui/YardFields.tsx`（新）、`ui/DeliveryList.tsx`（新，今日到货）、`GeneratorPanel.tsx`、`EditorPanel.tsx`、`LiveData.tsx`（星期）；镜头范围：`CameraRig.tsx`；

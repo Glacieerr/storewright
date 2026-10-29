@@ -47,7 +47,7 @@ export function ExtScreen() {
       <div className="segmented wide" role="tablist">
         {sections.map((k) => (
           <button key={k} role="tab" aria-selected={section === k} className={section === k ? 'on' : ''} onClick={() => setSection(k)}>
-            {t(LABEL[k])}
+            <span className="seg-label">{t(LABEL[k])}</span>
             {badge[k] > 0 && <em>{badge[k]}</em>}
           </button>
         ))}

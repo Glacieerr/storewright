@@ -266,13 +266,24 @@ button:focus-visible {
   border-radius: 0;
   background: none;
   min-width: 0;
-  padding: 0 2px;
+  padding: 0 1px;
   min-height: 62px;
   flex-direction: column;
   gap: 2px;
   font-size: 13px;
   color: var(--muted);
   position: relative;
+}
+/* 英文标签比中文长：带班负责人有 7 个标签，窄屏上（360 像素宽的安卓机、展示页里的手机）字号随屏宽缩小，最长的 Inventory 在 300 像素宽时也放得下 */
+:lang(en) .tabbar button {
+  font-size: clamp(9px, 3.1vw, 13px);
+}
+/* 再窄也不叠到隔壁的标签上，用省略号收尾（按钮的无障碍名称仍是完整的标签） */
+.tab-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .tabbar button.on {
   color: var(--brand);
@@ -1268,6 +1279,13 @@ td.actions button {
   color: var(--danger-ink);
   padding: 0 5px;
 }
+/* 分段标签的文字：放不下时用省略号收尾，不会溢出被切掉（按钮的无障碍名称仍是完整的标签） */
+.seg-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .count-row {
   display: flex;
   align-items: center;
@@ -2200,6 +2218,12 @@ ol.brief-list li::before {
 .ai-health li small {
   flex-basis: 100%;
 }
+/* 简报里预测的原因单独占一行（以前紧跟在「高峰 17 点约 30 单」后面，读起来像一句话） */
+.brief small.sub-why {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+}
 
 /* 手机宽度（展示页里的手机约 300 像素宽）的修复 */
 /* 标签多（5 个以上）的分段控件：不换行，不把「模式与统计」挤成三行；宽屏一行（放不下时横向滑动），窄屏排成三列 */
@@ -2231,6 +2255,10 @@ ol.brief-list li::before {
   .segmented.wide:has(> button:nth-child(5)) > button.on {
     background: var(--brand);
   }
+  /* 英文标签长（Recommendations）：排成三列时字号随屏宽缩小，390 像素宽时完整显示，更窄时用省略号 */
+  :lang(en) .segmented.wide:has(> button:nth-child(5)) > button {
+    font-size: clamp(11px, 2.95vw, 14px);
+  }
   /* 窄屏的分段标签不换行；数字角标放到右上角，不占标签的宽度（「熟食现做」不再挤成两行） */
   .segmented.wide > button {
     white-space: nowrap;
@@ -2238,13 +2266,14 @@ ol.brief-list li::before {
   }
   .segmented.wide em {
     position: absolute;
-    top: 3px;
-    right: 3px;
-    min-width: 16px;
-    height: 16px;
-    line-height: 16px;
+    /* 贴在右上角、比小写字母的顶端高：占满整格的英文标签（Recommendations）不会被它压住 */
+    top: 2px;
+    right: 2px;
+    min-width: 14px;
+    height: 14px;
+    line-height: 14px;
     font-size: 10px;
-    padding: 0 4px;
+    padding: 0 3px;
   }
 }
 /* 突发状况横幅的标题：点一下展开 / 收起 */

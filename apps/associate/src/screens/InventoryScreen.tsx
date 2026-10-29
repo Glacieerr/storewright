@@ -45,7 +45,7 @@ export function InventoryScreen() {
       <div className="segmented wide" role="tablist">
         {tabs.map(([k, label]) => (
           <button key={k} role="tab" aria-selected={section === k} className={section === k ? 'on' : ''} onClick={() => setSection(k)}>
-            {t(label)}
+            <span className="seg-label">{t(label)}</span>
             {badge[k] > 0 && <em>{badge[k]}</em>}
           </button>
         ))}

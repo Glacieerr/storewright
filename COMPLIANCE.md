@@ -79,7 +79,7 @@ Cold-chain timers, temperature alerts (defaults: chilled above 5 °C, frozen abo
 | Private notes and outputs · 私人笔记和输出 | ✅ `private/`, experiment outputs and builds are git-ignored · `private/`、实验输出、构建产物都在 `.gitignore` 里 | `git check-ignore` |
 | Tracking scripts · 跟踪脚本 | ✅ None · 没有 | Code search · 代码检索 |
 | Accessibility (automated) · 无障碍（自动） | ✅ Passing · 通过 | `npm run e2e` (a11y project) |
-| Tests · 测试 | ✅ 381 unit and property tests; 83 end-to-end runs across all browser setups (23 of them on Chrome), all passing; walkthrough of 22 sections and 221 steps with 0 failures (2026-10-28) · 381 个单元与属性测试；全部浏览器的端到端测试 83 个（其中 Chrome 23 个）全部通过；走查 22 个部分、221 步、0 失败（2026-10-28） | `npm run check`, `npm run e2e`, `npm run e2e:browsers` |
+| Tests · 测试 | ✅ 382 unit and property tests; 83 end-to-end runs across all browser setups (23 of them on Chrome), all passing; walkthrough of 22 sections and 221 steps with 0 failures (2026-10-28) · 382 个单元与属性测试；全部浏览器的端到端测试 83 个（其中 Chrome 23 个）全部通过；走查 22 个部分、221 步、0 失败（2026-10-28） | `npm run check`, `npm run e2e`, `npm run e2e:browsers` |
 | Real sign-in and roles · 真正的登录和角色 | ⚠️ Not built; required before any non-demo deployment · 没有做；任何非演示部署之前必须做 | [docs/08 §7](docs/08-live-operations.md) |
 | Source link on a public deployment · 公开部署时的源代码链接 | ⚠️ To add once the repository is public (AGPL-3.0 §13 practice) · 仓库公开后加上（AGPL-3.0 第 13 条的做法） | — |
 | Dependency vulnerability audit · 依赖漏洞审计 | ⚠️ Run `npm audit` before deploying · 部署前运行 `npm audit` | — |

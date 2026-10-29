@@ -2,6 +2,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { EN } from './en';
+import { setLang, t } from './index';
 
 const ROOT = join(__dirname, '..');
 const HAN = /[一-鿿]/;
@@ -32,6 +33,16 @@ describe('员工端英文', () => {
       }
     }
     expect(missing).toEqual([]);
+  });
+
+  it('英文的单复数：参数为 1 时用单数（「1 tote」，不是「1 totes」）', () => {
+    setLang('en');
+    try {
+      expect([t('{0} 个框', 1), t('{0} 个框', 2), t('{0} 个货位', 1), t('{0} 件', 0)]).toEqual(['1 tote', '2 totes', '1 location', '0 units']);
+    } finally {
+      setLang('zh');
+    }
+    expect(t('{0} 个框', 1)).toBe('1 个框');
   });
 
   it('译文的占位符与原文一致', () => {

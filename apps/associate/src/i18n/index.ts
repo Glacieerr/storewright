@@ -48,9 +48,11 @@ export function useLang(): Lang {
   );
 }
 
+/** 英文译文里可以写单复数：{0|tote|totes} 在参数 {0} 为 1 时取前一个词，否则取后一个 */
 export function t(s: string, ...args: Array<string | number>): string {
   const v = lang === 'en' ? (EN[s] ?? s) : s;
-  return args.length ? v.replace(/\{(\d+)\}/g, (m, i: string) => String(args[Number(i)] ?? m)) : v;
+  if (!args.length) return v;
+  return v.replace(/\{(\d+)\|([^|}]*)\|([^}]*)\}/g, (_, i: string, one: string, other: string) => (Number(args[Number(i)]) === 1 ? one : other)).replace(/\{(\d+)\}/g, (m, i: string) => String(args[Number(i)] ?? m));
 }
 
 /** 时钟 HH:MM */

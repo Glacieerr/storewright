@@ -619,7 +619,7 @@ export function AiScreen() {
       <div className="segmented wide" role="tablist">
         {tabs.map(([k, label]) => (
           <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>
-            {t(label)}
+            <span className="seg-label">{t(label)}</span>
             {k === 'recs' && open > 0 && <em>{open}</em>}
           </button>
         ))}

@@ -70,6 +70,8 @@ export interface TraceSegment {
 export interface AssociateTrace {
   id: string;
   role: Role;
+  /** 学生兼职工（决策记录 0020） */
+  student?: boolean;
   /** 在岗时间段 [上岗, 下岗] */
   shifts: Array<[number, number]>;
   segments: TraceSegment[];
@@ -155,6 +157,8 @@ export interface DayMetrics {
   exceptionBusyHours: number;
   busyHoursTotal: number;
   staffedHoursTotal: number;
+  /** 其中学生兼职工的工时（决策记录 0020；按学生时薪计） */
+  studentHours?: number;
   laborMinutesPerOrder: number;
   laborCostPerOrder: number;
   unfinishedOrders: number;
@@ -175,6 +179,8 @@ interface Associate {
   role: Role;
   busy: boolean;
   leaving: boolean;
+  /** 学生兼职工：按自己的班次上下岗，不参与按小时调整的全职人数 */
+  student?: boolean;
 }
 
 interface Task {
@@ -288,7 +294,7 @@ export function simulateDay(input: SimInput): SimResult {
     if (!tracing) return;
     let tr = traces.get(a.id);
     if (!tr) {
-      tr = { id: a.id, role: a.role, shifts: [], segments: [] };
+      tr = { id: a.id, role: a.role, shifts: [], segments: [], ...(a.student ? { student: true } : {}) };
       traces.set(a.id, tr);
     }
     tr.shifts.push([sim.now, Number.POSITIVE_INFINITY]);
@@ -348,11 +354,12 @@ export function simulateDay(input: SimInput): SimResult {
 
   function setHeadcount(role: Role, target: number): void {
     const pool = pools[role];
-    const active = pool.filter((a) => !a.leaving);
+    // 只调整全职人数；学生兼职工按自己的班次上下岗
+    const active = pool.filter((a) => !a.leaving && !a.student);
     if (active.length < target) {
       let need = target - active.length;
       for (const a of pool) {
-        if (need > 0 && a.leaving) {
+        if (need > 0 && a.leaving && !a.student) {
           a.leaving = false;
           need--;
         }
@@ -383,6 +390,28 @@ export function simulateDay(input: SimInput): SimResult {
         setHeadcount(r, n);
       }
       dispatchAll();
+    });
+  }
+
+  // 学生兼职工（决策记录 0020）：在全职人数之外，按各自的班次上岗；下岗时手上的活做完再走
+  let studentSec = 0;
+  for (const sh of scenario.students ?? []) {
+    if (sh.end <= sh.start) continue;
+    const start = Math.max(DAY_START, sh.start);
+    staffed[sh.role] += sh.end - start;
+    studentSec += sh.end - start;
+    const a: Associate = { id: `${sh.role}-${sh.id}`, role: sh.role, busy: false, leaving: false, student: true };
+    sim.at(start, () => {
+      pools[sh.role].push(a);
+      joinShift(a);
+      dispatchAll();
+    });
+    sim.at(sh.end, () => {
+      a.leaving = true;
+      if (!a.busy) {
+        pools[sh.role] = pools[sh.role].filter((x) => x !== a);
+        leaveShift(a);
+      }
     });
   }
 
@@ -1043,6 +1072,7 @@ export function simulateDay(input: SimInput): SimResult {
     exceptionBusyHours: busy.exception / 3600,
     busyHoursTotal: busyTotal,
     staffedHoursTotal: staffedTotal,
+    studentHours: studentSec / 3600,
     laborMinutesPerOrder: (busyTotal * 60) / Math.max(1, orders.length),
     laborCostPerOrder: (busyTotal * scenario.hourlyWage) / Math.max(1, orders.length),
     unfinishedOrders: states.filter((s) => !s.handedOff).length + (orders.length - states.length),

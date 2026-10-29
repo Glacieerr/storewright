@@ -64,6 +64,8 @@ export function LiveProvider({ auth, children, onAuthError }: { auth: Auth; chil
         storage: window.localStorage,
         onRejected: (_cmd, r) => toast(rejectText(r, (id) => id), 'error'),
         onAuthError: () => onAuthError?.(),
+        // 控制台订阅数字孪生的设备读数（员工手机不订阅，决策记录 0016）
+        twin: auth.role === 'console',
         // 浏览器内演示模式：实时连接和请求都经过浏览器里的门店中枢
         ...(DEMO ? { WebSocketImpl: link.WebSocket as unknown as typeof WebSocket, fetchImpl: link.fetch as unknown as typeof fetch } : {}),
       }),

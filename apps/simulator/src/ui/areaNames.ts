@@ -21,4 +21,11 @@ export const AREA_NAME: Record<string, string> = {
   HOT_HOLD: '熟食保温区',
   PARCEL: '包裹区',
   RECOVERY: '回收专区',
+  STAGING_COOLER: '线上订单冷藏库',
+  STAGING_FREEZER: '线上订单冷冻库',
+  PASSAGE: '连通通道',
+  OVERFLOW: '溢流位',
 };
+
+/** 二楼的高位库存区叫补货区（货梯送上来的托盘放在这里，决策记录 0019） */
+export const UPPER_STOCK_NAME = '补货区';

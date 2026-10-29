@@ -40,7 +40,7 @@ export function Toasts() {
   return (
     <div className="toasts" role="status" aria-live="assertive">
       {items.map((x) => (
-        <div key={x.id} className={`toast ${x.kind}`} onClick={() => dismiss(x.id)}>
+        <div key={x.id} className={`toast ${x.kind}`}>
           {x.text}
         </div>
       ))}

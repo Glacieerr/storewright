@@ -17,9 +17,23 @@ export interface ReplenishRules {
   sellOutHorizonH: number;
   /** 每批最多任务数 */
   batchSize: number;
+  /** 一辆补货推车最多装多重、多大（千克、升；决策记录 0026）；没有时用 DEFAULT_CART */
+  cartKg?: number;
+  cartL?: number;
 }
 
 export const DEFAULT_REPLENISH_RULES: ReplenishRules = { lowFraction: 0.25, sellOutHorizonH: 2, batchSize: 8 };
+
+/** 补货推车的默认装载上限：约 150 千克、600 升（一辆平板推车摞两层箱子） */
+export const DEFAULT_CART = { kg: 150, liters: 600 } as const;
+
+/** 一批的装载上限：每个任务是一箱，按箱子的重量、体积累加（决策记录 0026：以前只按 8 个任务分批） */
+export interface BatchLoad<T> {
+  kg?: number;
+  liters?: number;
+  weight: (t: T) => number;
+  volume: (t: T) => number;
+}
 
 /** 预计售罄时间（小时）；几乎不动销时为无穷大 */
 export function sellOutHours(est: number, velocityPerHour: number): number {
@@ -60,6 +74,45 @@ export function replenishPriority(s: ShelfNeed & { unitPrice: number }): number 
   return Math.round(hours * 60 * priceBoost);
 }
 
+/**
+ * 接下来 horizonH 小时断货的概率（决策记录 0021 · C2）：
+ * 已下单、这段时间要拣的线上件数是已经知道的需求，先从货架上扣掉；
+ * 店内销量和还会来的线上订单是不确定的，按负二项分布（k = 4，比泊松更分散）算「需求超过剩下件数」的概率。
+ */
+export interface StockoutInput {
+  est: number;
+  /** 货架上找得到的概率（AI 的可售概率；没有时为 1） */
+  pFind?: number;
+  velocityPerHour: number;
+  /** 这段时间要拣的、已下单的线上件数 */
+  onlineOrderedUnits: number;
+  /** 这段时间还会来的线上订单预计要的件数 */
+  onlineForecastUnits: number;
+  horizonH: number;
+}
+
+export function stockoutRisk(x: StockoutInput, k = 4): number {
+  const available = Math.floor(Math.max(0, x.est) * (x.pFind ?? 1) - x.onlineOrderedUnits);
+  if (available <= 0) return 1;
+  const m = Math.max(0, x.velocityPerHour) * x.horizonH + Math.max(0, x.onlineForecastUnits);
+  if (m <= 1e-9) return 0;
+  // P(X ≥ available) = 1 − P(X ≤ available − 1)
+  const q = m / (k + m);
+  let p = Math.pow(k / (k + m), k);
+  let cdf = 0;
+  for (let n = 0; n < available; n++) {
+    cdf += p;
+    p *= ((n + k) / (n + 1)) * q;
+  }
+  return Math.round(Math.min(1, Math.max(0, 1 - cdf)) * 1000) / 1000;
+}
+
+/** 按断货概率的优先级（分钟，越小越优先，和 replenishPriority 同一量纲）：概率越高越靠前，单价高的略提前 */
+export function riskPriority(risk: number, horizonH: number, unitPrice: number): number {
+  const priceBoost = 1 - 0.15 * Math.min(1, Math.max(0, unitPrice) / 20);
+  return Math.round((1 - risk) * horizonH * 60 * priceBoost);
+}
+
 export interface BatchableTask {
   id: string;
   /** 通道（同一通道合并成批） */
@@ -67,8 +120,11 @@ export interface BatchableTask {
   priority: number;
 }
 
-/** 同一通道的任务合并成批：批按其中最紧急的任务排序，批内按优先级排序 */
-export function batchByArea<T extends BatchableTask>(tasks: readonly T[], batchSize = DEFAULT_REPLENISH_RULES.batchSize): T[][] {
+/**
+ * 同一通道的任务合并成批：批按其中最紧急的任务排序，批内按优先级排序。
+ * 给了装载上限时，一批装不下（超过推车的重量或体积）就另起一批；一箱就超过上限的单独成批。
+ */
+export function batchByArea<T extends BatchableTask>(tasks: readonly T[], batchSize = DEFAULT_REPLENISH_RULES.batchSize, load?: BatchLoad<T>): T[][] {
   const groups = new Map<string, T[]>();
   for (const t of tasks) {
     const g = groups.get(t.area) ?? [];
@@ -78,7 +134,24 @@ export function batchByArea<T extends BatchableTask>(tasks: readonly T[], batchS
   const batches: T[][] = [];
   for (const g of groups.values()) {
     g.sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id));
-    for (let i = 0; i < g.length; i += batchSize) batches.push(g.slice(i, i + batchSize));
+    let cur: T[] = [];
+    let kg = 0;
+    let liters = 0;
+    for (const t of g) {
+      const w = load ? load.weight(t) : 0;
+      const v = load ? load.volume(t) : 0;
+      const over = !!load && cur.length > 0 && ((load.kg !== undefined && kg + w > load.kg) || (load.liters !== undefined && liters + v > load.liters));
+      if (cur.length >= batchSize || over) {
+        batches.push(cur);
+        cur = [];
+        kg = 0;
+        liters = 0;
+      }
+      cur.push(t);
+      kg += w;
+      liters += v;
+    }
+    if (cur.length) batches.push(cur);
   }
   return batches.sort((a, b) => (a[0]?.priority ?? 0) - (b[0]?.priority ?? 0) || (a[0]?.id ?? '').localeCompare(b[0]?.id ?? ''));
 }

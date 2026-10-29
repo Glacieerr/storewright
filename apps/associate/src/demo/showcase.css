@@ -72,8 +72,27 @@ body {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 16px;
   padding: 8px 20px 12px;
-  /* 笔记本屏幕上也要能完整操作：左栏和手机至少 560 像素高，不够时整页滚动 */
-  height: max(560px, calc(100vh - 140px));
+  /* 宽屏时页面正好一屏高：标题和引导用多少，左栏和手机就用剩下的高度，手机底部的标签栏不会落到屏幕外
+     （以前按「整屏减 140 像素」算，引导展开时手机底部超出屏幕约 70 像素）；至少 480 像素，不够时整页滚动 */
+  flex: 1 1 0;
+  min-height: 480px;
+}
+@media (min-width: 1101px) {
+  #root {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+  }
+}
+/* 矮的窗口（笔记本浏览器常见 700–850 像素高）：标题下的介绍收起来，高度留给手机 */
+@media (min-width: 1101px) and (max-height: 860px) {
+  .sc-head {
+    padding: 8px 20px 4px;
+  }
+  .sc-head p {
+    display: none;
+  }
 }
 .sc-left {
   display: grid;

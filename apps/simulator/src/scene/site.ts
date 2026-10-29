@@ -1,6 +1,9 @@
 import { createRng, type Rng } from '@storewright/domain';
-import type { LotLayout, Pt, RoadAccess } from './lot';
+import { LANE_OFF, MEDIAN_W, type LotLayout, type Pt, type RoadAccess } from './lot';
 import { trRecord } from '../i18n';
+import { planYard, type YardPlan } from './yardPlan';
+import { planWater, type WaterPlan } from './terrain/waterPlan';
+import type { BoatTraffic } from './terrain/harbor';
 
 /**
  * 门店周边环境：按随机种子和道路风格生成主路、支路、信号灯、人行道、建筑、树木和后勤通道。
@@ -29,7 +32,37 @@ export interface SiteSettings {
   /** 天气（影响路况、车边交付速度、线上订单量和画面）与季节（影响日照时间和植物颜色） */
   weather?: Weather;
   season?: Season;
+  /** 水系（决策记录 0019）：湖（有出海口，船只进出港，默认）或没有水面 */
+  water?: WaterKind;
+  /** 附近有学校：上学、放学时路上车多、人多（决策记录 0019） */
+  school?: boolean;
+  /** 主路上有铁路道口：火车经过时道口栏杆放下，车辆排队（决策记录 0019） */
+  railway?: boolean;
+  /** 船只多少（决策记录 0020）：栈桥的船跑几趟、海上来的访客船和海湾里经过的船有几条；默认一般 */
+  boats?: BoatTraffic;
 }
+
+export type WaterKind = 'lake' | 'none';
+export const WATER_LABEL: Record<WaterKind, string> = trRecord({ lake: '湖与出海口', none: '没有水面' });
+export const BOATS_LABEL: Record<BoatTraffic, string> = trRecord({ few: '少', normal: '一般', many: '多' });
+
+/** 卸货场的进场设置（门店配置 outdoor.yard，决策记录 0019） */
+export interface YardAccess {
+  side: 'RIGHT' | 'LEFT';
+  via: 'DRIVE' | 'STREET';
+  offsetM: number;
+  slots: number;
+  trailerStalls: number;
+}
+
+export const DEFAULT_ACCESS: YardAccess = { side: 'RIGHT', via: 'DRIVE', offsetM: 24, slots: 0, trailerStalls: 0 };
+/** 专用后勤通道宽 9 米（一进一出两条 4.5 米的车道） */
+export const DRIVE_W = 9;
+/** 后勤通道接主路的喇叭口：两边路缘的圆弧半径（米） */
+export const DRIVE_FLARE = 15;
+/** 停车场出入口：宽 8.6 米（一进一出，中间隔离岛），喇叭口路缘半径 6 米 */
+export const LOT_GATE_W = 8.6;
+export const LOT_FLARE = 6;
 
 export const SITE_LAYOUT_LABEL: Record<SiteLayoutKind, string> = trRecord({
   auto: '随机',
@@ -63,7 +96,8 @@ export interface LaneDef {
   speed: number;
   /** 车流基准到达率（辆/秒，拥堵指数为 1 时） */
   rate: number;
-  stops: Array<{ d: number; signal: number; group: 0 | 1 }>;
+  /** 停止线：信号灯路口（signal 是信号灯下标）；gate = 'rail' 是铁路道口、'school' 是学校护导员的人行横道（signal 为 −1） */
+  stops: Array<{ d: number; signal: number; group: 0 | 1; gate?: 'rail' | 'school' }>;
   kind: 'main' | 'side';
   /** 限速路段（施工）：[起点, 终点, 限速] */
   zones?: Array<{ d0: number; d1: number; vmax: number }>;
@@ -137,8 +171,10 @@ export interface SiteLayout {
   trees: Tree[];
   lamps: Pt[];
   road: RoadAccess;
-  /** 门店背后的卸货区 */
+  /** 门店背后的卸货区（卸货场的范围） */
   dock: Rect;
+  /** 卸货场：单向绕行的车道、待命车位（决策记录 0018） */
+  yard: YardPlan;
   roadTopZ: number;
   roadBottomZ: number;
   turns: TurnDef[];
@@ -148,6 +184,24 @@ export interface SiteLayout {
   ponds: Array<{ x: number; z: number; rx: number; rz: number }>;
   /** 施工路段：锥桶位置与施工牌 */
   works?: { cones: Pt[]; sign: Pt; x0: number; x1: number };
+  /** 水系：湖、跌水堰、渠道与河、石拱桥、栈桥码头、出海水道与海湾 */
+  water: WaterPlan;
+  /** 不是矩形的路面（出入口的喇叭口，决策记录 0019），逆时针多边形 */
+  asphaltPolys: Pt[][];
+  /** 出入口跨过人行道的那一段（水泥铺装，和路面齐平） */
+  aprons: Rect[];
+  /** 停车场出入口中间的隔离岛 */
+  medians: Rect[];
+  /** 出入口的导向箭头（rotY：箭头所指的方向） */
+  driveArrows: Array<{ x: number; z: number; rotY: number }>;
+  /** 路边线在这些 x 范围断开（路口、出入口的喇叭口） */
+  edgeGaps: Array<[number, number]>;
+  /** 卸货场的进场道路（后勤通道或支路）与入口标志的位置 */
+  access: { side: 'RIGHT' | 'LEFT'; via: 'DRIVE' | 'STREET'; x: number; half: number; sign: Pt };
+  /** 铁路（决策记录 0019）：沿 Z 方向穿过场地，在主路上有一个道口 */
+  railway?: { x: number; z0: number; z1: number; roadZ0: number; roadZ1: number };
+  /** 学校（决策记录 0019）：主路对面的校园（教学楼、操场、旗杆），门前人行横道有护导员 */
+  school?: { x: number; z: number; w: number; d: number; field: Rect; flag: Pt; sign: Pt; crossX: number };
 }
 
 const LW = 3.4;
@@ -194,22 +248,52 @@ export interface SiteInput {
   /** 门店外轮廓（首层） */
   store: { minX: number; maxX: number; minZ: number; maxZ: number };
   settings: SiteSettings;
+  /** 卸货场的进场设置与卸货门的位置（不给时用缺省值：右侧专用后勤通道） */
+  access?: YardAccess;
+  doorXs?: number[];
 }
 
-export function generateSite({ lot, store, settings }: SiteInput): SiteLayout {
+/** 喇叭口：路缘圆弧（半径 r）和两条直边围成的那一小块路面；corner 是两条边的交点，ux/uz 指向两条边各自离开拐角的方向 */
+function flare(corner: Pt, ux: Pt, uz: Pt, r: number, steps = 10): Pt[] {
+  // 圆心在两条边外侧 r 处：corner + (ux + uz) * r
+  const cx = corner.x + (ux.x + uz.x) * r;
+  const cz = corner.z + (ux.z + uz.z) * r;
+  const a0 = Math.atan2(-uz.z, -uz.x);
+  const a1 = Math.atan2(-ux.z, -ux.x);
+  let da = a1 - a0;
+  while (da > Math.PI) da -= 2 * Math.PI;
+  while (da < -Math.PI) da += 2 * Math.PI;
+  const pts: Pt[] = [{ ...corner }];
+  for (let k = 0; k <= steps; k++) pts.push({ x: cx + r * Math.cos(a0 + (da * k) / steps), z: cz + r * Math.sin(a0 + (da * k) / steps) });
+  // 逆时针
+  let area = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i] as Pt;
+    const b = pts[(i + 1) % pts.length] as Pt;
+    area += a.x * b.z - b.x * a.z;
+  }
+  return area < 0 ? pts.reverse() : pts;
+}
+
+export function generateSite({ lot, store, settings, access: acc = DEFAULT_ACCESS, doorXs }: SiteInput): SiteLayout {
   const P = STYLE[settings.style];
   const rng: Rng = createRng(settings.seed * 7919 + STYLE_SEED[settings.style]);
+  const hasWater = (settings.water ?? 'lake') !== 'none';
 
   // 主路：在停车场外侧，平行于门店正面
   const roadTopZ = lot.edgeZ - 3 - 2.4;
   const roadW = 2 * P.lanesPerDir * LW + P.median;
   const roadBottomZ = roadTopZ - roadW;
-  const minX = lot.minX - 125;
-  const maxX = lot.maxX + 125;
-  const minZ = roadBottomZ - 115;
-  const maxZ = store.maxZ + 70;
+  // 场地只到周边一圈（决策记录 0019）：左右各 110 米；路对面有湖时到出海口外的海湾，没有水面时 100 米
+  const minX = lot.minX - 110;
+  const maxX = lot.maxX + 110;
+  let minZ = roadBottomZ - (hasWater ? 115 : 100);
 
   const asphalt: Rect[] = [];
+  const asphaltPolys: Pt[][] = [];
+  const aprons: Rect[] = [];
+  const medians: Rect[] = [];
+  const driveArrows: SiteLayout['driveArrows'] = [];
   const sidewalks: Rect[] = [];
   const grass: Rect[] = [];
   const markings: Marking[] = [];
@@ -218,33 +302,48 @@ export function generateSite({ lot, store, settings }: SiteInput): SiteLayout {
   const keepOut: Rect[] = [];
   const intersections: Intersection[] = [];
 
-  asphalt.push(rectFrom(minX, roadBottomZ, maxX, roadTopZ));
-  sidewalks.push(rectFrom(minX, roadTopZ, maxX, roadTopZ + 2.4));
-  sidewalks.push(rectFrom(minX, roadBottomZ - 2.4, maxX, roadBottomZ));
-  keepOut.push(rectFrom(minX, roadBottomZ - 3, maxX, roadTopZ + 3));
-  if (P.median > 0) grass.push(rectFrom(minX, roadTopZ - P.lanesPerDir * LW - P.median, maxX, roadTopZ - P.lanesPerDir * LW));
-
   // 地块类型：自动时按种子随机
   const layoutRng = createRng(settings.seed * 131 + 7);
   const layout: Exclude<SiteLayoutKind, 'auto'> =
     !settings.layout || settings.layout === 'auto' ? (layoutRng.pick(['standard', 'standard', 'corner', 'strip']) as Exclude<SiteLayoutKind, 'auto'>) : settings.layout;
 
-  // 支路位置：避开停车场、门店和右侧后勤通道
-  const serviceX0 = lot.maxX + 1;
-  const serviceX1 = lot.maxX + 7;
+  // 卸货场的进场道路（决策记录 0019）：门店右侧或左侧，专用后勤通道（接主路）或侧面的支路（经信号灯路口）
   const sideW = 2 * P.sideLanesPerDir * LW + (settings.style === 'urban' ? 2.4 : 0);
+  const right = acc.side === 'RIGHT';
+  const street = acc.via === 'STREET' || (layout === 'corner' && !right);
+  const off = Math.max(0, acc.offsetM);
+  let driveX: number;
+  let driveHalf: number;
+  if (street) {
+    driveHalf = sideW / 2;
+    driveX = right ? lot.maxX + off + 2.4 + driveHalf : layout === 'corner' ? lot.minX - 6 - driveHalf - 2.4 : lot.minX - off - 2.4 - driveHalf;
+  } else {
+    driveHalf = DRIVE_W / 2;
+    driveX = right ? lot.maxX + off + driveHalf : lot.minX - off - driveHalf;
+  }
+  // 进场道路的外沿（含人行道）：右侧进场时它右边的支路、河要让开；左侧进场时左边的支路要让开
+  const accessX0 = driveX - driveHalf - (street ? 2.4 : 0);
+  const accessX1 = driveX + driveHalf + (street ? 2.4 : 0);
+  // 上行（进场）、下行（驶离）车道：多车道的支路上，右侧进场的车靠路边（右转进场），左侧进场的车靠中线（左转进场）
+  const nSide = street ? P.sideLanesPerDir : 1;
+  const laneOff = street ? LW : DRIVE_W / 4;
+  const xIn = driveX - (right ? nSide - 0.5 : 0.5) * laneOff * (street ? 1 : 2);
+  const xOut = driveX + (right ? 0.5 : nSide - 0.5) * laneOff * (street ? 1 : 2);
+
+  // 支路位置：避开停车场、门店和卸货场的进场道路
   const xs: number[] = [];
+  const nearAccess = (x: number) => x + sideW / 2 + 2.4 + 30 > accessX0 && x - sideW / 2 - 2.4 - 30 < accessX1;
   if (settings.style === 'urban') {
     for (let k = 0; k < 2; k++) {
       xs.push(lot.minX - 22 - k * rng.uniform(62, 78));
-      xs.push(serviceX1 + 22 + k * rng.uniform(62, 78));
+      xs.push(lot.maxX + 29 + k * rng.uniform(62, 78));
     }
   } else if (settings.style === 'suburban') {
     const count = rng.chance(0.6) ? 2 : 1;
     if (count === 2 || rng.chance(0.5)) xs.push(lot.minX - rng.uniform(28, 55));
-    if (count === 2 || xs.length === 0) xs.push(serviceX1 + rng.uniform(28, 60));
+    if (count === 2 || xs.length === 0) xs.push(lot.maxX + 7 + rng.uniform(28, 60));
   } else {
-    xs.push(rng.chance(0.5) ? lot.minX - rng.uniform(45, 70) : serviceX1 + rng.uniform(45, 75));
+    xs.push(rng.chance(0.5) ? lot.minX - rng.uniform(45, 70) : lot.maxX + 7 + rng.uniform(45, 75));
   }
   // 街角地块：门店左侧紧挨着一条支路（替换掉太近的支路）
   if (layout === 'corner') {
@@ -252,21 +351,109 @@ export function generateSite({ lot, store, settings }: SiteInput): SiteLayout {
     for (let i = xs.length - 1; i >= 0; i--) if (Math.abs((xs[i] as number) - cx) < sideW + 30) xs.splice(i, 1);
     xs.push(cx);
   }
-  // 商业街：左侧留出连排小店的位置
-  if (layout === 'strip') {
-    for (let i = xs.length - 1; i >= 0; i--) if ((xs[i] as number) > lot.minX - 85 - sideW && (xs[i] as number) < lot.minX) xs.splice(i, 1);
-    if (!xs.some((x) => x < lot.minX)) xs.push(lot.minX - 95 - sideW);
+  // 卸货场在左侧：进场道路和门店之间不能有别的支路（卸货场从进场道路一直铺到门店背后）；
+  // 右侧进场时右边的支路也要让开进场道路
+  for (let i = xs.length - 1; i >= 0; i--) {
+    const x = xs[i] as number;
+    if (street && Math.abs(x - driveX) < 0.01) continue;
+    if (nearAccess(x) || (!right && x > accessX0 - 30 && x < lot.minX)) xs.splice(i, 1);
   }
+  if (street && !xs.some((x) => Math.abs(x - driveX) < 0.01)) xs.push(driveX);
+  // 商业街：左侧留出连排小店的位置（左侧进场时小店排在进场道路左边）
+  const stripStart = right ? lot.minX - 4.5 : accessX0 - 4;
+  if (layout === 'strip') {
+    for (let i = xs.length - 1; i >= 0; i--) if ((xs[i] as number) > stripStart - 85 - sideW && (xs[i] as number) < lot.minX && !(street && Math.abs((xs[i] as number) - driveX) < 0.01)) xs.splice(i, 1);
+    if (!xs.some((x) => x < Math.min(lot.minX, accessX0))) xs.push(stripStart - 90 - sideW);
+  }
+  // 铁路：在场地左边沿 Z 方向穿过，离场地边缘 24 米；附近的支路让开
+  const railX = settings.railway ? minX + 24 : undefined;
+  if (railX !== undefined) for (let i = xs.length - 1; i >= 0; i--) if (Math.abs((xs[i] as number) - railX) < 28 && !(street && Math.abs((xs[i] as number) - driveX) < 0.01)) xs.splice(i, 1);
   xs.sort((a, b) => a - b);
 
+  // 卸货场：右侧进场时西边不越过左侧支路（含人行道）；左侧进场时东边先留宽一些，河再让开它
+  const westRoads = xs.filter((x) => x < lot.minX).map((x) => x + sideW / 2 + 2.4 + 1.5);
+  const yard = planYard({
+    side: acc.side,
+    via: street ? 'STREET' : 'DRIVE',
+    driveX,
+    driveHalf,
+    xIn,
+    xOut,
+    wall: store.maxZ,
+    farLimit: right ? Math.max(minX + 10, ...westRoads) : store.maxX + 60,
+    doorXs: doorXs ?? [store.maxX - 3],
+    slots: acc.slots,
+    trailerStalls: acc.trailerStalls,
+  });
+  // 门店背后留出卸货场（排队、绕行、倒车靠台、甩挂车位）
+  const maxZ = Math.max(store.maxZ + 90, yard.z1 + 10);
+  const serviceX1 = right ? accessX1 : Math.max(lot.maxX + 1, yard.x1 + 3);
+
+  // 水系：湖在主路对面、门店右前方，有一条出海水道通到场地前沿的海湾；河从后面流过来，经石拱桥下面、跌水堰流进湖里
+  const water = planWater({
+    lot,
+    store,
+    roadTopZ,
+    roadBottomZ,
+    minX,
+    maxX,
+    minZ,
+    maxZ,
+    serviceX1,
+    leftRoads: xs.filter((x) => x < lot.maxX).map((x) => ({ x, half: sideW / 2 })),
+    seed: settings.seed,
+    enabled: hasWater,
+  });
+  if (water.outlet) minZ = water.minZ;
+  {
+    const rightRoads = xs.filter((x) => x > lot.maxX && !(street && right && Math.abs(x - driveX) < 0.01)).sort((a, b) => a - b);
+    const kept = xs.filter((x) => x <= lot.maxX || (street && right && Math.abs(x - driveX) < 0.01));
+    let minNext = water.rightClear + 2 + sideW / 2 + 2.4;
+    for (const x0 of rightRoads) {
+      const x = Math.max(x0, minNext);
+      if (x + sideW / 2 + 2.4 > maxX - 20) continue;
+      kept.push(x);
+      minNext = x + 45;
+    }
+    xs.length = 0;
+    xs.push(...kept.sort((a, b) => a - b));
+  }
+
+  asphalt.push(rectFrom(minX, roadBottomZ, maxX, roadTopZ));
+  if (P.median > 0) grass.push(rectFrom(minX, roadTopZ - P.lanesPerDir * LW - P.median, maxX, roadTopZ - P.lanesPerDir * LW));
+  keepOut.push(rectFrom(minX, roadBottomZ - 3, maxX, roadTopZ + 3));
+  // 主路两侧的人行道：在出入口处断开（出入口跨人行道的那段是和路面齐平的水泥铺装）
+  const lotGates = lot.perimeterX.map((px) => [px - LOT_GATE_W / 2 - LOT_FLARE, px + LOT_GATE_W / 2 + LOT_FLARE] as [number, number]);
+  const driveGate: [number, number] | undefined = street ? undefined : [driveX - driveHalf - DRIVE_FLARE, driveX + driveHalf + DRIVE_FLARE];
+  const nearGaps: Array<[number, number]> = [...lotGates, ...(driveGate ? [driveGate] : [])].sort((a, b) => a[0] - b[0]);
+  {
+    let x0 = minX;
+    for (const [a, b] of nearGaps) {
+      if (a > x0) sidewalks.push(rectFrom(x0, roadTopZ, a, roadTopZ + 2.4));
+      x0 = Math.max(x0, b);
+    }
+    if (maxX > x0) sidewalks.push(rectFrom(x0, roadTopZ, maxX, roadTopZ + 2.4));
+  }
+  sidewalks.push(rectFrom(minX, roadBottomZ - 2.4, maxX, roadBottomZ));
+
+  // 卸货场沿支路的那一边：人行道在卸货场入口处断开（整段做成和路面齐平的车道口）
+  const yardCut: [number, number] = [yard.wall + 28, yard.z1];
   xs.forEach((sx, si) => {
     const half = sideW / 2;
     asphalt.push(rectFrom(sx - half, minZ, sx + half, roadBottomZ));
     asphalt.push(rectFrom(sx - half, roadTopZ, sx + half, maxZ));
     sidewalks.push(rectFrom(sx - half - 2.4, minZ, sx - half, roadBottomZ - 2.4));
     sidewalks.push(rectFrom(sx + half, minZ, sx + half + 2.4, roadBottomZ - 2.4));
-    sidewalks.push(rectFrom(sx - half - 2.4, roadTopZ + 2.4, sx - half, maxZ));
-    sidewalks.push(rectFrom(sx + half, roadTopZ + 2.4, sx + half + 2.4, maxZ));
+    const isAccess = street && Math.abs(sx - driveX) < 0.01;
+    for (const side of [-1, 1] as const) {
+      const x0 = side < 0 ? sx - half - 2.4 : sx + half;
+      const cut = isAccess && (right ? side < 0 : side > 0);
+      if (cut) {
+        sidewalks.push(rectFrom(x0, roadTopZ + 2.4, x0 + 2.4, yardCut[0]));
+        if (maxZ > yardCut[1]) sidewalks.push(rectFrom(x0, yardCut[1], x0 + 2.4, maxZ));
+        aprons.push(rectFrom(x0, yardCut[0], x0 + 2.4, yardCut[1]));
+      } else sidewalks.push(rectFrom(x0, roadTopZ + 2.4, x0 + 2.4, maxZ));
+    }
     keepOut.push(rectFrom(sx - half - 3, minZ, sx + half + 3, maxZ));
 
     // 中心双黄线与停止线、人行横道
@@ -326,7 +513,7 @@ export function generateSite({ lot, store, settings }: SiteInput): SiteLayout {
       dir: { x: 1, z: 0 },
       speed: P.speed,
       rate: P.mainRate,
-      stops: xs.map((sx, si) => ({ d: sx - sideW / 2 - 3.6 - minX, signal: si, group: 0 as const })),
+      stops: [...xs.map((sx, si) => ({ d: sx - sideW / 2 - 3.6 - minX, signal: si, group: 0 as const })), ...(railX !== undefined ? [{ d: railX - 7 - minX, signal: -1, group: 0 as const, gate: 'rail' as const }] : [])].sort((a, b) => a.d - b.d),
       kind: 'main',
     });
     lanes.push({
@@ -335,7 +522,7 @@ export function generateSite({ lot, store, settings }: SiteInput): SiteLayout {
       dir: { x: -1, z: 0 },
       speed: P.speed,
       rate: P.mainRate,
-      stops: xs.map((sx, si) => ({ d: maxX - (sx + sideW / 2 + 3.6), signal: si, group: 0 as const })).sort((a, b) => a.d - b.d),
+      stops: [...xs.map((sx, si) => ({ d: maxX - (sx + sideW / 2 + 3.6), signal: si, group: 0 as const })), ...(railX !== undefined ? [{ d: maxX - (railX + 7), signal: -1, group: 0 as const, gate: 'rail' as const }] : [])].sort((a, b) => a.d - b.d),
       kind: 'main',
     });
   }
@@ -440,21 +627,132 @@ export function generateSite({ lot, store, settings }: SiteInput): SiteLayout {
     dashed(roadBottomZ + i * LW);
   }
 
-  // 停车场与门店的禁建区、出入口车道、右侧后勤通道与背后卸货区
+  // 停车场与门店的禁建区；停车场出入口（决策记录 0019）：一进一出两条车道，中间一道隔离岛，接主路处是喇叭口
   keepOut.push(rectFrom(lot.minX - 4, lot.edgeZ - 4, lot.maxX + 4, store.maxZ + 4));
-  for (const px of lot.perimeterX) asphalt.push(rectFrom(px - 3.5, roadTopZ, px + 3.5, lot.edgeZ));
-  // 卸货区深 28 米，半挂车可以掉头倒车靠台
-  asphalt.push(rectFrom(serviceX0, roadTopZ, serviceX1, store.maxZ + 28));
-  const dock = rectFrom(store.maxX - 36, store.maxZ, serviceX1, store.maxZ + 28);
+  const sw = roadTopZ + 2.4;
+  for (const px of lot.perimeterX) {
+    const g0 = px - LOT_GATE_W / 2;
+    const g1 = px + LOT_GATE_W / 2;
+    asphalt.push(rectFrom(g0, sw, g1, lot.edgeZ));
+    aprons.push(rectFrom(g0 - LOT_FLARE, roadTopZ, g1 + LOT_FLARE, sw));
+    asphaltPolys.push(flare({ x: g0, z: sw }, { x: -1, z: 0 }, { x: 0, z: 1 }, LOT_FLARE));
+    asphaltPolys.push(flare({ x: g1, z: sw }, { x: 1, z: 0 }, { x: 0, z: 1 }, LOT_FLARE));
+    medians.push(rectFrom(px - MEDIAN_W / 2, roadTopZ + 1.2, px + MEDIAN_W / 2, lot.edgeZ - 0.4));
+    // 进口箭头朝里（+Z）、出口箭头朝外，出口车道在人行道前有停车线
+    driveArrows.push({ x: px - LANE_OFF - 0.2, z: (sw + lot.edgeZ) / 2 + 0.6, rotY: 0 });
+    driveArrows.push({ x: px + LANE_OFF + 0.2, z: (sw + lot.edgeZ) / 2 + 0.6, rotY: Math.PI });
+    markings.push({ ...rectFrom(px + MEDIAN_W / 2 + 0.1, sw + 0.35, g1 - 0.2, sw + 0.8), color: 'white' });
+  }
+  // 卸货场的进场道路：专用后勤通道从主路一直通到卸货场顶部（接主路处是半径 15 米的喇叭口，半挂车不用直角转弯）；
+  // 支路的话路面已经有了
+  if (!street) {
+    const d0 = driveX - driveHalf;
+    const d1 = driveX + driveHalf;
+    asphalt.push(rectFrom(d0, sw, d1, yard.z1));
+    aprons.push(rectFrom(d0 - DRIVE_FLARE, roadTopZ, d1 + DRIVE_FLARE, sw));
+    asphaltPolys.push(flare({ x: d0, z: sw }, { x: -1, z: 0 }, { x: 0, z: 1 }, DRIVE_FLARE, 14));
+    asphaltPolys.push(flare({ x: d1, z: sw }, { x: 1, z: 0 }, { x: 0, z: 1 }, DRIVE_FLARE, 14));
+    // 中心双黄线（进场道路的一进一出），出口停车线
+    markings.push({ ...rectFrom(driveX - 0.2, sw + 2, driveX - 0.08, store.maxZ), color: 'yellow' });
+    markings.push({ ...rectFrom(driveX + 0.08, sw + 2, driveX + 0.2, store.maxZ), color: 'yellow' });
+    markings.push({ ...rectFrom(driveX + 0.3, sw + 0.35, d1 - 0.3, sw + 0.8), color: 'white' });
+    driveArrows.push({ x: xIn, z: sw + 9, rotY: 0 });
+    driveArrows.push({ x: xOut, z: sw + 9, rotY: Math.PI });
+    keepOut.push(rectFrom(d0 - 3, roadTopZ, d1 + 3, yard.z1 + 3));
+  }
+  // 卸货场的场地：从进场道路铺到门店背后（盖住所有卸货门前的场地）
+  const dockX0 = Math.min(yard.x0, store.minX - 4);
+  const dockX1 = Math.max(yard.x1, store.maxX + 4);
+  const dock = rectFrom(right ? dockX0 : yard.x0, store.maxZ, right ? yard.x1 : dockX1, yard.z1);
   asphalt.push(dock);
-  keepOut.push(rectFrom(serviceX0 - 2, roadTopZ, serviceX1 + 3, store.maxZ + 31));
-  keepOut.push(rectFrom(store.minX - 4, store.maxZ, serviceX1 + 3, store.maxZ + 31));
-  // 停车场外侧绿化带
-  grass.push(rectFrom(lot.minX, roadTopZ + 2.4, lot.maxX, lot.edgeZ));
+  keepOut.push(rectFrom(dock.x - dock.w / 2 - 3, store.maxZ, dock.x + dock.w / 2 + 3, yard.z1 + 3));
+  // 标线：待命车道两侧的白线、车位分隔线；靠台车道外侧的黄色禁停线（倒车区）；甩挂车位的白线
+  const qz = yard.zQueue;
+  const qx0 = yard.xHead - 2;
+  const qx1 = right ? yard.xIn - 14 : yard.xEast;
+  markings.push({ ...rectFrom(qx0, qz - 2.15, qx1, qz - 2.0), color: 'white' });
+  markings.push({ ...rectFrom(qx0, qz + 2.0, qx1, qz + 2.15), color: 'white' });
+  for (let j = 0; j <= yard.slots; j++) {
+    const x = Math.min(qx1, yard.xHead - 1.5 + j * yard.pitch);
+    markings.push({ ...rectFrom(x - 0.08, qz - 2.0, x + 0.08, qz + 2.0), color: 'white' });
+  }
+  const docks = doorXs ?? [store.maxX - 3];
+  markings.push({ ...rectFrom(Math.min(...docks) - 20, store.maxZ + 23.4, Math.max(...docks) + 20, store.maxZ + 23.55), color: 'yellow' });
+  // 卸货门前 18 米的水泥地坪（挂车支腿、倒车停靠的地方）
+  aprons.push(rectFrom(Math.min(...docks) - 9, store.maxZ, Math.max(...docks) + 9, store.maxZ + 18));
+  // 车道之间的白色虚线和行车方向箭头（靠台车道、顶部车道向 +X，驶离车道、待命车道向 −X）
+  const lx0 = yard.xTurnDock;
+  const lx1 = right ? yard.xIn - 15 : yard.xEast;
+  for (const z of [(yard.zCourt + yard.zExit) / 2 + 2, (yard.zQueue + yard.zTop) / 2]) {
+    for (let x = lx0 + 2; x < lx1 - 3; x += 6) markings.push({ ...rectFrom(x, z - 0.07, x + 3, z + 0.07), color: 'white' });
+  }
+  for (const [z, dir] of [
+    [yard.zCourt, 1],
+    [yard.zExit, -1],
+    [yard.zTop, 1],
+  ] as const) {
+    for (let k = 1; k <= 3; k++) {
+      const x = lx0 + ((lx1 - lx0) * k) / 4;
+      driveArrows.push({ x, z, rotY: dir > 0 ? Math.PI / 2 : -Math.PI / 2 });
+    }
+  }
+  for (let k = 0; k <= yard.stalls.length; k++) {
+    const first = yard.stalls[0];
+    if (!first) break;
+    const x = first.x - 1.9 + k * 3.8;
+    markings.push({ ...rectFrom(x - 0.07, first.z - 8.5, x + 0.07, first.z + 8.5), color: 'white' });
+  }
+  // 停车场外侧绿化带：在出入口（含喇叭口）处断开
+  {
+    let x0 = lot.minX;
+    for (const [a, b] of [...lotGates].sort((p, q) => p[0] - q[0])) {
+      if (a > x0) grass.push(rectFrom(x0, roadTopZ + 2.4, Math.min(a, lot.maxX), lot.edgeZ));
+      x0 = Math.max(x0, b);
+    }
+    if (lot.maxX > x0) grass.push(rectFrom(x0, roadTopZ + 2.4, lot.maxX, lot.edgeZ));
+  }
+  keepOut.push(...water.keepOut);
+  // 路边线在路口和出入口断开
+  const edgeGaps: Array<[number, number]> = nearGaps.map(([a, b]) => [a + 0.5, b - 0.5]);
+
+  // 铁路的路基两侧不放建筑和树
+  if (railX !== undefined) keepOut.push(rectFrom(railX - 7, minZ, railX + 7, maxZ));
+
+  // 学校：主路对面一块 64 × 46 米的校园（前面是教学楼，后面是操场），从停车场正对面往两边找空地
+  let school: SiteLayout['school'];
+  if (settings.school) {
+    const W = 64;
+    const D = 46;
+    const zc = roadBottomZ - 2.4 - 7 - D / 2;
+    const cx0 = (lot.minX + lot.maxX) / 2;
+    for (let k = 0; k < 40 && !school; k++) {
+      const x = cx0 + (k % 2 === 0 ? -1 : 1) * Math.ceil(k / 2) * 9;
+      const r: Rect = { x, z: zc, w: W, d: D };
+      if (r.x - W / 2 < minX + 4 || r.x + W / 2 > maxX - 4 || r.z - D / 2 < minZ + 4) continue;
+      if (keepOut.some((q) => overlaps(r, q, 2)) || xs.some((sx) => Math.abs(sx - x) < W / 2 + sideW / 2 + 4)) continue;
+      const field: Rect = { x, z: zc - D / 2 + 13, w: W - 6, d: 22 };
+      school = { x, z: zc, w: W, d: D, field, flag: { x: x - 14, z: zc + D / 2 - 3 }, sign: { x: x + 18, z: zc + D / 2 - 1.2 }, crossX: x };
+      keepOut.push(r);
+      grass.push(field);
+    }
+    if (school) {
+      // 门前的人行横道（斑马线）和护导员拦车的停止线
+      const cx = school.crossX;
+      for (let k = 0; k < Math.floor(roadW / 1.2); k++) markings.push({ x: cx, z: roadBottomZ + 0.6 + k * 1.2, w: 3.2, d: 0.55, color: 'white' });
+      for (const l of lanes) {
+        if (l.kind !== 'main') continue;
+        const d = l.dir.x > 0 ? cx - 3.5 - minX : maxX - (cx + 3.5);
+        l.stops.push({ d, signal: -1, group: 0, gate: 'school' });
+        l.stops.sort((a, b) => a.d - b.d);
+      }
+    }
+  }
 
   // ---------- 建筑：沿道路两侧按风格排布 ----------
   const buildings: Building[] = [];
   const canopies: SiteLayout['canopies'] = [];
+  // 学校的教学楼：两层砖红色，平屋顶，朝向主路
+  if (school) buildings.push({ x: school.x, z: school.z + school.d / 2 - 9, w: 44, d: 15, h: 8.5, color: '#c9775a', roof: 'flat', ridgeX: true });
   const trees: Tree[] = [];
   const free = (r: Rect, gap: number) => r.x - r.w / 2 > minX && r.x + r.w / 2 < maxX && r.z - r.d / 2 > minZ && r.z + r.d / 2 < maxZ && !keepOut.some((k) => overlaps(r, k, gap)) && !buildings.some((b) => overlaps(r, b, gap));
 
@@ -575,8 +873,10 @@ export function generateSite({ lot, store, settings }: SiteInput): SiteLayout {
   }
 
   // ---------- 树木与路灯 ----------
+  trees.push(...water.trees);
   for (let x = lot.minX + 4; x < lot.maxX - 4; x += 9) {
-    if (lot.perimeterX.some((px) => Math.abs(px - x) < 5)) continue;
+    // 出入口（含喇叭口）和立柱招牌处不种树
+    if (lot.perimeterX.some((px) => Math.abs(px - x) < 11) || Math.abs(x - (lot.minX + 16)) < 2.5) continue;
     trees.push({ x, z: (roadTopZ + 2.4 + lot.edgeZ) / 2, s: rng.uniform(0.85, 1.1), kind: 'round' });
   }
   for (const isl of lot.islands) trees.push({ x: isl.x, z: isl.z, s: 0.9, kind: 'round' });
@@ -602,6 +902,9 @@ export function generateSite({ lot, store, settings }: SiteInput): SiteLayout {
     lamps.push({ x: isl.x, z: isl.z + isl.d / 2 - 0.6 });
   }
   for (let x = minX + 15; x < maxX; x += 32) lamps.push({ x, z: roadTopZ + 0.6 });
+  // 卸货场的照明：沿场地的北边和西边（车道之外）
+  for (let x = yard.x0 + 6; x < yard.x1 - 10; x += 28) lamps.push({ x, z: yard.z1 - 1.2 });
+  for (let z = store.maxZ + 12; z < yard.z1 - 10; z += 28) lamps.push({ x: yard.x0 + 1.2, z });
 
   const nearLaneZ = roadTopZ - 0.5 * LW;
   const farLaneZ = roadBottomZ + (P.lanesPerDir - 0.5) * LW;
@@ -618,8 +921,10 @@ export function generateSite({ lot, store, settings }: SiteInput): SiteLayout {
     canopies,
     trees,
     lamps,
-    road: { nearLaneZ, farLaneZ, spawnMinX: minX + 2, spawnMaxX: maxX - 2 },
+    // 有铁路道口时，仿真里的车辆在道口东边出现（道口的排队由背景车流表现）
+    road: { nearLaneZ, farLaneZ, spawnMinX: railX !== undefined ? railX + 9 : minX + 2, spawnMaxX: maxX - 2 },
     dock,
+    yard,
     roadTopZ,
     roadBottomZ,
     turns,
@@ -627,6 +932,15 @@ export function generateSite({ lot, store, settings }: SiteInput): SiteLayout {
     layout,
     ponds,
     works,
+    water,
+    asphaltPolys,
+    aprons,
+    medians,
+    driveArrows,
+    edgeGaps,
+    access: { side: acc.side, via: street ? 'STREET' : 'DRIVE', x: driveX, half: driveHalf, sign: { x: right ? accessX0 - 1.6 - (street ? 0 : DRIVE_FLARE) : accessX1 + 1.6 + (street ? 0 : DRIVE_FLARE), z: roadTopZ + 3.6 } },
+    ...(railX !== undefined ? { railway: { x: railX, z0: minZ, z1: maxZ, roadZ0: roadBottomZ - 2.4, roadZ1: roadTopZ + 2.4 } } : {}),
+    ...(school ? { school } : {}),
   };
 }
 

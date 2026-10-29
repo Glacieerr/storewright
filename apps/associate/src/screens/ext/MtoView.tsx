@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { displayName, mtoBoard, type MtoTicket } from '@storewright/ops';
 import { clock, t } from '../../i18n';
 import { useLive, useNow } from '../../live';
+import { ScanBox } from '../../ui/ScanBox';
 
 const DISCARD_TEXT: Record<NonNullable<MtoTicket['discardReason']>, string> = { HOLD_EXPIRED: '保温超时', MANUAL: '手动丢弃', ORDER_CANCELLED: '订单取消' };
 
@@ -16,6 +17,9 @@ export function MtoView() {
   const board = mtoBoard(s);
   const hotSlots = client.statics?.hotSlots ?? [];
   const [slot, setSlot] = useState<Record<string, string>>({});
+  // 门店要求扫码时，保温位只能扫标签（决策记录 0026）；扫码框一次只开一个（自动获取焦点）
+  const strict = !!s.settings?.requireScan;
+  const [scanFor, setScanFor] = useState<string | undefined>();
   const all = Object.values(s.mto);
   const pulled = all.filter((x) => x.status === 'PULLED').length;
   const discarded = all.filter((x) => x.status === 'DISCARDED');
@@ -46,7 +50,11 @@ export function MtoView() {
                 {x.name} × {x.qty}
               </b>
               {x.hot && <span className="tag">{t('热食')}</span>}
-              {x.aiAdjusted && <span className="tag ai" title={t('标准建议 {0}', clock(x.standardStartAt))}>{t('AI 调整')}</span>}
+              {x.aiAdjusted && (
+                <span className="tag ai" title={t('标准建议 {0}', clock(x.standardStartAt))}>
+                  {t('AI 调整')}
+                </span>
+              )}
               <span className={`due${late ? ' late' : ''}`}>{late ? t('应在 {0} 开始，已晚', clock(x.startAt)) : t('建议 {0} 开始', clock(x.startAt))}</span>
             </div>
             <div className="facts">
@@ -70,6 +78,9 @@ export function MtoView() {
       {board.cooking.map((x) => {
         const free = hotSlots.filter((c) => !usedSlots.has(c));
         const chosen = slot[x.id] ?? free[0];
+        const needSlot = x.hot && hotSlots.length > 0;
+        // 要求扫码时默认给第一份热食开扫码框
+        const scanning = needSlot && (scanFor === x.id || (strict && scanFor === undefined && board.cooking.find((y) => y.hot)?.id === x.id));
         return (
           <div key={x.id} className="card">
             <div className="card-head">
@@ -82,19 +93,31 @@ export function MtoView() {
               <span>{who(x)}</span>
               <span>{t('{0} 开始 · {1}', clock(x.startedAt ?? now), nameOf(x.associateId))}</span>
             </div>
-            {x.hot && hotSlots.length > 0 && (
+            {needSlot && (
               <div className="chips">
                 {free.map((c) => (
-                  <button key={c} className={`chip${chosen === c ? ' on' : ''}`} onClick={() => setSlot({ ...slot, [x.id]: c })}>
+                  <button key={c} className={`chip${chosen === c ? ' on' : ''}`} disabled={strict} onClick={() => setSlot({ ...slot, [x.id]: c })}>
                     {c}
                   </button>
                 ))}
                 {!free.length && <span className="muted">{t('保温位已满')}</span>}
               </div>
             )}
+            {scanning && <ScanBox label={t('扫保温位标签：做好放进去')} hint={free[0] ? t('例如 {0}', free[0]) : undefined} onScan={(code) => run({ type: 'CompleteMto', ticketId: x.id, slotCode: code })} />}
             <div className="actions">
-              <button className="primary" onClick={() => void run({ type: 'CompleteMto', ticketId: x.id, ...(x.hot && chosen ? { slotCode: chosen } : {}) })}>
-                {x.hot && chosen ? t('完成，放入 {0}', chosen) : t('完成')}
+              {!(needSlot && strict) && (
+                <button className="primary" onClick={() => void run({ type: 'CompleteMto', ticketId: x.id, ...(needSlot && chosen ? { slotCode: chosen, tap: true } : {}) })}>
+                  {needSlot && chosen ? t('完成，放入 {0}', chosen) : t('完成')}
+                </button>
+              )}
+              {needSlot && !scanning && (
+                <button className={strict ? 'primary' : 'link'} onClick={() => setScanFor(x.id)}>
+                  {t('扫保温位放入')}
+                </button>
+              )}
+              {/* 做坏了、掉了：制作中也能丢弃（决策记录 0026） */}
+              <button className="link danger" onClick={() => void run({ type: 'DiscardMto', ticketId: x.id })}>
+                {t('丢弃')}
               </button>
             </div>
           </div>

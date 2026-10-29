@@ -5,8 +5,9 @@ import { CameraScanner } from './CameraScanner';
 /**
  * 扫码框：硬件扫码枪（模拟键盘输入 + 回车）、摄像头、手动输入三种方式。
  * 默认不弹出软键盘（扫码枪照样能输入），点键盘按钮再手动输入。
+ * 摄像头连续扫（决策记录 0026）：onScan 返回 false 时关掉摄像头（例如扫完要在弹出的面板里填数量）。
  */
-export function ScanBox({ onScan, label, hint }: { onScan: (code: string) => void; label: string; hint?: string }) {
+export function ScanBox({ onScan, label, hint }: { onScan: (code: string) => void | boolean | Promise<unknown>; label: string; hint?: string }) {
   const ref = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState('');
   const [keyboard, setKeyboard] = useState(false);
@@ -14,12 +15,13 @@ export function ScanBox({ onScan, label, hint }: { onScan: (code: string) => voi
   useEffect(() => {
     ref.current?.focus({ preventScroll: true });
   }, [keyboard]);
-  const submit = (raw: string) => {
+  const submit = (raw: string): boolean => {
     const code = raw.trim();
-    if (!code) return;
+    if (!code) return true;
     setValue('');
-    onScan(code);
+    const r = onScan(code);
     window.setTimeout(() => ref.current?.focus({ preventScroll: true }), 0);
+    return r !== false;
   };
   return (
     <div className="scanbox">
@@ -51,9 +53,12 @@ export function ScanBox({ onScan, label, hint }: { onScan: (code: string) => voi
       {camera && (
         <CameraScanner
           onClose={() => setCamera(false)}
-          onCode={(c) => {
+          onManual={() => {
             setCamera(false);
-            submit(c);
+            setKeyboard(true);
+          }}
+          onCode={(c) => {
+            if (!submit(c)) setCamera(false);
           }}
         />
       )}

@@ -101,7 +101,7 @@ function finalize(order: Order, ctx: PlanningContext, groups: Array<{ key: strin
  * - 单件本身就超过装填系数但物理上放得下时，允许独占一个空框；
  * - 一个框只属于一个订单。
  */
-export function assignTotes(ctx: PlanningContext, order: Order, options: { fillFactor?: number } = {}): ToteAssignmentResult {
+export function assignTotes(ctx: PlanningContext, order: Order, options: { fillFactor?: number; volumeFactor?: (item: Item) => number } = {}): ToteAssignmentResult {
   const { standard, oversized } = splitOversized(ctx, order);
   const tote = ctx.model.config.equipment.tote;
   const capL = ctx.model.toteCapacityL * (options.fillFactor ?? tote.fillFactor);
@@ -125,7 +125,8 @@ export function assignTotes(ctx: PlanningContext, order: Order, options: { fillF
     const totes: OpenTote[] = [];
     for (const line of sorted) {
       const item = getItem(ctx, line.itemId);
-      const v = volumeLiters(item.dims);
+      // 体积数据常常偏小：按学到的分框系数放大（决策记录 0023 · B7）
+      const v = volumeLiters(item.dims) * (options.volumeFactor?.(item) ?? 1);
       for (let u = 0; u < line.qty; u++) {
         let target = totes.find((t) => t.volumeL + v <= capL && t.weightKg + item.weightKg <= maxKg);
         if (!target) {

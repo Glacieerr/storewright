@@ -4,7 +4,7 @@
 # 非演示部署请设置 DEMO=0 和 CONSOLE_KEY；手机摄像头扫码需要 HTTPS（反向代理或 HTTPS=1）。
 FROM node:22-slim
 WORKDIR /app
-COPY package.json package-lock.json tsconfig.base.json ./
+COPY package.json package-lock.json tsconfig.base.json LICENSE LICENSE-docs THIRD_PARTY_NOTICES.md ./
 COPY packages ./packages
 COPY apps ./apps
 RUN npm ci && npm run build:associate && npm cache clean --force

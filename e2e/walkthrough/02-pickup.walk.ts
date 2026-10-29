@@ -1,6 +1,6 @@
-import { expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
 import { Recorder } from './recorder';
-import { createOrders, scan, signIn, stageOrders, state, tab, until, type AnyState } from './helpers';
+import { createOrders, scan, signIn, stageOrders, state, tab, until, test, type AnyState } from './helpers';
 
 /**
  * 自取订单在四台设备上的完整流程，包括：找不到商品时的 AI 替代推荐、转后仓补取、

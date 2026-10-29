@@ -155,7 +155,11 @@ describe('后端：命令、推送与同步', () => {
     const seq = r1.body.events[0].seq as number;
     await until(() => v.state.seq >= seq);
     await new Promise((r) => setTimeout(r, 50));
-    expect(v.state.seq).toBe(seq);
+    // 重复提交没有产生第二次领取；之后只可能有 AI 按领取人的熟练度组重新估计用时（决策记录 0021）
+    const res = await fetch(`${base}/api/stores/demo/events?after=${seq}`, { headers: { authorization: `Bearer ${consoleToken}` } });
+    const later = ((await res.json()) as { events: Array<{ type: string; actor: string }> }).events;
+    expect(later.filter((e) => e.actor !== 'ai')).toEqual([]);
+    expect(later.every((e) => e.type === 'PickWalkEstimated' || e.type === 'WalkLinesFlagged' || e.type === 'NudgesSent')).toBe(true);
   });
 
   it('断线期间的事件在重连后补齐；离线提交的命令进入发件箱，恢复后提交', async () => {

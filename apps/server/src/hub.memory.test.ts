@@ -78,7 +78,8 @@ describe('phantom stock in the accelerated demo (found by the walkthrough)', () 
     const target = [...e.runtime.statics.planogram].sort((a, b) => b.baseVelocity - a.baseVelocity).find((p) => !p.sensor);
     if (!target) throw new Error('no target');
     const sim = new StoreSim(e.runtime, 11, 2000);
-    sim.start(600);
+    // 从门店时间早上 9 点开始：结果不随跑测试的时间变化（晚上跑时，8 小时的仿真会进入客流很少的深夜）
+    sim.start(600, 9);
     sim.stop();
     await sim.emptyShelf(target.itemId, true);
     // 每一拍是 20 分钟的仿真销量（时钟几乎不走）
@@ -103,7 +104,8 @@ describe('auto-restock in the demo store (found by the walkthrough)', () => {
     const target = e.runtime.statics.planogram.find((p) => !p.sensor && sellableCases(s, p.itemId).length > 0);
     if (!target) throw new Error('no target');
     const sim = new StoreSim(e.runtime, 11, 2000);
-    sim.start(600);
+    // 从门店时间早上 9 点开始：结果不随跑测试的时间变化（晚上跑时，8 小时的仿真会进入客流很少的深夜）
+    sim.start(600, 9);
     sim.stop();
     await sim.emptyShelf(target.itemId, false);
     const task = Object.values(s.repl).find((t) => t.itemId === target.itemId && t.status === 'OPEN');

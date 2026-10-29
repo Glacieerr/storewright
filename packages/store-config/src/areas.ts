@@ -32,9 +32,14 @@ export type AreaKind =
   | 'STAGING'
   | 'STAGING_DELIVERY'
   | 'STAGING_OVERSIZED'
+  | 'STAGING_COOLER'
+  | 'STAGING_FREEZER'
   | 'HOT_HOLD'
   | 'PARCEL'
-  | 'RECOVERY';
+  | 'RECOVERY'
+  // 连通（决策记录 0019）：收货区 ↔ 暂存区的通道、暂存区里放后仓溢出托盘的地面
+  | 'PASSAGE'
+  | 'OVERFLOW';
 
 export type AreaGroup = 'RECEIVING' | 'STORAGE' | 'STAGING';
 /** 容量单位：托盘位、箱、框、件、包裹 */
@@ -60,10 +65,17 @@ export const AREA_KINDS: Record<AreaKind, { group: AreaGroup; unit: AreaUnit; te
   STAGING: { group: 'STAGING', unit: 'TOTE', temp: 'AMBIENT' },
   STAGING_DELIVERY: { group: 'STAGING', unit: 'TOTE', temp: 'AMBIENT' },
   STAGING_OVERSIZED: { group: 'STAGING', unit: 'ITEM', temp: 'AMBIENT' },
+  STAGING_COOLER: { group: 'STAGING', unit: 'TOTE', temp: 'CHILLED' },
+  STAGING_FREEZER: { group: 'STAGING', unit: 'TOTE', temp: 'FROZEN' },
   HOT_HOLD: { group: 'STAGING', unit: 'ITEM', temp: 'HOT' },
   PARCEL: { group: 'STAGING', unit: 'PARCEL', temp: 'AMBIENT' },
   RECOVERY: { group: 'STAGING', unit: 'TOTE', temp: 'AMBIENT' },
+  PASSAGE: { group: 'STAGING', unit: 'PALLET', temp: 'AMBIENT' },
+  OVERFLOW: { group: 'STAGING', unit: 'PALLET', temp: 'AMBIENT' },
 };
+
+/** 暂存区里装冷藏 / 冷冻订单框的步入式冷库（线上订单冷藏库、冷冻库） */
+export const STAGING_WALK_IN: Partial<Record<AreaKind, 'CHILLED' | 'FROZEN'>> = { STAGING_COOLER: 'CHILLED', STAGING_FREEZER: 'FROZEN' };
 
 export interface Rect {
   x0: number;
@@ -124,6 +136,16 @@ export interface BackroomFrame {
   width: number;
   depth: number;
   backWall: number;
+  /** 两层的门店：一楼收货区旁的货梯（通到二楼的卸货区和补货区，决策记录 0019） */
+  lift?: { x: number; z: number; upperFloorId: string };
+}
+
+/** 卸货门的间距（米） */
+export const DOCK_PITCH = 5;
+
+/** 后墙上最多能排几个卸货门：约占后墙的 60%（其余是货架区） */
+export function maxDocks(width: number): number {
+  return Math.max(1, Math.min(10, Math.floor((width * 0.6) / DOCK_PITCH)));
 }
 
 export interface StoreAreas {
@@ -148,11 +170,36 @@ export function backroomFrame(config: StoreConfig): BackroomFrame {
   const backWall = Math.max(...f1Runs.map((r) => Math.max(r.start.y, r.end.y)), 0);
   const stagingX = config.layout.points.staging.x;
   const entry = { x: config.layout.points.backroom.x, z: config.layout.points.backroom.y };
-  // 卸货门：后墙右侧，间隔 5 米
-  const docks = Array.from({ length: br.docks }, (_, k) => ({ x: width - 3 - k * 5, z: depth }));
-  const receiving = { x0: Math.min(stagingX - 8, width - 3 - (br.docks - 1) * 5 - 4), x1: width - 1, z0: Math.max(backWall + 2.4, depth - 9), z1: depth - 0.5 };
-  const zone = { x0: 1.5, x1: Math.max(4, receiving.x0 - 4), z0: backWall + 2.4, z1: depth - 0.6 };
-  return { zone, receiving, docks, mainAisleX: zone.x1 + 1.8, entry, floorId, width, depth, backWall };
+  // 卸货门：后墙右侧，间隔 5 米（门店太窄时少排几个）
+  const n = Math.min(br.docks, maxDocks(width));
+  const docks = Array.from({ length: n }, (_, k) => ({ x: width - 3 - k * DOCK_PITCH, z: depth }));
+  const receiving = { x0: Math.min(stagingX - 8, width - 3 - (n - 1) * DOCK_PITCH - 4), x1: width - 1, z0: Math.max(backWall + 2.4, depth - 9), z1: depth - 0.5 };
+  // 两层的门店：货架区和收货区之间留出货梯的位置（货梯在主通道和收货区之间，前后位置两层都要在货架以外）
+  const upper = config.layout.floors.find((f) => f.level === (f1?.level ?? 0) + 1);
+  const upperRuns = upper ? config.layout.runs.filter((r) => r.floorId === upper.id) : [];
+  const upperBack = upperRuns.length ? Math.max(...upperRuns.map((r) => Math.max(r.start.y, r.end.y))) : backWall;
+  const liftGap = upper ? 3.4 : 0;
+  const zone = { x0: 1.5, x1: Math.max(4, receiving.x0 - 4 - liftGap), z0: backWall + 2.4, z1: depth - 0.6 };
+  const lift = upper ? { x: receiving.x0 - 1.9, z: Math.min(Math.min(depth, upper.depthM) - 2, Math.max(backWall, upperBack) + 2.4 + 1.7), upperFloorId: upper.id } : undefined;
+  return { zone, receiving, docks, mainAisleX: zone.x1 + 1.8, entry, floorId, width, depth, backWall, ...(lift ? { lift } : {}) };
+}
+
+/** 卸货场的设置（决策记录 0019）：没给的项用缺省值 */
+export interface YardSettings {
+  side: 'RIGHT' | 'LEFT';
+  via: 'DRIVE' | 'STREET';
+  offsetM: number;
+  /** 0 = 按场地自动 */
+  slots: number;
+  trailerStalls: number;
+}
+
+/** 后勤通道离停车场的缺省距离：两个出入口的喇叭口不重叠 */
+export const DEFAULT_YARD_OFFSET = 24;
+
+export function yardSettings(config: Pick<StoreConfig, 'outdoor'>): YardSettings {
+  const y = config.outdoor.yard ?? {};
+  return { side: y.side ?? 'RIGHT', via: y.via ?? 'DRIVE', offsetM: y.offsetM ?? DEFAULT_YARD_OFFSET, slots: y.slots ?? 0, trailerStalls: y.trailerStalls ?? 0 };
 }
 
 /** 一块货架区里能排下的托盘货架：从后边（z1）往前排，第一排靠墙只有一面 */
@@ -182,8 +229,11 @@ function round1(r: Rect): Rect {
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
-/** 暂存货架摆放：明确给了位置的照位置；指定了区域的在区域里排成网格；其余从暂存点往店内排成若干列（原来的规则） */
-export function stagingPlacement(config: StoreConfig, areas?: ReadonlyArray<{ id: string } & Rect>): PlacedRack[] {
+/**
+ * 暂存货架摆放：明确给了位置的照位置；指定了区域的在区域里排成网格；其余从暂存点往店内排成若干列（原来的规则）。
+ * assign：默认布局（没有明确给出区域）里货架归哪个区域，例如冷藏、冷冻订单货架放进线上订单冷藏库、冷冻库（决策记录 0019）
+ */
+export function stagingPlacement(config: StoreConfig, areas?: ReadonlyArray<{ id: string } & Rect>, assign?: (r: StagingRackConfig) => string | undefined): PlacedRack[] {
   const sp = config.layout.points.staging;
   const order = ['AMB', 'GM', 'CHL', 'FRZ', 'HOT', 'OVS', 'RCV'];
   const rank = (code: string) => {
@@ -192,13 +242,18 @@ export function stagingPlacement(config: StoreConfig, areas?: ReadonlyArray<{ id
   };
   const sorted = [...config.staging.racks].sort((a, b) => rank(a.zoneCode) - rank(b.zoneCode) || a.rackNo - b.rackNo);
   const out: PlacedRack[] = [];
+  const areaOf = (r: StagingRackConfig) => r.areaId ?? assign?.(r);
   const base = (r: StagingRackConfig, x: number, z: number): PlacedRack => {
     const p: PlacedRack = { rackId: r.id, zoneCode: r.zoneCode, tempZone: r.tempZone, purpose: r.purpose, area: r.area, x, z, length: stagingRackLength(r.slotsPerLevel), levels: r.levels, slotsPerLevel: r.slotsPerLevel };
-    if (r.areaId) p.areaId = r.areaId;
+    const id = areaOf(r);
+    if (id) p.areaId = id;
     return p;
   };
   // 默认网格：没有区域、也没有位置的货架
-  const free = sorted.filter((r) => r.x === undefined && !(r.areaId && areas?.some((a) => a.id === r.areaId)));
+  const free = sorted.filter((r) => {
+    const id = areaOf(r);
+    return r.x === undefined && !(id && areas?.some((a) => a.id === id));
+  });
   free.forEach((r, i) => {
     const col = Math.floor(i / STAGING_PER_COLUMN);
     const row = i % STAGING_PER_COLUMN;
@@ -207,7 +262,10 @@ export function stagingPlacement(config: StoreConfig, areas?: ReadonlyArray<{ id
   });
   // 区域里的网格：按区域分组，从区域左前角排起
   const byArea = new Map<string, StagingRackConfig[]>();
-  for (const r of sorted) if (r.x === undefined && r.areaId && areas?.some((a) => a.id === r.areaId)) byArea.set(r.areaId, [...(byArea.get(r.areaId) ?? []), r]);
+  for (const r of sorted) {
+    const id = areaOf(r);
+    if (r.x === undefined && id && areas?.some((a) => a.id === id)) byArea.set(id, [...(byArea.get(id) ?? []), r]);
+  }
   for (const [areaId, list] of byArea) {
     const a = areas?.find((x) => x.id === areaId);
     if (!a) continue;
@@ -232,9 +290,95 @@ function bbox(rs: PlacedRack[], pad = 0.5): Rect {
   };
 }
 
-/** 没有明确给出区域时的默认区域（与原来的后仓、收货区、暂存区布局一致） */
-export function defaultAreas(config: StoreConfig, frame = backroomFrame(config), racks = stagingPlacement(config)): Array<{ id: string; kind: AreaKind; floorId: string; tempZone?: AreaTemp } & Rect> {
-  const out: Array<{ id: string; kind: AreaKind; floorId: string; tempZone?: AreaTemp } & Rect> = [];
+/** 默认布局里装进步入式冷库的暂存货架：冷藏、冷冻订单货架和对应温区的回收货架 */
+function walkInFor(r: StagingRackConfig): 'STAGING_COOLER' | 'STAGING_FREEZER' | undefined {
+  if (r.tempZone === 'CHILLED') return 'STAGING_COOLER';
+  if (r.tempZone === 'FROZEN') return 'STAGING_FREEZER';
+  return undefined;
+}
+
+/** 步入式冷库的默认大小：货架每列 3 个（区域网格的排法），列宽按最长的货架 */
+function walkInSize(racks: readonly StagingRackConfig[]): { w: number; d: number } {
+  const rows = Math.min(3, racks.length);
+  const cols = Math.ceil(racks.length / 3);
+  const longest = Math.max(...racks.map((r) => stagingRackLength(r.slotsPerLevel)));
+  const pitch = Math.max(STAGING_COL_PITCH, longest + 0.8);
+  return { w: Math.max(3.6, 0.4 + (cols - 1) * pitch + longest + 0.8), d: 0.6 + (rows - 1) * STAGING_ROW_PITCH + 0.9 };
+}
+
+type DraftArea = { id: string; kind: AreaKind; floorId: string; tempZone?: AreaTemp } & Rect;
+
+/**
+ * 默认的线上订单区（决策记录 0019）：常温暂存货架网格在前（靠交付门口），后面是线上订单冷藏库、冷冻库（冷藏、冷冻订单货架在里面），
+ * 一条 3 米宽的连通通道从暂存区一直通到后面的收货区，通道旁边是放后仓溢出托盘的地面（溢流位）。
+ * 暂存区和收货区之间放不下冷库时，冷库放到暂存货架右边；两者紧挨着时（很小的门店）不设通道。
+ */
+function defaultOpd(config: StoreConfig, frame: BackroomFrame): { areas: DraftArea[]; assign: (r: StagingRackConfig) => string | undefined } {
+  const sf = config.layout.points.staging.floorId;
+  const cold = { STAGING_COOLER: [] as StagingRackConfig[], STAGING_FREEZER: [] as StagingRackConfig[] };
+  for (const r of config.staging.racks) {
+    const k = r.x === undefined && !r.areaId ? walkInFor(r) : undefined;
+    if (k) cold[k].push(r);
+  }
+  // 常温货架的网格（冷藏、冷冻货架拿出去之后）
+  const ambient = stagingPlacement({ ...config, staging: { ...config.staging, racks: config.staging.racks.filter((r) => !(r.x === undefined && !r.areaId && walkInFor(r))) } });
+  const areas: DraftArea[] = [];
+  if (!ambient.length) return { areas, assign: () => undefined };
+  const sb = bbox(ambient);
+  const recvZ0 = frame.receiving.z0;
+  const rooms = (['STAGING_COOLER', 'STAGING_FREEZER'] as const).filter((k) => cold[k].length);
+  const sizes = rooms.map((k) => walkInSize(cold[k]));
+  const roomD = Math.max(0, ...sizes.map((z) => z.d));
+  const gap = recvZ0 - sb.z1;
+  const behind = gap >= roomD + 1.2;
+  let x = sb.x1 + 0.6;
+  let z0 = sb.z0;
+  if (gap >= 1.2) {
+    // 通道沿暂存区左边往后通到收货区；溢流位在通道左边、靠暂存区的一端（地面堆放托盘）
+    const passage = { x0: sb.x0, x1: sb.x0 + 3, z0: sb.z1 + 0.3, z1: recvZ0 - 0.3 };
+    areas.push({ id: 'PASSAGE-1', kind: 'PASSAGE', floorId: sf, ...round1(passage) });
+    const d = Math.min(6, Math.max(2.4, passage.z1 - passage.z0 - 0.6));
+    areas.push({ id: 'OVERFLOW-1', kind: 'OVERFLOW', floorId: sf, ...round1({ x0: passage.x0 - 6.4, x1: passage.x0 - 0.4, z0: passage.z0 + 0.3, z1: passage.z0 + 0.3 + d }) });
+    // 冷库在通道右边，门朝前（暂存区）
+    if (behind) {
+      x = passage.x1 + 0.4;
+      z0 = sb.z1 + 0.6;
+    }
+  }
+  // 放不下时冷库放到暂存货架右边（大件暂存区再往右）
+  rooms.forEach((k, i) => {
+    const z = sizes[i] as { w: number; d: number };
+    areas.push({ id: `${k}-1`, kind: k, floorId: sf, ...round1({ x0: x, x1: x + z.w, z0, z1: z0 + z.d }) });
+    x += z.w + 0.4;
+  });
+  const assign = (r: StagingRackConfig) => {
+    const k = r.x === undefined && !r.areaId ? walkInFor(r) : undefined;
+    return k && rooms.includes(k) ? `${k}-1` : undefined;
+  };
+  return { areas, assign };
+}
+
+/** 二楼（决策记录 0019）：货梯口旁的卸货区和后面的补货区；只有两层的门店才有 */
+function defaultUpper(config: StoreConfig, frame: BackroomFrame): DraftArea[] {
+  const lift = frame.lift;
+  if (!lift) return [];
+  const f = config.layout.floors.find((x) => x.id === lift.upperFloorId);
+  if (!f) return [];
+  const runs = config.layout.runs.filter((r) => r.floorId === f.id);
+  const back = runs.length ? Math.max(...runs.map((r) => Math.max(r.start.y, r.end.y))) : 0;
+  const z0 = back + 2.4;
+  const z1 = f.depthM - 0.6;
+  if (z1 - z0 < 2) return [];
+  const out: DraftArea[] = [];
+  const unloadX1 = Math.min(f.widthM - 1, lift.x + 1.8 + 7);
+  if (unloadX1 - (lift.x + 1.8) >= 2) out.push({ id: 'UNLOAD-2', kind: 'UNLOAD', floorId: f.id, ...round1({ x0: lift.x + 1.8, x1: unloadX1, z0, z1 }) });
+  if (lift.x - 1.8 - 1.5 >= 4) out.push({ id: 'OVERSTOCK-2', kind: 'OVERSTOCK', floorId: f.id, ...round1({ x0: 1.5, x1: lift.x - 1.8, z0, z1 }) });
+  return out;
+}
+
+/** 没有明确给出区域时的默认区域（后仓、收货区与原来一致；线上订单区和二楼见 defaultOpd、defaultUpper） */
+export function defaultAreas(config: StoreConfig, frame = backroomFrame(config), opd = defaultOpd(config, frame), racks = stagingPlacement(config, opd.areas, opd.assign)): DraftArea[] {
+  const out: DraftArea[] = [];
   const f = frame.floorId;
   const z = frame.zone;
   const zw = z.x1 - z.x0;
@@ -272,26 +416,35 @@ export function defaultAreas(config: StoreConfig, frame = backroomFrame(config),
   const unloadDepth = Math.min(4, (r.z1 - r.z0) * 0.5);
   out.push({ id: 'UNLOAD-1', kind: 'UNLOAD', floorId: f, ...round1({ x0: r.x0 + wl + 0.3, x1: r.x1, z0: r.z1 - unloadDepth, z1: r.z1 }) });
   out.push({ id: 'HOLD-1', kind: 'RECEIVING_HOLD', floorId: f, ...round1({ x0: r.x0 + wl + 0.3, x1: r.x1, z0: r.z0, z1: r.z1 - unloadDepth - 0.2 }) });
-  // 暂存区：默认的货架网格里各温区、配送、回收的货架交错排列，所以整体是一个暂存区；
+  // 暂存区：常温货架网格里各温区（不含冷藏、冷冻）、配送、回收的货架交错排列，所以整体是一个暂存区；
   // 大件暂存是暂存区旁边的一块地面（明确划分配送暂存道、回收专区要在编辑器里画区域）
   const sf = config.layout.points.staging.floorId;
-  if (racks.length) {
-    const sb = bbox(racks);
+  const ambient = racks.filter((p) => !p.areaId || !opd.areas.some((a) => a.id === p.areaId));
+  if (ambient.length) {
+    const sb = bbox(ambient);
     out.push({ id: 'STAGING-1', kind: 'STAGING', floorId: sf, ...round1(sb) });
-    if (config.modules.gm) out.push({ id: 'OVS-1', kind: 'STAGING_OVERSIZED', floorId: sf, ...round1({ x0: sb.x1 + 0.6, x1: sb.x1 + 5.6, z0: sb.z0, z1: sb.z0 + Math.min(6, sb.z1 - sb.z0) }) });
+    if (config.modules.gm) {
+      // 冷库放在暂存货架右边时，大件暂存区让到冷库右边
+      const right = Math.max(sb.x1, ...opd.areas.filter((a) => a.z0 < sb.z1 && a.x0 >= sb.x1 - 0.01).map((a) => a.x1));
+      out.push({ id: 'OVS-1', kind: 'STAGING_OVERSIZED', floorId: sf, ...round1({ x0: right + 0.6, x1: right + 5.6, z0: sb.z0, z1: sb.z0 + Math.min(6, sb.z1 - sb.z0) }) });
+    }
   }
+  out.push(...opd.areas);
   // 包裹区和熟食保温区：交付门和暂存货架之间
   const sp = config.layout.points.staging;
   if (config.modules.parcelHub) out.push({ id: 'PARCEL-1', kind: 'PARCEL', floorId: sf, ...round1({ x0: sp.x + 3, x1: sp.x + 8, z0: sp.y - 4.4, z1: sp.y - 0.6 }) });
   if (config.modules.mto) out.push({ id: 'HOT-1', kind: 'HOT_HOLD', floorId: sf, tempZone: 'HOT', ...round1({ x0: sp.x + 8.5, x1: sp.x + 11.5, z0: sp.y - 4.4, z1: sp.y - 0.6 }) });
+  out.push(...defaultUpper(config, frame));
   return out;
 }
 
 /** 区域的默认容量（配置里没给时） */
-function defaultCapacity(kind: AreaKind, r: Rect, config: StoreConfig, racks: PlacedRack[], id: string, auto: boolean): number {
+function defaultCapacity(kind: AreaKind, r: Rect, config: StoreConfig, racks: PlacedRack[], id: string, auto: boolean, upper = false): number {
   switch (kind) {
     case 'RACKS':
     case 'OVERSTOCK':
+      // 二楼的补货区是地面堆放（没有叉车），按托盘位算
+      if (upper) return floorSpots(r);
       return rackRowsIn(r).reduce((n, row) => n + row.bays * config.backroom.rackLevels * (row.singleSided ? 1 : 2), 0);
     case 'COOLER':
       // 默认冷藏库 12 个库位、冷冻库 10 个，每个 30 箱（与原来的固定库位一致）
@@ -307,6 +460,8 @@ function defaultCapacity(kind: AreaKind, r: Rect, config: StoreConfig, racks: Pl
       return Math.max(20, Math.floor((r.x1 - r.x0) * (r.z1 - r.z0) * 6));
     case 'STAGING':
     case 'STAGING_DELIVERY':
+    case 'STAGING_COOLER':
+    case 'STAGING_FREEZER':
     case 'RECOVERY': {
       const inside = racks.filter((p) => p.areaId === id || (!p.areaId && p.x >= r.x0 && p.x <= r.x1 && p.z >= r.z0 && p.z <= r.z1));
       const totes = inside.reduce((n, p) => n + p.levels * p.slotsPerLevel * (config.staging.racks.find((x) => x.id === p.rackId)?.totesPerSlot ?? 1), 0);
@@ -322,6 +477,9 @@ function defaultCapacity(kind: AreaKind, r: Rect, config: StoreConfig, racks: Pl
     case 'RECEIVING_HOLD':
       // 地面堆放：每个托盘位约 20 箱
       return floorSpots(r) * 20;
+    case 'PASSAGE':
+      // 通道要保持畅通：只算能临时停几个托盘（推车错车用），不当存储
+      return Math.max(1, Math.floor(Math.max(r.x1 - r.x0, r.z1 - r.z0) / 8));
     default:
       return floorSpots(r);
   }
@@ -331,9 +489,9 @@ function defaultCapacity(kind: AreaKind, r: Rect, config: StoreConfig, racks: Pl
 export function storeAreas(config: StoreConfig): StoreAreas {
   const frame = backroomFrame(config);
   const given = config.areas;
-  const prelim = given ?? [];
-  const racks = stagingPlacement(config, prelim);
-  const raw = given ?? defaultAreas(config, frame, racks);
+  const opd = given ? undefined : defaultOpd(config, frame);
+  const racks = given ? stagingPlacement(config, given) : stagingPlacement(config, opd?.areas, opd?.assign);
+  const raw = given ?? defaultAreas(config, frame, opd, racks);
   const areas: ResolvedArea[] = raw.map((a) => {
     const meta = AREA_KINDS[a.kind];
     const rect = { x0: Math.min(a.x0, a.x1), x1: Math.max(a.x0, a.x1), z0: Math.min(a.z0, a.z1), z1: Math.max(a.z0, a.z1) };
@@ -344,10 +502,10 @@ export function storeAreas(config: StoreConfig): StoreAreas {
       floorId: a.floorId,
       tempZone: a.tempZone ?? meta.temp,
       ...rect,
-      capacity: 'capacity' in a && typeof a.capacity === 'number' && a.capacity > 0 ? a.capacity : defaultCapacity(a.kind, rect, config, racks, a.id, !given),
+      capacity: 'capacity' in a && typeof a.capacity === 'number' && a.capacity > 0 ? a.capacity : defaultCapacity(a.kind, rect, config, racks, a.id, !given, a.floorId !== frame.floorId),
       unit: meta.unit,
       // 托盘货架平时就放得很满，快满了才提醒
-      alertAt: 'alertAt' in a && typeof a.alertAt === 'number' ? a.alertAt : a.kind === 'RACKS' || a.kind === 'OVERSTOCK' ? 0.95 : 0.85,
+      alertAt: 'alertAt' in a && typeof a.alertAt === 'number' ? a.alertAt : a.kind === 'RACKS' || a.kind === 'OVERSTOCK' ? 0.95 : a.kind === 'PASSAGE' ? 0.5 : 0.85,
       auto: !given,
     };
     if ('label' in a && typeof a.label === 'string' && a.label) out.label = a.label;
@@ -385,7 +543,13 @@ export function materializeAreas(cfg: StoreConfig): void {
       return out;
     });
     const staging = cfg.areas.find((a) => a.kind === 'STAGING');
-    if (staging) cfg.staging.racks = cfg.staging.racks.map((r) => (r.areaId || r.x !== undefined ? r : { ...r, areaId: staging.id }));
+    const room = (k: AreaKind) => cfg.areas?.find((a) => a.kind === k)?.id;
+    cfg.staging.racks = cfg.staging.racks.map((r) => {
+      if (r.areaId || r.x !== undefined) return r;
+      const k = walkInFor(r);
+      const id = (k && room(k)) ?? staging?.id;
+      return id ? { ...r, areaId: id } : r;
+    });
   }
   if (!cfg.docks) cfg.docks = storeAreas(cfg).docks.map((d) => ({ id: d.id, x: d.x, kind: d.kind, reefer: d.reefer }));
 }
@@ -400,8 +564,12 @@ const NEW_SIZE: Partial<Record<AreaKind, [number, number]>> = {
   RECEIVING_HOLD: [8, 5],
   STAGING: [10, 8],
   STAGING_DELIVERY: [10, 5],
+  STAGING_COOLER: [5, 5],
+  STAGING_FREEZER: [5, 5],
   PARCEL: [5, 4],
   HOT_HOLD: [3, 3],
+  PASSAGE: [3, 10],
+  OVERFLOW: [6, 6],
 };
 
 /** 新建一个区域：放在同组区域附近的空地上；返回新区域的编号 */

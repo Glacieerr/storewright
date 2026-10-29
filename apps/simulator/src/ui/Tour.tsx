@@ -22,7 +22,7 @@ interface Step {
 const SEEN_KEY = 'storewright.tour.seen';
 
 export function tourSeen(): boolean {
-  // 嵌在展示页里（门店实况、全天仿真）时不弹导览邀请
+  // 嵌在展示页里（数字孪生、全天仿真）时不弹导览邀请
   const q = new URLSearchParams(location.search);
   if (q.get('live') === 'demo' || q.get('autoplay') === '1') return true;
   try {
@@ -54,7 +54,7 @@ function steps(): Step[] {
   return [
     {
       title: t('欢迎来到 Storewright'),
-      body: t('这是一个门店运营模拟器：线上订单在店里拣货、暂存，顾客到停车场取货；后仓收货、夜班补货也都在同一次仿真里。左边是门店，右边是实时数据，下面是时间轴。'),
+      body: t('这是门店的数字孪生。现在看到的是规划孪生：线上订单在店里拣货、暂存，顾客到停车场取货，后仓收货、夜班补货也都在同一次仿真里，改布局、排班、策略之前先在这里试。连上门店后（「数字孪生」标签）它就和门店实时同步，可以回放过去、推演未来。左边是门店，右边是数据，下面是时间轴。'),
       enter: () => {
         live();
         app().setTab('live');

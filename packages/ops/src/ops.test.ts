@@ -10,8 +10,10 @@ import { buildBins, buildPlanogram, execute, orderInfoFrom, type OpsContext } fr
 import { decide } from './decide';
 import { DEFAULT_REPLENISH_RULES } from '@storewright/algorithms';
 import { emptyState, type OpsState, type StoreStatic } from './types';
-import { codeHashInput, handoffBoard, openWalks, orderShortages, pickRows, stagingOccupancy, suggestSlots, summary } from './views';
+import { isBusy, onShift, teamBoard } from './staff';
+import { codeHashInput, handoffBoard, needsAgeCheck, openWalks, orderShortages, pickRows, recoveryNeeded, stagingOccupancy, suggestSlots, summary, toStageTotes } from './views';
 import { clientProjection } from './projection';
+import { planNudges } from './nudges';
 
 const model = new StoreModel(createTemplate('medium'));
 const catalog = generateCatalog(model, { seed: 7 });
@@ -171,8 +173,10 @@ describe('一张自取订单的全链路', () => {
     // 不是自己的批次不能拣
     const r = pickRows(st.s, st.s.walks[w1?.id ?? ''] as never)[0];
     expect(st.code({ type: 'PickItem', walkId: w1?.id ?? '', toteId: r?.toteId ?? '', lineId: r?.lineId ?? '', qty: 1 }, 'A2')).toBe('WALK_NOT_YOURS');
-    // 没有扫描绑定框不能拣进去
-    expect(st.code({ type: 'PickItem', walkId: w1?.id ?? '', toteId: r?.toteId ?? '', lineId: r?.lineId ?? '', qty: 1 }, 'A1')).toBe('TOTE_NOT_BOUND');
+    // 门店要求扫码时，没有扫框不能拣进去（不要求扫码时第一次放进框会自动绑定，决策记录 0026）
+    st.ok({ type: 'SetStoreSettings', requireScan: true });
+    expect(st.code({ type: 'PickItem', walkId: w1?.id ?? '', toteId: r?.toteId ?? '', lineId: r?.lineId ?? '', qty: 1, gtin: r?.gtin ?? '' }, 'A1')).toBe('TOTE_NOT_BOUND');
+    st.ok({ type: 'SetStoreSettings', requireScan: false });
     // 没拣完不能结束
     expect(st.code({ type: 'CompleteWalk', walkId: w1?.id ?? '' }, 'A1')).toBe('WALK_UNFINISHED');
     // 还没开始拣可以放弃
@@ -380,12 +384,13 @@ describe('交付看板与核验', () => {
     for (const w of st.walksOf(o.id)) st.pickWalk(w, 'A1');
     st.stageOrder(o.id, 'A2');
     st.ok({ type: 'StartPrep', key: o.id }, 'A3');
-    expect(st.code({ type: 'VerifyCode', key: o.id, code: 'K7Q2' }, 'A3')).toBe('NOT_READY');
+    // 顾客已经到了：框没取完也可以先核验（决策记录 0026）
+    expect(st.code({ type: 'VerifyCode', key: o.id, code: 'BAD-EARLY' }, 'A3')).toBe('OK');
     for (const id of st.s.orders[o.id]?.toteIds ?? []) st.ok({ type: 'ScanPrepTote', key: o.id, labelId: st.s.totes[id]?.labelId ?? '' }, 'A3');
     expect(st.code({ type: 'VerifyManually', key: o.id }, 'A3')).toBe('MANUAL_NOT_ALLOWED');
     // 输错不限次数、不锁定（决策记录 0014）：错到 codeAttempts 次后多一个人工核验入口，验证码仍可继续输入
     for (let i = 0; i < rules.handoff.codeAttempts + 3; i++) st.ok({ type: 'VerifyCode', key: o.id, code: `BAD${i}` }, 'A3');
-    expect(st.s.sessions[o.id]?.codeFailures).toBe(rules.handoff.codeAttempts + 3);
+    expect(st.s.sessions[o.id]?.codeFailures).toBe(rules.handoff.codeAttempts + 4);
     expect(st.s.sessions[o.id]?.manualRequired).toBe(true);
     expect(decide(st.s, { cmd: { type: 'VerifyManually', key: o.id }, actor: 'A3', at: st.now }, ctx).ok).toBe(true);
     st.ok({ type: 'VerifyCode', key: o.id, code: 'K7Q2' }, 'A3');
@@ -587,5 +592,397 @@ describe('取货车位（决策记录 0013）', () => {
     expect(ok.decision.ok).toBe(true);
     // 没有配置车位时不检查
     expect(st.code({ type: 'CheckIn', orderId: o.id, bay: '7' }, 'customer')).toBe('OK');
+  });
+});
+
+describe('设备告警（数字孪生，决策记录 0016）', () => {
+  const impact = { orders: ['O1'], totes: 2, cases: 0, units: 0, moveTo: ['C-09'] };
+  const raise = { type: 'RaiseEquipmentAlert' as const, sensorId: 'T-STAGING-1-C', kind: 'TEMP_HIGH' as const, severity: 'ALARM' as const, value: 8.4, limit: 5, since: T0 - 2 * MIN, impact };
+
+  it('只有孪生服务能发出和解除；同一传感器同一类告警不重复；带班负责人或控制台确认；解除后记下持续时长和极值', () => {
+    const st = new Store();
+    // 员工和控制台都不能自己发出告警
+    expect(st.code(raise, 'A1')).toBe('NOT_AUTHORIZED');
+    expect(st.code(raise, 'console')).toBe('NOT_AUTHORIZED');
+    const [e] = st.ok(raise, 'twin');
+    expect(e).toMatchObject({ type: 'EquipmentAlertRaised', payload: { alertId: 'AL00001', since: T0 - 2 * MIN, impact } });
+    expect(st.ok(raise, 'twin')).toEqual([]);
+    expect(st.s.alerts.AL00001).toMatchObject({ status: 'ACTIVE', severity: 'ALARM', value: 8.4, limit: 5, raisedAt: T0 });
+    // 拣货员不能确认；控制台可以（带班负责人同样可以，作业核心用同一个权限判断）
+    expect(st.code({ type: 'AcknowledgeAlert', alertId: 'AL00001' }, 'A1')).toBe('NOT_AUTHORIZED');
+    expect(st.code({ type: 'AcknowledgeAlert', alertId: 'NOPE' })).toBe('ALERT_NOT_FOUND');
+    st.ok({ type: 'AcknowledgeAlert', alertId: 'AL00001' });
+    expect(st.s.alerts.AL00001).toMatchObject({ status: 'ACKED', ackBy: 'console', ackAt: T0 });
+    expect(st.ok({ type: 'AcknowledgeAlert', alertId: 'AL00001' })).toEqual([]);
+    expect(st.code({ type: 'ClearEquipmentAlert', alertId: 'AL00001' }, 'console')).toBe('NOT_AUTHORIZED');
+    st.now = T0 + 5 * MIN;
+    const [c] = st.ok({ type: 'ClearEquipmentAlert', alertId: 'AL00001', peak: 9.1 }, 'twin');
+    expect(c).toMatchObject({ type: 'EquipmentAlertCleared', payload: { durationSec: 7 * 60, peak: 9.1 } });
+    expect(st.s.alerts.AL00001).toMatchObject({ status: 'CLEARED', clearedAt: T0 + 5 * MIN, peak: 9.1 });
+    expect(st.code({ type: 'AcknowledgeAlert', alertId: 'AL00001' })).toBe('ALERT_CLEARED');
+    // 解除之后同一传感器可以再发新的告警
+    expect(st.ok(raise, 'twin')[0]).toMatchObject({ payload: { alertId: 'AL00002' } });
+    // 告警进事件流：回放得到同样的状态，设备快照里也带着
+    expect(replay(st.log, undefined, statics).alerts).toEqual(st.s.alerts);
+    expect(clientProjection(st.s, st.now).alerts).toEqual(st.s.alerts);
+  });
+
+  it('影响里的数字和编号经过清理', () => {
+    const st = new Store();
+    const [e] = st.ok({ ...raise, value: Number.NaN, since: T0 + 60 * MIN, impact: { orders: ['O1', 3 as unknown as string], totes: -2, cases: 1.6, units: Number.POSITIVE_INFINITY, moveTo: [] } }, 'twin');
+    expect(e).toMatchObject({ payload: { value: 0, since: T0, impact: { orders: ['O1'], totes: 0, cases: 2, units: 0, moveTo: [] } } });
+  });
+});
+
+describe('学生兼职工的班次（决策记录 0020）', () => {
+  it('有班次的员工只在班次时段里在岗（当地时间）；没有班次的全职员工整天在岗', () => {
+    const at = (h: number, m = 0) => new Date(2026, 9, 22, h, m).getTime();
+    const student = { shift: { from: 16 * 60, to: 20 * 60 } };
+    expect(onShift(student, at(15, 59))).toBe(false);
+    expect(onShift(student, at(16))).toBe(true);
+    expect(onShift(student, at(19, 59))).toBe(true);
+    expect(onShift(student, at(20))).toBe(false);
+    expect(onShift({}, at(3))).toBe(true);
+  });
+});
+
+// 全部流程梳理时发现的问题（决策记录 0025）
+describe('流程梳理发现的问题（决策记录 0025）', () => {
+  /** 一张自取订单拣完、暂存、顾客到店，交给 A3 开始准备 */
+  function preparing(st: Store) {
+    const o = st.create(pickOrder((x) => x.type === 'PICKUP' && x.lines.length >= 2, 4));
+    st.ok({ type: 'LockOrder', orderId: o.id });
+    st.ok({ type: 'ReleaseWalks' });
+    for (const w of st.walksOf(o.id)) st.pickWalk(w, 'A1');
+    st.stageOrder(o.id, 'A2');
+    st.ok({ type: 'CheckIn', orderId: o.id, bay: '1' }, 'customer');
+    st.ok({ type: 'StartPrep', key: o.id }, 'A3');
+    const first = st.s.orders[o.id]?.toteIds[0] as string;
+    st.ok({ type: 'ScanPrepTote', key: o.id, labelId: st.s.totes[first]?.labelId ?? '' }, 'A3');
+    return { orderId: o.id, first };
+  }
+
+  it('准备中取消订单：这一单的交付准备结束、员工不再「忙」，已取出的框进回收专区的列表', () => {
+    const st = new Store();
+    const { orderId, first } = preparing(st);
+    expect(isBusy(st.s, 'A3')).toBe(true);
+    st.ok({ type: 'CancelOrder', orderId, reason: 'customer' });
+    expect(st.s.sessions[orderId]).toBeUndefined();
+    expect(isBusy(st.s, 'A3')).toBe(false);
+    expect(recoveryNeeded(st.s).map((t) => t.id)).toContain(first);
+    st.ok({ type: 'RecoverTote', labelId: st.s.totes[first]?.labelId ?? '' }, 'A3');
+    expect(st.s.totes[first]?.status).toBe('RECOVERY');
+    expect(replay(st.log, undefined, statics)).toEqual(st.s);
+  });
+
+  it('取出后不在交付准备里的框可以放回暂存区（改派时没有空格位的情况），也出现在待暂存列表；放回不重复「订单已暂存」', () => {
+    const st = new Store();
+    const { orderId, first } = preparing(st);
+    // 准备中的框不能再暂存
+    const label = st.s.totes[first]?.labelId ?? '';
+    expect(st.code({ type: 'StageTote', labelId: label, slotCode: st.s.totes[first]?.slotCode ?? '' }, 'A2')).toBe('TOTE_NOT_PICKED');
+    // 交付准备结束了、框还在手上（改派时原格位和同温区都满了时就是这样）
+    delete st.s.sessions[orderId];
+    expect(toStageTotes(st.s).map((t) => t.id)).toContain(first);
+    const stagedEvents = st.log.filter((e) => e.type === 'OrderStaged').length;
+    st.ok({ type: 'StageTote', labelId: label, slotCode: st.s.totes[first]?.slotCode ?? '' }, 'A2');
+    expect(st.s.totes[first]?.status).toBe('STAGED');
+    expect(st.log.filter((e) => e.type === 'OrderStaged').length).toBe(stagedEvents);
+    expect(toStageTotes(st.s).map((t) => t.id)).not.toContain(first);
+  });
+
+  it('配送订单等行程成行后一起准备；换格位时不推荐它现在所在的格位', () => {
+    const st = new Store();
+    const o = st.create(pickOrder((x) => x.type === 'DELIVERY', 1), 150);
+    st.ok({ type: 'LockOrder', orderId: o.id });
+    st.ok({ type: 'ReleaseWalks' });
+    for (const w of st.walksOf(o.id)) st.pickWalk(w, 'A1');
+    st.stageOrder(o.id, 'A2');
+    expect(st.s.orders[o.id]?.tripId).toBeUndefined();
+    expect(st.code({ type: 'StartPrep', key: o.id }, 'A3')).toBe('TRIP_PENDING');
+    const id = st.s.orders[o.id]?.toteIds[0] as string;
+    expect(suggestSlots(st.s, statics, id, 10)).not.toContain(st.s.totes[id]?.slotCode);
+  });
+
+  it('年龄限制的商品换成替代品时，交付也要核验证件', () => {
+    const s = emptyState();
+    s.orders.O1 = { id: 'O1', lines: [{ lineId: 'L1', ageRestricted: true }], lineResults: { L1: { picked: 0, short: 0, substituted: 2 } } } as unknown as OpsState['orders'][string];
+    expect(needsAgeCheck(s, ['O1'])).toBe(true);
+    (s.orders.O1 as { lineResults: Record<string, { picked: number; short: number; substituted: number }> }).lineResults.L1 = { picked: 0, short: 2, substituted: 0 };
+    expect(needsAgeCheck(s, ['O1'])).toBe(false);
+  });
+});
+
+// 修复全部卡点（决策记录 0026）
+describe('门店设置、扫码核对、第一次放进框时绑定（决策记录 0026）', () => {
+  function walkFor(st: Store) {
+    const o = st.create(pickOrder((x) => x.type === 'PICKUP' && x.lines.length >= 2, 6));
+    st.ok({ type: 'LockOrder', orderId: o.id });
+    st.ok({ type: 'ReleaseWalks' });
+    const walkId = st.walksOf(o.id)[0] as string;
+    st.ok({ type: 'ClaimWalk', walkId }, 'A1');
+    return { orderId: o.id, walkId };
+  }
+
+  it('不要求扫码：第一次往框里放东西时自动绑定；扫了商品条码就核对', () => {
+    const st = new Store();
+    const { walkId } = walkFor(st);
+    const w = st.s.walks[walkId];
+    const row = pickRows(st.s, w as NonNullable<typeof w>)[0];
+    if (!row) throw new Error('row');
+    expect(st.code({ type: 'PickItem', walkId, toteId: row.toteId, lineId: row.lineId, qty: 1, gtin: '00000000000017' }, 'A1')).toBe('WRONG_ITEM');
+    const out = st.ok({ type: 'PickItem', walkId, toteId: row.toteId, lineId: row.lineId, qty: 1, gtin: row.gtin }, 'A1');
+    expect(out.map((e) => e.type)).toEqual(['LabelBound', 'ItemPicked']);
+    expect(st.s.walks[walkId]?.bound).toContain(row.toteId);
+    expect(replay(st.log, undefined, statics)).toEqual(st.s);
+  });
+
+  it('要求扫码：点选被拒；没扫商品条码被拒；没绑定的框要扫框标签；只有控制台和带班负责人能改设置', () => {
+    const st = new Store();
+    const { walkId } = walkFor(st);
+    expect(st.code({ type: 'SetStoreSettings', requireScan: true }, 'A1')).toBe('NOT_AUTHORIZED');
+    st.ok({ type: 'SetStoreSettings', requireScan: true }, 'console');
+    expect(st.s.settings?.requireScan).toBe(true);
+    const w = st.s.walks[walkId];
+    const row = pickRows(st.s, w as NonNullable<typeof w>)[0];
+    if (!row) throw new Error('row');
+    const label = st.s.totes[row.toteId]?.labelId ?? '';
+    expect(st.code({ type: 'BindLabel', walkId, labelId: label, tap: true }, 'A1')).toBe('SCAN_REQUIRED');
+    expect(st.code({ type: 'PickItem', walkId, toteId: row.toteId, lineId: row.lineId, qty: 1, gtin: row.gtin }, 'A1')).toBe('TOTE_NOT_BOUND');
+    expect(st.code({ type: 'PickItem', walkId, toteId: row.toteId, lineId: row.lineId, qty: 1, labelId: label }, 'A1')).toBe('SCAN_REQUIRED');
+    expect(st.ok({ type: 'PickItem', walkId, toteId: row.toteId, lineId: row.lineId, qty: 1, labelId: label, gtin: row.gtin }, 'A1').map((e) => e.type)).toEqual(['LabelBound', 'ItemPicked']);
+    // 缺货不往框里放东西，不用绑定
+    const other = pickRows(st.s, st.s.walks[walkId] as NonNullable<typeof w>).find((r) => r.toteId !== row.toteId && r.done < r.qty);
+    if (other) expect(st.code({ type: 'ReportNotFound', walkId, toteId: other.toteId, lineId: other.lineId, qty: other.qty - other.done, resolution: 'SHORT' }, 'A1')).toBe('OK');
+    expect(st.code({ type: 'SetStoreSettings', prepGate: 'NOPE' as 'ANY' }, 'console')).toBe('SETTING_INVALID');
+  });
+
+  it('放弃批次时解除绑定：下一个人领到时要重新扫框', () => {
+    const st = new Store();
+    const { walkId } = walkFor(st);
+    const w = st.s.walks[walkId] as NonNullable<OpsState['walks'][string]>;
+    for (const id of w.toteIds) st.ok({ type: 'BindLabel', walkId, labelId: st.s.totes[id]?.labelId ?? '' }, 'A1');
+    expect(st.s.walks[walkId]?.bound.length).toBe(w.toteIds.length);
+    st.ok({ type: 'UnclaimWalk', walkId }, 'A1');
+    expect(st.s.walks[walkId]?.bound).toEqual([]);
+    expect(w.toteIds.every((id) => st.s.totes[id]?.status === 'IN_WALK')).toBe(true);
+    expect(replay(st.log, undefined, statics)).toEqual(st.s);
+  });
+});
+
+describe('冷链计时到暂存为止（决策记录 0026）', () => {
+  it('完成拣货后框还没放进暂存：超时照样提醒；放进暂存后不再提醒', () => {
+    const st = new Store();
+    const o = st.create(pickOrder((x) => x.type === 'PICKUP' && x.lines.some((l) => catalog.byId.get(l.itemId)?.tempZone === 'CHILLED'), 0));
+    st.ok({ type: 'LockOrder', orderId: o.id });
+    st.ok({ type: 'ReleaseWalks' });
+    const cold = st.walksOf(o.id).find((w) => st.s.walks[w]?.tempZone === 'CHILLED') as string;
+    st.pickWalk(cold, 'A1');
+    const w = st.s.walks[cold];
+    expect(w?.status).toBe('COMPLETED');
+    expect(w?.coldStartedAt).toBeDefined();
+    st.now += ((w?.coldLimitSec ?? 0) + 60) * 1000;
+    const out = st.ok({ type: 'Tick', release: false }, 'system');
+    expect(out.some((e) => e.type === 'ColdChainAlert')).toBe(true);
+    // 另一张：放进暂存后不提醒
+    const st2 = new Store();
+    const o2 = st2.create(pickOrder((x) => x.type === 'PICKUP' && x.lines.some((l) => catalog.byId.get(l.itemId)?.tempZone === 'CHILLED'), 0));
+    st2.ok({ type: 'LockOrder', orderId: o2.id });
+    st2.ok({ type: 'ReleaseWalks' });
+    for (const id of st2.walksOf(o2.id)) st2.pickWalk(id, 'A1');
+    st2.stageOrder(o2.id, 'A2');
+    const w2 = Object.values(st2.s.walks).find((x) => x.tempZone === 'CHILLED');
+    st2.now += ((w2?.coldLimitSec ?? 0) + 60) * 1000;
+    expect(st2.ok({ type: 'Tick', release: false }, 'system').some((e) => e.type === 'ColdChainAlert')).toBe(false);
+  });
+});
+
+describe('暂存：自取区和配送区、回收专区扫码（决策记录 0026）', () => {
+  it('配送订单的框不能放进自取区的格位；要求扫码时移到回收专区要扫对温区的回收专区标签', () => {
+    const st = new Store();
+    const o = st.create(pickOrder((x) => x.type === 'DELIVERY', 3), 150);
+    st.ok({ type: 'LockOrder', orderId: o.id });
+    st.ok({ type: 'ReleaseWalks' });
+    for (const w of st.walksOf(o.id)) st.pickWalk(w, 'A1');
+    const tote = st.s.totes[st.s.orders[o.id]?.toteIds[0] ?? ''];
+    const pickupSlot = statics.slots.find((x) => x.area === 'PICKUP' && x.tempZone === tote?.tempZone);
+    if (pickupSlot) expect(st.code({ type: 'StageTote', labelId: tote?.labelId ?? '', slotCode: pickupSlot.code }, 'A2')).toBe('SLOT_AREA_MISMATCH');
+    st.stageOrder(o.id, 'A2');
+    st.ok({ type: 'CancelOrder', orderId: o.id, reason: 'customer' });
+    st.ok({ type: 'SetStoreSettings', requireScan: true });
+    const label = tote?.labelId ?? '';
+    expect(st.code({ type: 'RecoverTote', labelId: label, tap: true }, 'A2')).toBe('SCAN_REQUIRED');
+    expect(st.code({ type: 'RecoverTote', labelId: label }, 'A2')).toBe('SCAN_REQUIRED');
+    const wrong = tote?.tempZone === 'AMBIENT' ? 'RECOVERY-FRZ' : 'RECOVERY-AMB';
+    expect(st.code({ type: 'RecoverTote', labelId: label, area: wrong }, 'A2')).toBe('SLOT_ZONE_MISMATCH');
+    const right = { AMBIENT: 'RECOVERY-AMB', CHILLED: 'RECOVERY-CHL', FROZEN: 'RECOVERY-FRZ', HOT: 'RECOVERY-HOT' }[tote?.tempZone ?? 'AMBIENT'];
+    st.ok({ type: 'RecoverTote', labelId: label, area: right }, 'A2');
+    expect(st.s.totes[tote?.id ?? '']?.status).toBe('RECOVERY');
+    expect(resolveScan(st.s, statics, ' recovery-amb ')).toEqual({ kind: 'recovery', code: 'RECOVERY-AMB', tempZone: 'AMBIENT' });
+  });
+});
+
+describe('交付：先核验再取框、退出准备、顾客到了才开始、召回商品（决策记录 0026）', () => {
+  function staged(st: Store, skip = 11) {
+    const o = st.create(pickOrder((x) => x.type === 'PICKUP' && x.lines.length >= 2, skip));
+    st.ok({ type: 'LockOrder', orderId: o.id });
+    st.ok({ type: 'ReleaseWalks' });
+    for (const w of st.walksOf(o.id)) st.pickWalk(w, 'A1');
+    st.stageOrder(o.id, 'A2');
+    return o.id;
+  }
+
+  it('先核验、再取框：框没取完不能交；取完直接进入交付', () => {
+    const st = new Store();
+    const id = staged(st);
+    st.ok({ type: 'CheckIn', orderId: id }, 'customer');
+    st.ok({ type: 'StartPrep', key: id }, 'A3');
+    st.ok({ type: 'VerifyCode', key: id, code: 'K7Q2' }, 'A3');
+    expect(st.s.sessions[id]?.status).toBe('PREPPING');
+    expect(st.code({ type: 'CompleteHandoff', key: id, removeAgeItems: true }, 'A3')).toBe('NOT_READY');
+    for (const t of st.s.orders[id]?.toteIds ?? []) st.ok({ type: 'ScanPrepTote', key: id, labelId: st.s.totes[t]?.labelId ?? '' }, 'A3');
+    expect(st.s.sessions[id]?.status).toBe('HANDING_OFF');
+    st.ok({ type: 'CompleteHandoff', key: id, removeAgeItems: true }, 'A3');
+    expect(st.s.orders[id]?.status).toBe('COMPLETED');
+    expect(replay(st.log, undefined, statics)).toEqual(st.s);
+  });
+
+  it('退出准备：取出的框进「待暂存」放回；重新开始时手上的框可以直接扫进来', () => {
+    const st = new Store();
+    const id = staged(st, 12);
+    st.ok({ type: 'StartPrep', key: id }, 'A3');
+    const first = st.s.orders[id]?.toteIds[0] as string;
+    st.ok({ type: 'ScanPrepTote', key: id, labelId: st.s.totes[first]?.labelId ?? '' }, 'A3');
+    expect(st.code({ type: 'AbandonPrep', key: id }, 'A9')).toBe('NOT_IN_SESSION');
+    st.ok({ type: 'AbandonPrep', key: id }, 'A3');
+    expect(st.s.sessions[id]).toBeUndefined();
+    expect(st.s.orders[id]?.status).toBe('STAGED');
+    expect(toStageTotes(st.s).map((t) => t.id)).toContain(first);
+    // 马上重新开始：手上的框直接扫进新的准备
+    st.ok({ type: 'StartPrep', key: id }, 'A4');
+    st.ok({ type: 'ScanPrepTote', key: id, labelId: st.s.totes[first]?.labelId ?? '' }, 'A4');
+    expect(st.s.sessions[id]?.scanned).toContain(first);
+    expect(replay(st.log, undefined, statics)).toEqual(st.s);
+  });
+
+  it('门店设置「顾客到了才能开始」：没到时不能开始准备', () => {
+    const st = new Store();
+    const id = staged(st, 13);
+    st.ok({ type: 'SetStoreSettings', prepGate: 'ARRIVED' });
+    expect(st.code({ type: 'StartPrep', key: id }, 'A3')).toBe('NOT_ARRIVED');
+    st.ok({ type: 'CheckIn', orderId: id }, 'customer');
+    expect(st.code({ type: 'StartPrep', key: id }, 'A3')).toBe('OK');
+  });
+
+  it('召回商品已经拣进框里：交给顾客前要确认取出', () => {
+    const st = new Store();
+    const id = staged(st, 14);
+    const item = st.s.orders[id]?.lines[0]?.itemId as string;
+    st.s.recalls = { RC1: { id: 'RC1', title: 't', itemIds: [item], lots: [], openedAt: st.now, by: 'L1', status: 'OPEN', steps: {}, affected: { shelf: {}, cases: [], totes: [], openOrders: [], doneOrders: [] } } };
+    st.ok({ type: 'CheckIn', orderId: id }, 'customer');
+    st.ok({ type: 'StartPrep', key: id }, 'A3');
+    for (const t of st.s.orders[id]?.toteIds ?? []) st.ok({ type: 'ScanPrepTote', key: id, labelId: st.s.totes[t]?.labelId ?? '' }, 'A3');
+    st.ok({ type: 'VerifyCode', key: id, code: 'K7Q2' }, 'A3');
+    expect(st.code({ type: 'CompleteHandoff', key: id, removeAgeItems: true }, 'A3')).toBe('RECALL_ITEMS_PRESENT');
+    st.ok({ type: 'CompleteHandoff', key: id, removeAgeItems: true, removeRecalled: true }, 'A3');
+    expect(st.s.orders[id]?.recallRemoved).toBe(true);
+  });
+});
+
+describe('提醒：顾客到店（决策记录 0026）', () => {
+  it('顾客到店时提醒在岗的交付员；有人开始准备后不再提醒', () => {
+    const st = new Store();
+    st.ok({ type: 'ChangeRole', associateId: 'A1', role: 'HANDOFF' });
+    const o = st.create(pickOrder((x) => x.type === 'PICKUP', 15));
+    st.ok({ type: 'LockOrder', orderId: o.id });
+    st.ok({ type: 'ReleaseWalks' });
+    for (const w of st.walksOf(o.id)) st.pickWalk(w, 'X1');
+    st.stageOrder(o.id, 'X1');
+    st.ok({ type: 'CheckIn', orderId: o.id, bay: '2' }, 'customer');
+    const plan = planNudges(st.s, statics, st.now);
+    const arrival = plan.send.find((c) => c.to === 'A1' && c.kind === 'ARRIVAL');
+    expect(arrival?.params).toMatchObject({ order: o.shortCode, bay: '2' });
+    st.ok({ type: 'StartPrep', key: o.id }, 'A3');
+    expect(planNudges(st.s, statics, st.now).send.some((c) => c.kind === 'ARRIVAL')).toBe(false);
+  });
+});
+
+describe('带班负责人的工具（决策记录 0026）', () => {
+  const claimed = (st: Store) => {
+    const o = st.create(pickOrder((x) => x.type === 'PICKUP'));
+    st.ok({ type: 'LockOrder', orderId: o.id });
+    st.ok({ type: 'ReleaseWalks' });
+    const w = st.walksOf(o.id)[0] as string;
+    st.ok({ type: 'ClaimWalk', walkId: w }, 'A1');
+    return w;
+  };
+  const finish = (st: Store, w: string) => {
+    const walk = st.s.walks[w];
+    if (!walk) throw new Error('walk');
+    for (const r of pickRows(st.s, walk)) if (r.qty > r.done) st.ok({ type: 'PickItem', walkId: w, toteId: r.toteId, lineId: r.lineId, qty: r.qty - r.done }, 'A1');
+    st.ok({ type: 'CompleteWalk', walkId: w }, 'A1');
+  };
+
+  it('调忙着的人：做完这一单再去（排队），做完后节拍调过去；空闲的人直接调；熟食也可以调', () => {
+    const st = new Store();
+    const w = claimed(st);
+    const [q] = st.ok({ type: 'ChangeRole', associateId: 'A1', role: 'HANDOFF', minutes: 60, whenFree: true });
+    expect(q).toMatchObject({ type: 'AssociateMoveQueued', payload: { associateId: 'A1', role: 'HANDOFF', minutes: 60 } });
+    expect(st.s.roles.A1).toBeUndefined();
+    expect(teamBoard(statics, st.s, st.now).members.find((m) => m.id === 'A1')?.queued).toEqual({ role: 'HANDOFF', minutes: 60 });
+    st.ok({ type: 'Tick', release: false }, 'system');
+    expect(st.s.roles.A1).toBeUndefined();
+    finish(st, w);
+    expect(st.s.roles.A1).toBeUndefined();
+    st.ok({ type: 'Tick', release: false }, 'system');
+    expect(st.s.roles.A1).toBe('HANDOFF');
+    expect(st.s.roleChanges?.A1?.until).toBe(st.now + 60 * MIN);
+    expect(st.s.pendingMoves?.A1).toBeUndefined();
+    expect(st.code({ type: 'ChangeRole', associateId: 'X1', role: 'DELI', whenFree: true })).toBe('OK');
+    expect(st.s.roles.X1).toBe('DELI');
+    expect(replay(st.log, undefined, statics)).toEqual(st.s);
+  });
+
+  it('排队的调动：选「留在现在的岗位」就取消；本人做完后的下一个操作之前先调过去（不用等节拍）', () => {
+    const st = new Store();
+    const w = claimed(st);
+    st.ok({ type: 'ChangeRole', associateId: 'A1', role: 'STAGE', whenFree: true });
+    expect(st.ok({ type: 'ChangeRole', associateId: 'A1', role: 'PICK' })[0]).toMatchObject({ type: 'AssociateMoveCancelled', payload: { associateId: 'A1' } });
+    expect(st.s.pendingMoves?.A1).toBeUndefined();
+    st.ok({ type: 'ChangeRole', associateId: 'A1', role: 'STAGE', whenFree: true });
+    finish(st, w);
+    const out = st.ok({ type: 'AckSop', sopId: 'stage-scan' }, 'A1');
+    expect(out.map((e) => e.type)).toEqual(['AssociateRoleChanged', 'SopAcknowledged']);
+    expect(st.s.roles.A1).toBe('STAGE');
+    expect(replay(st.log, undefined, statics)).toEqual(st.s);
+  });
+
+  it('AI 的调人建议：采纳时这个人手上有任务就排队，做完再去（以前算过时、要再忽略一次）', () => {
+    const st = new Store();
+    const w = claimed(st);
+    const draft = { module: 'STAFFING' as const, target: 'A1', action: { kind: 'MOVE_ASSOCIATE', params: { associateId: 'A1', to: 'STAGE', hours: 1 } }, confidence: 0.7, reasons: [], alternatives: [], model: { id: 'staff', version: 1, kind: 'rules' }, expiresAt: st.now + 60 * MIN };
+    st.ok({ type: 'IssueRecommendation', draft }, 'ai');
+    const rec = Object.values(st.s.recs)[0];
+    if (!rec) throw new Error('rec');
+    const out = st.ok({ type: 'AcceptRecommendation', recId: rec.id });
+    expect(out.at(-1)).toMatchObject({ type: 'AssociateMoveQueued', payload: { associateId: 'A1', role: 'STAGE', minutes: 60, recId: rec.id } });
+    finish(st, w);
+    st.ok({ type: 'Tick', release: false }, 'system');
+    expect(st.s.roles.A1).toBe('STAGE');
+    expect(st.log.filter((e) => e.type === 'AssociateRoleChanged').at(-1)).toMatchObject({ payload: { recId: rec.id, minutes: 60 } });
+  });
+
+  it('设备告警：负责这台设备的岗位也能确认（后仓员工确认冷库告警），别的岗位不能', () => {
+    const st = new Store();
+    const cooler = { type: 'RaiseEquipmentAlert' as const, sensorId: 'T-COOLER', kind: 'TEMP_HIGH' as const, severity: 'WARN' as const, value: 6.2, limit: 5, since: T0, impact: { orders: [], totes: 0, cases: 3, units: 40, moveTo: [] } };
+    st.ok(cooler, 'twin');
+    const id = Object.keys(st.s.alerts)[0] as string;
+    expect(st.code({ type: 'AcknowledgeAlert', alertId: id }, 'A1')).toBe('NOT_AUTHORIZED');
+    st.ok({ type: 'AcknowledgeAlert', alertId: id }, 'X1');
+    expect(st.s.alerts[id]).toMatchObject({ status: 'ACKED', ackBy: 'X1' });
+    // 暂存冷柜的告警给暂存、交付：后仓员工不能确认
+    st.ok({ ...cooler, sensorId: 'T-STAGING-1-C' }, 'twin');
+    const id2 = Object.keys(st.s.alerts).find((x) => x !== id) as string;
+    expect(st.code({ type: 'AcknowledgeAlert', alertId: id2 }, 'X1')).toBe('NOT_AUTHORIZED');
   });
 });

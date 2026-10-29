@@ -100,7 +100,8 @@ test('带班负责人在 AI 页处理订单量预测建议，控制台同步看�
   await consolePage.getByRole('tab', { name: '模型' }).click();
   await consolePage.getByRole('button', { name: '立即预测' }).click();
   await lead.locator('.tabbar button').filter({ hasText: 'AI' }).click();
-  const card = lead.locator('.card', { hasText: '接下来' }).first();
+  // 找建议卡片（.ai-rec）：营业时间里上面还有一张「订单量展望」卡片，也写着「接下来…」
+  const card = lead.locator('.ai-rec', { hasText: '接下来' }).first();
   await expect(card).toBeVisible();
   await card.getByRole('button', { name: '有用' }).click();
   await expect.poll(async () => Object.values((await state(consolePage)).recs).some((r) => r.module === 'FORECAST' && r.status === 'ACCEPTED')).toBe(true);
@@ -115,17 +116,22 @@ test('补货闭环：控制台让货架变空 → 系统生成补货任务 → �
   await consolePage.getByRole('button', { name: '让货架变空', exact: true }).click();
   await expect.poll(async () => Object.values((await state(restocker)).repl).some((r) => r.itemId === itemId && r.status === 'OPEN')).toBe(true);
 
-  // 补货员：库存 → 补货，领取这一批，取一箱，到货位扫描货位标签，上架
+  // 补货员：库存 → 补货，领取这一批，按取箱清单取齐整批的箱子（决策记录 0026），再按货位逐个扫描货位标签上架
   await restocker.locator('.tabbar button').filter({ hasText: '库存' }).click();
   await restocker.getByRole('button', { name: '领取这一批' }).first().click();
+  await expect.poll(async () => Object.values((await state(restocker)).repl).some((r) => r.status === 'CLAIMED')).toBe(true);
   const task = Object.values((await state(restocker)).repl).find((r) => r.itemId === itemId);
-  for (let guard = 0; guard < 6; guard++) {
-    const s = await state(restocker);
-    const current = Object.values(s.repl).find((r) => r.status === 'CLAIMED');
-    if (!current) break;
-    await restocker.locator('.tote-list .row-btn').first().click();
+  const claimed = Object.values((await state(restocker)).repl).filter((r) => r.status === 'CLAIMED');
+  for (let i = 0; i < claimed.length; i++) {
+    const row = restocker.locator('.batch-cases .row-btn:not([disabled])').first();
+    if (!(await row.count())) break;
+    await row.click();
+  }
+  for (const current of claimed) {
     await scan(restocker, '扫描箱子或货位标签', current.locationId);
-    await restocker.getByRole('button', { name: '完成上架' }).click();
+    const done = restocker.getByRole('button', { name: '完成上架' });
+    if (!(await done.waitFor({ state: 'visible', timeout: 3000 }).then(() => true, () => false))) continue;
+    await done.click();
     await expect.poll(async () => (await state(restocker)).repl[current.id]?.status).not.toBe('CLAIMED');
   }
   await expect.poll(async () => (await state(consolePage)).repl[task?.id ?? '']?.status).toBe('DONE');

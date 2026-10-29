@@ -25,7 +25,10 @@ export function Shoppers() {
     stays.forEach((list, spot) => list.forEach((stay, k) => !stay.staff && out.push({ stay, key: spot * 64 + k })));
     return out.sort((a, b) => a.stay.arrive - b.stay.arrive);
   }, [stays]);
-  const tracks = useMemo(() => new Map<number, ShopperTrack | null>(), [entries, model, geo]);
+  const plan = useApp((s) => s.checkoutPlan);
+  // 收银通道计划变了（采纳、撤销 AI 建议）就重新规划顾客的路线
+  const tracks = useMemo(() => new Map<number, ShopperTrack | null>(), [entries, model, geo, plan]);
+  const openManual = useMemo(() => (plan ? (floorId: string, hour: number) => plan.find((p) => p.floorId === floorId)?.byHour[hour] : undefined), [plan]);
   const pose = useRef<ShopperPose>({ x: 0, y: 0, z: 0, heading: 0, moving: false, cart: false });
   const probe = useRef<ShopperPose>({ x: 0, y: 0, z: 0, heading: 0, moving: false, cart: false });
   const timeline = useApp((s) => s.timeline);
@@ -41,7 +44,7 @@ export function Shoppers() {
       if (t > e.stay.leave || n >= out.length) continue;
       let tr = tracks.get(e.key);
       if (tr === undefined) {
-        tr = planShopper(model, geo, e.stay, e.key) ?? null;
+        tr = planShopper(model, geo, e.stay, e.key, openManual) ?? null;
         tracks.set(e.key, tr);
       }
       if (!tr || !shopperPose(tr, t, pose.current)) continue;

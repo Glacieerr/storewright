@@ -1,4 +1,4 @@
-import { Component, useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { Component, lazy, Suspense, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import * as THREE from 'three';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { sceneAccess } from './capture';
@@ -33,9 +33,21 @@ import { CartAttendants } from './CartAttendants';
 import { StoreDetails } from './StoreDetails';
 import { CinematicDirector } from './Cinematic';
 import { LiveOverlay } from './LiveOverlay';
+import { TwinSensors } from './TwinSensors';
 import { EditPlane, EditPreview } from './EditTools';
 import { SCENE } from './palette';
 import { t } from '../i18n';
+import { installToonStyle } from './style/toonStyle';
+import { styleUniforms } from './style/uniforms';
+import { PostFX } from './style/PostFX';
+import { SkyDome } from './style/Sky';
+import { updateLights } from './style/lights';
+
+// 卡通着色补丁要在任何材质编译之前装好
+installToonStyle();
+
+/** 开发时地址栏带 ?gallery：在场景上方摆出所有车型和小船（检查外形用，不进入正式构建） */
+const VehicleGallery = import.meta.env.DEV && typeof location !== 'undefined' && new URLSearchParams(location.search).has('gallery') ? lazy(() => import('./debug/VehicleGallery')) : null;
 
 /** 昼夜光照：太阳方向与颜色、环境光、天空颜色随仿真时钟变化；高画质时太阳投射阴影 */
 function DayNight() {
@@ -60,7 +72,7 @@ function DayNight() {
   // 「多变」天气：按季节和种子生成一天的计划，逐帧取当前时刻的状态
   const plan = useMemo(() => (weather === 'dynamic' ? weatherPlan(siteSeed, season) : undefined), [weather, siteSeed, season]);
   const state = useMemo(() => fixedWeather(weather === 'dynamic' ? 'clear' : weather), [weather]);
-  useFrame(() => {
+  useFrame((root) => {
     updateEnv(clock.time, env, season, plan ? weatherAt(plan, clock.time, state) : state);
     const s = sun.current;
     const a = amb.current;
@@ -77,13 +89,34 @@ function DayNight() {
     h.groundColor.copy(env.hemiGround);
     h.intensity = env.hemiIntensity;
     scene.background = env.background;
+    // 共享的风格参数：天色、太阳、轮廓光、风、雨雪
+    const u = styleUniforms;
+    u.swTime.value = root.clock.elapsedTime;
+    u.swSkyTop.value.copy(env.skyTop);
+    u.swHorizon.value.copy(env.background);
+    u.swSunDir.value.copy(env.sunDir);
+    u.swSunColor.value.copy(env.sunColor);
+    u.swNight.value = env.night;
+    u.swRain.value = env.rain;
+    u.swSnow.value = env.snowCover;
+    u.swWind.value = 0.8 + 1.2 * Math.min(1, env.rain + env.snow * 0.6);
+    u.swRimColor.value.copy(env.rim);
+    updateLights(env.night);
+    u.swRimStrength.value = 0.3 * (1 - 0.4 * env.night) * (1 - 0.5 * Math.min(1, env.cloud + env.rain));
+    const cam = getThree().camera;
+    const ortho = (cam as THREE.OrthographicCamera).isOrthographicCamera === true;
+    // 正交相机离场景很远（约 300 米），雾的距离要加上这段，否则整个画面都是雾
+    const base = ortho ? cam.position.distanceTo(new THREE.Vector3(cameraState.target.x, 0, cameraState.target.z)) : 0;
     if (env.fogFar > 0) {
-      // 正交相机离场景很远（约 300 米），雾的距离要加上这段，否则整个画面都是雾
-      const cam = getThree().camera;
-      const base = (cam as THREE.OrthographicCamera).isOrthographicCamera ? cam.position.distanceTo(new THREE.Vector3(cameraState.target.x, 0, cameraState.target.z)) : 0;
       fog.color.copy(env.background);
       fog.near = base + env.fogNear;
       fog.far = base + env.fogFar;
+      scene.fog = fog;
+    } else if (!ortho) {
+      // 透视视角：远处一点淡淡的空气透视，远景融进地平线
+      fog.color.copy(env.background);
+      fog.near = 240;
+      fog.far = 1700;
       scene.fog = fog;
     } else scene.fog = null;
   });
@@ -234,8 +267,21 @@ export function Scene() {
   const dpr: [number, number] = quality === 'high' ? [1, 2] : quality === 'medium' ? [1, 1.5] : [1, 1];
   return (
     <SceneBoundary>
-    <Canvas key={quality} dpr={dpr} shadows={quality === 'high'} gl={{ antialias: quality !== 'low' }} onPointerMissed={() => useApp.getState().mode === 'sim' && useApp.getState().select(undefined)}>
+    <Canvas
+      key={quality}
+      dpr={dpr}
+      shadows={quality === 'high'}
+      // 中、高画质由后期处理抗锯齿（离屏缓冲没有多重采样），画布本身不需要
+      gl={{ antialias: false }}
+      onCreated={({ gl }) => {
+        gl.toneMapping = THREE.NeutralToneMapping;
+        gl.toneMappingExposure = 1.0;
+      }}
+      onPointerMissed={() => useApp.getState().mode === 'sim' && useApp.getState().select(undefined)}
+    >
       <DayNight />
+      <SkyDome clouds={quality !== 'low'} />
+      {quality !== 'low' && <PostFX quality={quality} />}
       <DebugBridge />
       <ContextGround />
       <ClockDriver />
@@ -266,10 +312,16 @@ export function Scene() {
       <StoreDetails />
       <CinematicDirector />
       <LiveOverlay />
+      <TwinSensors />
       <SelectionMarker />
       <EditPlane />
       <EditPreview />
       <Handles />
+      {VehicleGallery && (
+        <Suspense fallback={null}>
+          <VehicleGallery />
+        </Suspense>
+      )}
     </Canvas>
     </SceneBoundary>
   );

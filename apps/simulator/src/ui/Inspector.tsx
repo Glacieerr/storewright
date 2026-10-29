@@ -67,6 +67,7 @@ function AssociateView({ id }: { id: string }) {
         <span className="dot" style={{ background: ROLE_COLOR[a.role] }} />
         {t('{0}员', ROLE_LABEL[a.role])} · {a.id}
       </h2>
+      {a.student && <p className="hint">{t('学生兼职工：不能按全职的时长工作，只在自己的班次里在岗（上学日放学后最多 4 小时，周末和暑假最多 6 小时）。')}</p>}
       <dl className="facts">
         <dt>{t('当前')}</dt>
         <dd>{!onShift ? t('不在岗') : seg ? translate(seg.activity) : t('待命')}</dd>
@@ -87,15 +88,15 @@ function AssociateView({ id }: { id: string }) {
         <dt>{t('全天利用率')}</dt>
         <dd>{shiftSec ? pct(busySec / shiftSec) : '—'}</dd>
       </dl>
-      <h3>{t('改派（从当前小时起）')}</h3>
+      {!a.student && <h3>{t('改派（从当前小时起）')}</h3>}
       <div className="chips">
-        {ROLES.filter((r) => r !== a.role).map((r: Role) => (
+        {(a.student ? [] : ROLES.filter((r) => r !== a.role)).map((r: Role) => (
           <button key={r} className="chip" onClick={() => useApp.getState().reassign(a.role, r)}>
             → {ROLE_LABEL[r]}
           </button>
         ))}
       </div>
-      <p className="hint">{t('改派会把本岗位从当前小时起的排班减 1、目标岗位加 1，然后重新仿真；管理员的调整优先于系统建议。')}</p>
+      {!a.student && <p className="hint">{t('改派会把本岗位从当前小时起的排班减 1、目标岗位加 1，然后重新仿真；管理员的调整优先于系统建议。')}</p>}
     </>
   );
 }

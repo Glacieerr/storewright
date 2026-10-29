@@ -1,9 +1,12 @@
-import { batchByArea, checkBin, needsReplenishment, replenishPriority, suggestedUnits, COUNT_INTERVAL_DAYS, type AbcClass, type BinCheck } from '@storewright/algorithms/replenish';
+import { batchByArea, checkBin, needsReplenishment, replenishPriority, riskPriority, stockoutRisk, suggestedUnits, COUNT_INTERVAL_DAYS, DEFAULT_CART, DEFAULT_REPLENISH_RULES, type AbcClass, type BinCheck } from '@storewright/algorithms/replenish';
 import { caseId as makeCaseId, gtin14 } from '@storewright/domain';
 import type { CommandEnvelope, OpsCommand, RejectCode, Rejection } from './commands';
 import { ev, type PendingEvent } from './events';
 import { locationIndex, planogramIndex } from './apply';
-import type { BinInfo, CountReason, Discrepancy, LiveCase, OpsState, PlanogramEntry, ReplReason, ShelfState, StoreStatic } from './types';
+import { requireScan } from './settings';
+import { dateOf } from './roster';
+import { LOT_TASKS } from './types';
+import type { BinInfo, CountReason, Discrepancy, LiveCase, OpsState, PlanogramEntry, ReplReason, ReplWhy, ShelfState, StoreStatic } from './types';
 
 /**
  * 后仓库存、Exception、盘点、货架存量与补货的命令处理（决策 I-01～I-05、X-01～X-04、R-01～R-05）。
@@ -28,8 +31,11 @@ type InventoryCommand = Extract<
       | 'ClaimException'
       | 'ExceptionFound'
       | 'ExceptionMissing'
+      | 'ReleaseException'
       | 'DeliverException'
+      | 'ReturnExceptionItems'
       | 'CreateAsn'
+      | 'UpdateAsnEta'
       | 'ArriveTruck'
       | 'ReceiveCases'
       | 'CloseReceipt'
@@ -37,6 +43,7 @@ type InventoryCommand = Extract<
       | 'ChangeCaseStatus'
       | 'CreateCount'
       | 'ClaimCount'
+      | 'ReleaseCount'
       | 'CompleteCount'
       | 'RecordSales'
       | 'RecordSensor'
@@ -45,7 +52,8 @@ type InventoryCommand = Extract<
       | 'ReleaseReplenishment'
       | 'CompleteReplenishment'
       | 'CancelReplenishment'
-      | 'ConfirmShelf';
+      | 'ConfirmShelf'
+      | 'SkipWalkCheck';
   }
 >;
 
@@ -53,8 +61,11 @@ export const INVENTORY_COMMANDS = new Set<OpsCommand['type']>([
   'ClaimException',
   'ExceptionFound',
   'ExceptionMissing',
+  'ReleaseException',
   'DeliverException',
+  'ReturnExceptionItems',
   'CreateAsn',
+  'UpdateAsnEta',
   'ArriveTruck',
   'ReceiveCases',
   'CloseReceipt',
@@ -62,6 +73,7 @@ export const INVENTORY_COMMANDS = new Set<OpsCommand['type']>([
   'ChangeCaseStatus',
   'CreateCount',
   'ClaimCount',
+  'ReleaseCount',
   'CompleteCount',
   'RecordSales',
   'RecordSensor',
@@ -71,6 +83,7 @@ export const INVENTORY_COMMANDS = new Set<OpsCommand['type']>([
   'CompleteReplenishment',
   'CancelReplenishment',
   'ConfirmShelf',
+  'SkipWalkCheck',
 ]);
 
 export function isInventoryCommand(cmd: OpsCommand): cmd is InventoryCommand {
@@ -91,6 +104,17 @@ export function binIndex(st: StoreStatic): Map<string, BinInfo> {
 }
 
 /** 商品 → 主货位的陈列表条目 */
+/** 批号是否在召回范围里：没给批号时全算；给了的按开头匹配；箱子没记批号时也算（宁可多下架） */
+export function lotHit(lots: readonly string[], lot: string | undefined): boolean {
+  if (!lots.length || !lot) return true;
+  return lots.some((x) => lot.toUpperCase().startsWith(x.toUpperCase()));
+}
+
+/** 这一箱是否在进行中的召回里 */
+export function caseRecalled(s: OpsState, c: { itemId: string; lot?: string | undefined }): boolean {
+  return Object.values(s.recalls ?? {}).some((r) => r.status === 'OPEN' && r.itemIds.includes(c.itemId) && lotHit(r.lots, c.lot));
+}
+
 export function planogramByItem(st: StoreStatic): Map<string, PlanogramEntry> {
   return planogramIndex(st);
 }
@@ -101,6 +125,14 @@ export function shelfNow(s: OpsState, p: PlanogramEntry): ShelfState {
 }
 
 /** 后仓里某商品可售且有剩余的箱子，按收货时间先进先出 */
+/**
+ * 能用的箱子（决策记录 0026）：可售、在库位里、库位没有正在进行的盘点。
+ * 一次「后仓找不到」只盘找过的那个库位，别的库位的箱子照样能补货、补取。
+ */
+export function usableCases(s: OpsState, itemId: string): LiveCase[] {
+  return sellableCases(s, itemId).filter((c) => !c.binCode || !openCountFor(s, c.binCode));
+}
+
 export function sellableCases(s: OpsState, itemId: string): LiveCase[] {
   return (s.itemCases[itemId] ?? [])
     .map((id) => s.cases[id])
@@ -128,13 +160,15 @@ export function openTaskAt(s: OpsState, itemId: string): boolean {
   return false;
 }
 
-/** 生成补货任务的事件（检查后仓库存、重复任务） */
-export function replTaskEvent(s: OpsState, st: StoreStatic, p: PlanogramEntry, reason: ReplReason, seqOffset: number, est?: number, demand = 0): PendingEvent | undefined {
+/** 生成补货任务的事件（检查后仓库存、重复任务）；extra 是按断货概率排的优先级和依据（决策记录 0021 · C2） */
+export function replTaskEvent(s: OpsState, st: StoreStatic, p: PlanogramEntry, reason: ReplReason, seqOffset: number, est?: number, demand = 0, extra?: { priority: number; risk: number; why: ReplWhy }): PendingEvent | undefined {
   if (openTaskAt(s, p.itemId)) return undefined;
-  if (s.suspect[p.itemId] !== undefined || !sellableCases(s, p.itemId).length) return undefined;
+  if (s.suspect[p.itemId] !== undefined || !usableCases(s, p.itemId).length) return undefined;
   const sh = shelfNow(s, p);
   const e = est ?? sh.est;
-  const priority = replenishPriority({ est: e, capacity: p.capacity, velocityPerHour: sh.velocity, onlineDemand: demand, unitPrice: p.unitPrice });
+  // 不是排程批量生成的任务（货架数出来是 0、拣货找不到、传感器……）也附上断货概率和依据
+  const x = extra ?? riskFor(s, st, p, s.at, e);
+  const priority = Math.min(x.priority, replenishPriority({ est: e, capacity: p.capacity, velocityPerHour: sh.velocity, onlineDemand: demand, unitPrice: p.unitPrice }));
   return ev('ReplenishmentTaskCreated', {
     taskId: `RP${String(s.counters.repl + 1 + seqOffset).padStart(4, '0')}`,
     locationId: p.locationId,
@@ -143,7 +177,74 @@ export function replTaskEvent(s: OpsState, st: StoreStatic, p: PlanogramEntry, r
     reason,
     suggestedUnits: Math.max(1, suggestedUnits({ est: e, capacity: p.capacity })),
     priority,
+    risk: x.risk,
+    why: x.why,
   });
+}
+
+/** 一件商品接下来几小时断货的概率、按概率的优先级和依据（决策记录 0021 · C2） */
+export function riskFor(s: OpsState, st: StoreStatic, p: PlanogramEntry, now: number, est?: number, need = onlineNeed(s, st, now)): { priority: number; risk: number; why: ReplWhy } {
+  const sh = shelfNow(s, p);
+  const e = est ?? sh.est;
+  const o = need.get(p.itemId) ?? { ordered: 0, orders: 0, forecast: 0 };
+  const rec = Object.values(s.recs).find((r) => r.status === 'OPEN' && r.module === 'AVAILABILITY' && r.target === p.itemId && r.prediction?.unit === 'PROBABILITY');
+  const pFind = rec?.prediction?.value;
+  const risk = stockoutRisk({ est: e, ...(pFind !== undefined ? { pFind } : {}), velocityPerHour: sh.velocity, onlineOrderedUnits: o.ordered, onlineForecastUnits: o.forecast, horizonH: RISK_HORIZON_H });
+  const why: ReplWhy = { online: Math.round((o.ordered + o.forecast) * 10) / 10, ordered: o.ordered, orders: o.orders, est: Math.round(e * 10) / 10, instore: Math.round(sh.velocity * RISK_HORIZON_H * 10) / 10, horizonH: RISK_HORIZON_H, ...(pFind !== undefined ? { pFind } : {}) };
+  return { priority: riskPriority(risk, RISK_HORIZON_H, p.unitPrice), risk, why };
+}
+
+/** 补货优先级看多远（小时） */
+export const RISK_HORIZON_H = 2;
+
+/**
+ * 接下来几小时的线上需求（决策记录 0021 · C2）：已下单、取货时段在这段时间（加上锁单提前量）里的未拣件数，
+ * 加上订单量展望里还会来的订单按这件商品的销售占比折算的件数。
+ */
+export function onlineNeed(s: OpsState, st: StoreStatic, now: number, horizonH = RISK_HORIZON_H, lockLeadMin = 60): Map<string, { ordered: number; orders: number; forecast: number }> {
+  const end = now + horizonH * 3_600_000;
+  const out = new Map<string, { ordered: number; orders: number; forecast: number }>();
+  const get = (id: string) => {
+    let v = out.get(id);
+    if (!v) out.set(id, (v = { ordered: 0, orders: 0, forecast: 0 }));
+    return v;
+  };
+  const existing = new Map<number, number>();
+  for (const o of Object.values(s.orders)) {
+    if (o.status === 'CANCELLED') continue;
+    const h = Math.floor(o.slotStart / 3_600_000);
+    existing.set(h, (existing.get(h) ?? 0) + 1);
+    if (o.status !== 'CREATED' && o.status !== 'LOCKED' && o.status !== 'PICKING') continue;
+    if (o.slotStart - lockLeadMin * 60_000 > end) continue;
+    const seen = new Set<string>();
+    for (const l of o.lines) {
+      const r = o.lineResults[l.lineId];
+      const left = l.qty - (r ? r.picked + r.short + r.substituted : 0);
+      if (left <= 0) continue;
+      const v = get(l.itemId);
+      v.ordered += left;
+      if (!seen.has(l.itemId)) {
+        v.orders += 1;
+        seen.add(l.itemId);
+      }
+    }
+  }
+  const ol = s.outlook;
+  if (ol?.hours.length) {
+    // 还会来的订单：展望里的预计单数 − 已经下单的单数（同一个取货小时）
+    let more = 0;
+    for (const h of ol.hours) {
+      const from = Math.max(h.t, now);
+      const to = Math.min(h.t + 3_600_000, end + lockLeadMin * 60_000);
+      if (to <= from) continue;
+      const left = Math.max(0, h.mean - (existing.get(Math.floor(h.t / 3_600_000)) ?? 0));
+      more += left * ((to - from) / 3_600_000);
+    }
+    const units = more * (ol.unitsPerOrder ?? 5);
+    const total = st.planogram.reduce((a, p) => a + p.baseVelocity, 0);
+    if (units > 0 && total > 0) for (const p of st.planogram) get(p.itemId).forecast += (units * p.baseVelocity) / total;
+  }
+  return out;
 }
 
 function countEvent(s: OpsState, binCode: string, reason: CountReason, seqOffset: number, itemId?: string): PendingEvent {
@@ -185,6 +286,13 @@ export function decideInventory(s: OpsState, env: CommandEnvelope & { cmd: Inven
       if (o.status === 'COMPLETED') return no('ORDER_COMPLETED');
       return yes([ev('ExceptionAssigned', { exceptionId: x.id })]);
     }
+    case 'ReleaseException': {
+      const x = s.exceptions[cmd.exceptionId];
+      if (!x) return no('EXCEPTION_NOT_FOUND');
+      if (x.associateId !== actor) return no('EXCEPTION_NOT_YOURS', { by: x.associateId ?? '' });
+      if (x.status !== 'ASSIGNED') return no('EXCEPTION_STATE', { status: x.status });
+      return yes([ev('ExceptionReleased', { exceptionId: x.id })]);
+    }
     case 'ExceptionFound': {
       const x = s.exceptions[cmd.exceptionId];
       if (!x) return no('EXCEPTION_NOT_FOUND');
@@ -204,20 +312,24 @@ export function decideInventory(s: OpsState, env: CommandEnvelope & { cmd: Inven
       const p = byItem.get(x.itemId);
       if (p && !openTaskAt(s, p.itemId)) {
         const rest = c.units - units;
-        const hasStock = rest > 0 || sellableCases(s, x.itemId).some((k) => k.id !== c.id);
+        const hasStock = rest > 0 || usableCases(s, x.itemId).some((k) => k.id !== c.id);
         if (hasStock && s.suspect[x.itemId] === undefined) {
           const sh = shelfNow(s, p);
+          const taskId = `RP${String(s.counters.repl + 1).padStart(4, '0')}`;
           out.push(
             ev('ReplenishmentTaskCreated', {
-              taskId: `RP${String(s.counters.repl + 1).padStart(4, '0')}`,
+              taskId,
               locationId: p.locationId,
               itemId: p.itemId,
               area: p.runId,
               reason: 'EXCEPTION',
               suggestedUnits: Math.max(1, suggestedUnits({ est: sh.est, capacity: p.capacity })),
               priority: replenishPriority({ est: sh.est, capacity: p.capacity, velocityPerHour: sh.velocity, onlineDemand: 0, unitPrice: p.unitPrice }),
+              ...(rest > 0 ? { fromCaseId: c.id } : {}),
             }),
           );
+          // 箱里剩下的顺手上架（决策记录 0026）：任务直接交给补取的人
+          if (cmd.alsoRestock && rest > 0) out.push(ev('ReplenishmentClaimed', { taskIds: [taskId] }));
         }
       }
       return yes(out);
@@ -227,10 +339,12 @@ export function decideInventory(s: OpsState, env: CommandEnvelope & { cmd: Inven
       if (!x) return no('EXCEPTION_NOT_FOUND');
       if (x.associateId !== actor) return no('EXCEPTION_NOT_YOURS', { by: x.associateId ?? '' });
       if (x.status !== 'ASSIGNED') return no('EXCEPTION_STATE', { status: x.status });
-      // 幽灵库存：记录标为可疑，生成盘点任务（决策 X-02）
-      const out: PendingEvent[] = [ev('ExceptionNotFound', { exceptionId: x.id })];
+      // 幽灵库存：生成盘点任务（决策 X-02）。说了找过哪个库位时只盘这个库位，别的库位的箱子照样能用（决策记录 0026）；
+      // 没说时整个商品标为可疑，盘所有库位
+      const bin = cmd.binCode?.trim().toUpperCase();
+      const out: PendingEvent[] = [ev('ExceptionNotFound', { exceptionId: x.id, ...(bin ? { binCode: bin } : {}) })];
       let k = 0;
-      for (const bin of binsOfItem(s, x.itemId)) if (!openCountFor(s, bin)) out.push(countEvent(s, bin, 'EXCEPTION_NOT_FOUND', k++, x.itemId));
+      for (const b of bin ? [bin] : binsOfItem(s, x.itemId)) if (!openCountFor(s, b)) out.push(countEvent(s, b, 'EXCEPTION_NOT_FOUND', k++, x.itemId));
       return yes(out);
     }
     case 'DeliverException': {
@@ -248,11 +362,30 @@ export function decideInventory(s: OpsState, env: CommandEnvelope & { cmd: Inven
       if (slot !== tote.slotCode) return no('LOCATION_MISMATCH', { expected: tote.slotCode });
       return yes([ev('ExceptionDeliveredToStaging', { exceptionId: x.id, toteId: tote.id, slotCode: slot })]);
     }
+    // 订单已交付或已取消（流程梳理发现，决策记录 0025）：取出的商品送不到暂存了，放回货架
+    case 'ReturnExceptionItems': {
+      const x = s.exceptions[cmd.exceptionId];
+      if (!x) return no('EXCEPTION_NOT_FOUND');
+      if (x.associateId !== actor) return no('EXCEPTION_NOT_YOURS', { by: x.associateId ?? '' });
+      if (x.status !== 'FOUND') return no('EXCEPTION_STATE', { status: x.status });
+      const o = s.orders[x.orderId];
+      if (o && o.status !== 'CANCELLED' && o.status !== 'COMPLETED') return no('EXCEPTION_STATE', { status: x.status });
+      return yes([ev('ExceptionItemsReturned', { exceptionId: x.id, itemId: x.itemId, units: x.units ?? x.qty })]);
+    }
     // —— 收货 ——
     case 'CreateAsn': {
       if (!cmd.lines.length) return no('INVALID_ORDER');
       for (const l of cmd.lines) if (!ctx.itemExists(l.itemId) || !Number.isInteger(l.cases) || l.cases <= 0) return no('ITEM_NOT_FOUND', { itemId: l.itemId });
-      return yes([ev('AsnReceived', { receiptId: `R${String(s.counters.receipts + 1).padStart(4, '0')}`, supplier: cmd.supplier, expected: cmd.lines })]);
+      const expectedAt = cmd.expectedAt !== undefined && Number.isFinite(cmd.expectedAt) ? Math.round(cmd.expectedAt) : undefined;
+      return yes([ev('AsnReceived', { receiptId: `R${String(s.counters.receipts + 1).padStart(4, '0')}`, supplier: cmd.supplier, expected: cmd.lines, ...(expectedAt !== undefined ? { expectedAt } : {}) })]);
+    }
+    case 'UpdateAsnEta': {
+      const r = s.receipts[cmd.receiptId];
+      if (!r) return no('RECEIPT_NOT_FOUND');
+      if (r.arrivedAt !== undefined || r.closedAt !== undefined) return no('RECEIPT_CLOSED');
+      if (!Number.isFinite(cmd.expectedAt)) return no('ETA_INVALID');
+      if (r.expectedAt === Math.round(cmd.expectedAt)) return yes([]);
+      return yes([ev('AsnEtaUpdated', { receiptId: r.id, expectedAt: Math.round(cmd.expectedAt), ...(r.expectedAt !== undefined ? { previous: r.expectedAt } : {}) })]);
     }
     case 'ArriveTruck': {
       const r = s.receipts[cmd.receiptId];
@@ -264,7 +397,8 @@ export function decideInventory(s: OpsState, env: CommandEnvelope & { cmd: Inven
       const r = s.receipts[cmd.receiptId];
       if (!r) return no('RECEIPT_NOT_FOUND');
       if (r.closedAt) return no('RECEIPT_CLOSED');
-      if (!r.arrivedAt) return no('RECEIPT_NOT_ARRIVED');
+      // 第一次扫箱就算卡车到了（决策记录 0026：不用先点「卡车已到」）
+      const arrive: PendingEvent[] = r.arrivedAt ? [] : [ev('TruckArrived', { receiptId: r.id })];
       const itemId = ctx.itemByGtin(cmd.gtin);
       if (!itemId) return no('ITEM_NOT_FOUND');
       if (!Number.isInteger(cmd.cases) || cmd.cases <= 0 || cmd.cases > 200) return no('QTY_INVALID', { remaining: 200 });
@@ -273,7 +407,10 @@ export function decideInventory(s: OpsState, env: CommandEnvelope & { cmd: Inven
       const packQty = asn?.packQty ?? p?.packQty ?? 12;
       // 扫描箱上原有条码后自动生成内部箱号，按托盘批量打印内部标签（决策 I-02）
       const caseIds = Array.from({ length: cmd.cases }, (_, i) => makeCaseId(at, s.counters.cases + i + 1));
-      return yes([ev('CasesReceived', { receiptId: r.id, itemId, gtin: gtin14(cmd.gtin), name: asn?.name ?? p?.name ?? itemId, packQty, caseIds, damaged: !!cmd.damaged })]);
+      // 批号和保质期（决策记录 0024 · C4）：日期写法不对时不收
+      const lot = typeof cmd.lot === 'string' && cmd.lot.trim() ? cmd.lot.trim().slice(0, 20) : undefined;
+      if (cmd.expiry !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(cmd.expiry)) return no('DATE_INVALID');
+      return yes([...arrive, ev('CasesReceived', { receiptId: r.id, itemId, gtin: gtin14(cmd.gtin), name: asn?.name ?? p?.name ?? itemId, packQty, caseIds, damaged: !!cmd.damaged, ...(lot ? { lot } : {}), ...(cmd.expiry ? { expiry: cmd.expiry } : {}) })]);
     }
     case 'CloseReceipt': {
       const r = s.receipts[cmd.receiptId];
@@ -310,6 +447,8 @@ export function decideInventory(s: OpsState, env: CommandEnvelope & { cmd: Inven
       if (!c) return no('CASE_NOT_FOUND');
       if (c.state === 'EMPTY' || c.state === 'LOST') return no('CASE_EMPTY');
       if (c.status === cmd.status && !cmd.binCode) return yes([]);
+      // 召回中的商品不能放回可售（流程梳理发现，决策记录 0025）
+      if (cmd.status === 'SELLABLE' && caseRecalled(s, c)) return no('ITEM_RECALLED');
       const p: { caseId: string; status: typeof cmd.status; binCode?: string } = { caseId: c.id, status: cmd.status };
       if (cmd.binCode) {
         const code = cmd.binCode.trim().toUpperCase();
@@ -337,11 +476,20 @@ export function decideInventory(s: OpsState, env: CommandEnvelope & { cmd: Inven
       if (c.status === 'CLAIMED') return c.associateId === actor ? yes([]) : no('COUNT_TAKEN', { by: c.associateId ?? '' });
       return yes([ev('CycleCountClaimed', { countId: c.id })]);
     }
+    case 'ReleaseCount': {
+      const c = s.counts[cmd.countId];
+      if (!c) return no('COUNT_NOT_FOUND');
+      if (c.status !== 'CLAIMED' || c.associateId !== actor) return no('COUNT_TAKEN', { by: c.associateId ?? '' });
+      return yes([ev('CycleCountReleased', { countId: c.id })]);
+    }
     case 'CompleteCount': {
       const c = s.counts[cmd.countId];
       if (!c) return no('COUNT_NOT_FOUND');
       if (c.status === 'DONE') return no('COUNT_DONE');
       if (c.associateId !== actor) return no('COUNT_TAKEN', { by: c.associateId ?? '' });
+      // 开始数之前扫库位标签（决策记录 0026）
+      if (cmd.binCode !== undefined && cmd.binCode.trim().toUpperCase() !== c.binCode) return no('LOCATION_MISMATCH', { expected: c.binCode });
+      if (cmd.binCode === undefined && requireScan(s)) return no('SCAN_REQUIRED');
       const inBin = (s.bins[c.binCode] ?? []).map((id) => s.cases[id]).filter((x): x is LiveCase => !!x && x.state === 'STORED');
       const results: Array<{ itemId: string; expected: number; counted: number }> = [];
       const lostCaseIds: string[] = [];
@@ -404,15 +552,36 @@ export function decideInventory(s: OpsState, env: CommandEnvelope & { cmd: Inven
         const c = s.checks[cmd.checkId];
         if (!c || c.itemId !== p.itemId) return no('CHECK_NOT_FOUND');
         if (c.status === 'DONE') return no('CHECK_DONE');
+        // 核对时扫货位（决策记录 0026）：扫了就核对；门店要求扫码时必须扫
+        if (cmd.locationId !== undefined && cmd.locationId.trim().toUpperCase() !== c.locationId) return no('LOCATION_MISMATCH', { expected: c.locationId });
+        if (cmd.locationId === undefined && requireScan(s)) return no('SCAN_REQUIRED');
         checkId = c.id;
+        // 货架上的批次任务（决策记录 0026）：贴折扣签、下架过期、拿下来捐赠、退货放回 —— 数的是做了几件，不是货架上有几件
+        if (LOT_TASKS.includes(c.reason)) {
+          const kind = c.reason as 'MARKDOWN' | 'PULL' | 'DONATE' | 'RETURN';
+          const out: PendingEvent[] = [ev('LotTaskDone', { checkId: c.id, itemId: p.itemId, kind, ...(c.lot ? { lot: c.lot } : {}), units: cmd.units })];
+          if (kind === 'DONATE' && c.lot && cmd.units > 0) out.push(ev('LotDonated', { itemId: p.itemId, lot: c.lot, units: cmd.units, ...(c.recId ? { recId: c.recId } : {}) }));
+          return yes(out);
+        }
       } else {
-        // 没指定任务时，顺带完成这个商品未完成的核对任务
-        checkId = Object.values(s.checks).find((c) => c.itemId === p.itemId && c.status === 'OPEN')?.id;
+        // 没指定任务时，顺带完成这个商品未完成的核对任务（不含批次任务）
+        checkId = Object.values(s.checks).find((c) => c.itemId === p.itemId && c.status === 'OPEN' && !LOT_TASKS.includes(c.reason))?.id;
       }
       const prev = Math.round(shelfNow(s, p).est);
-      const out: PendingEvent[] = [ev('ShelfCounted', { itemId: p.itemId, locationId: p.locationId, units: cmd.units, previousEst: prev, ...(checkId ? { checkId } : {}) })];
+      // 顺路核对（决策记录 0022 · C3）：只认这个批次里还没做的核对
+      const walkId = cmd.walkId && s.walks[cmd.walkId]?.checks?.some((c) => c.itemId === p.itemId && c.status === 'OPEN') ? cmd.walkId : undefined;
+      // 附近找一找（决策记录 0022 · C1）：都没有时数量只能是 0
+      if (cmd.found !== undefined && (!['HOME', 'NEARBY', 'NONE'].includes(cmd.found) || (cmd.found === 'NONE' && cmd.units > 0))) return no('QTY_INVALID', { remaining: 0 });
+      const out: PendingEvent[] = [ev('ShelfCounted', { itemId: p.itemId, locationId: p.locationId, units: cmd.units, previousEst: prev, ...(checkId ? { checkId } : {}), ...(walkId ? { walkId } : {}), ...(cmd.found ? { found: cmd.found } : {}) })];
       out.push(...thresholdTasks(s, st, [[p.itemId, cmd.units]], 'LOW', 0));
       return yes(out);
+    }
+    case 'SkipWalkCheck': {
+      const w = s.walks[cmd.walkId];
+      if (!w) return no('WALK_NOT_FOUND');
+      if (w.associateId !== env.actor) return no('WALK_NOT_YOURS');
+      if (!w.checks?.some((c) => c.itemId === cmd.itemId && c.status === 'OPEN')) return no('CHECK_NOT_FOUND');
+      return yes([ev('WalkCheckSkipped', { walkId: w.id, itemId: cmd.itemId })]);
     }
     case 'RequestReplenishment': {
       const p = byItem.get(cmd.itemId);
@@ -459,10 +628,12 @@ export function decideInventory(s: OpsState, env: CommandEnvelope & { cmd: Inven
       if (!t) return no('TASK_NOT_FOUND');
       if (t.status === 'DONE' || t.status === 'CANCELLED') return no('TASK_DONE');
       if (t.status === 'CLAIMED' && t.associateId !== actor) return no('TASK_NOT_YOURS', { by: t.associateId ?? '' });
-      // 后仓按记录找不到：记录标为可疑，生成盘点任务
-      const out: PendingEvent[] = [ev('ReplenishmentCancelled', { taskId: t.id, reason: 'NOT_FOUND' })];
+      // 后仓按记录找不到：生成盘点任务。说了找过哪个库位时只盘这个库位（别的库位的箱子照样能补货，决策记录 0026）；
+      // 没说时整个商品标为可疑，盘所有库位
+      const bin = cmd.binCode?.trim().toUpperCase();
+      const out: PendingEvent[] = [ev('ReplenishmentCancelled', { taskId: t.id, reason: 'NOT_FOUND', ...(bin ? { binCode: bin } : {}) })];
       let k = 0;
-      for (const bin of binsOfItem(s, t.itemId)) if (!openCountFor(s, bin)) out.push(countEvent(s, bin, 'REPLENISH_NOT_FOUND', k++, t.itemId));
+      for (const b of bin ? [bin] : binsOfItem(s, t.itemId)) if (!openCountFor(s, b)) out.push(countEvent(s, b, 'REPLENISH_NOT_FOUND', k++, t.itemId));
       return yes(out);
     }
   }
@@ -490,19 +661,24 @@ function thresholdTasks(s: OpsState, st: StoreStatic, entries: Array<[string, nu
  */
 export function inventoryTick(s: OpsState, st: StoreStatic, at: number, limit = 20): PendingEvent[] {
   const demand = onlineDemand(s);
-  const candidates: Array<{ p: PlanogramEntry; priority: number }> = [];
+  // 按断货概率排（决策记录 0021 · C2）：已下单的线上需求是已经知道的未来需求；
+  // 原来的低库存规则仍然触发任务，另外断货概率 ≥ 50% 的也生成任务（原因「可能断货」）
+  const need2 = onlineNeed(s, st, at);
+  const candidates: Array<{ p: PlanogramEntry; priority: number; risk: number; why: ReplWhy; rule: boolean }> = [];
   for (const p of st.planogram) {
-    if (s.suspect[p.itemId] !== undefined || !s.itemCases[p.itemId]?.length) continue;
+    if (s.suspect[p.itemId] !== undefined || !usableCases(s, p.itemId).length || openTaskAt(s, p.itemId)) continue;
     const sh = shelfNow(s, p);
     const need = { est: sh.est, capacity: p.capacity, velocityPerHour: sh.velocity, onlineDemand: demand.get(p.itemId) ?? 0 };
-    if (!needsReplenishment(need, st.replenish) || openTaskAt(s, p.itemId)) continue;
-    candidates.push({ p, priority: replenishPriority({ ...need, unitPrice: p.unitPrice }) });
+    const x = riskFor(s, st, p, at, sh.est, need2);
+    const rule = needsReplenishment(need, st.replenish);
+    if (!rule && x.risk < 0.5) continue;
+    candidates.push({ p, priority: Math.min(replenishPriority({ ...need, unitPrice: p.unitPrice }), x.priority), risk: x.risk, why: x.why, rule });
   }
-  candidates.sort((a, b) => a.priority - b.priority || a.p.locationId.localeCompare(b.p.locationId));
+  candidates.sort((a, b) => a.priority - b.priority || b.risk - a.risk || a.p.locationId.localeCompare(b.p.locationId));
   const out: PendingEvent[] = [];
   for (const c of candidates.slice(0, limit)) {
     const sh = shelfNow(s, c.p);
-    const e = replTaskEvent(s, st, c.p, sh.est <= 0 ? 'EMPTY' : 'LOW', out.length, undefined, demand.get(c.p.itemId) ?? 0);
+    const e = replTaskEvent(s, st, c.p, sh.est <= 0 ? 'EMPTY' : c.rule ? 'LOW' : 'RISK', out.length, undefined, demand.get(c.p.itemId) ?? 0, { priority: c.priority, risk: c.risk, why: c.why });
     if (e) out.push(e);
   }
   // 周期盘点：库位里价值最高的商品决定周期（A 每周、B 每月、C 每季度）
@@ -522,11 +698,43 @@ export function inventoryTick(s: OpsState, st: StoreStatic, at: number, limit = 
   }
   due.sort((a, b) => b.overdue - a.overdue || a.bin.localeCompare(b.bin));
   due.slice(0, 3).forEach((d, i) => out.push(countEvent(s, d.bin, 'SCHEDULED', i)));
+  // 过期的批次（决策记录 0026）：生成「下架」任务，每一批只生成一次（食品安全，不用等人确认）
+  const today = dateOf(at);
+  let pulls = 0;
+  for (const [itemId, lots] of Object.entries(s.shelfLots ?? {})) {
+    const p = byItemOf(st).get(itemId);
+    if (!p) continue;
+    for (const l of lots) {
+      if (!l.expiry || l.expiry >= today || l.units <= 0 || pulls >= 5) continue;
+      if (Object.values(s.checks).some((c) => c.reason === 'PULL' && c.itemId === itemId && c.lot === l.lot)) continue;
+      out.push(ev('ShelfCheckRequested', { checkId: `SC${String(s.counters.checks + 1 + pulls).padStart(4, '0')}`, itemId, locationId: p.locationId, reason: 'PULL', lot: l.lot, expected: l.units }));
+      pulls++;
+    }
+  }
   return out;
 }
 
-/** 补货队列：未领取的任务按通道合并成批（决策 R-05） */
-export function replBatches(s: OpsState) {
+const byItemOf = (st: StoreStatic) => planogramByItem(st);
+
+/**
+ * 补货队列：未领取的任务按通道合并成批（决策 R-05）。
+ * 给了门店静态数据时还按推车的装载上限分批（决策记录 0026）：一批的箱子加起来不超过推车的重量和体积。
+ */
+export function replBatches(s: OpsState, st?: StoreStatic) {
   const open = Object.values(s.repl).filter((t) => t.status === 'OPEN');
-  return batchByArea(open.map((t) => ({ ...t, area: t.area })));
+  if (!st) return batchByArea(open.map((t) => ({ ...t, area: t.area })));
+  const plan = planogramByItem(st);
+  return batchByArea(
+    open.map((t) => ({ ...t, area: t.area })),
+    st.replenish?.batchSize ?? DEFAULT_REPLENISH_RULES.batchSize,
+    { kg: st.replenish?.cartKg ?? DEFAULT_CART.kg, liters: st.replenish?.cartL ?? DEFAULT_CART.liters, weight: (t) => plan.get(t.itemId)?.caseKg ?? 0, volume: (t) => plan.get(t.itemId)?.caseL ?? 0 },
+  );
+}
+
+/** 一批任务（每个一箱）大约多重、多大，和推车的上限（补货页显示） */
+export function batchLoad(st: StoreStatic, tasks: ReadonlyArray<{ itemId: string }>): { kg: number; liters: number; cartKg: number; cartL: number } {
+  const plan = planogramByItem(st);
+  const kg = tasks.reduce((n, t) => n + (plan.get(t.itemId)?.caseKg ?? 0), 0);
+  const liters = tasks.reduce((n, t) => n + (plan.get(t.itemId)?.caseL ?? 0), 0);
+  return { kg: Math.round(kg), liters: Math.round(liters), cartKg: st.replenish?.cartKg ?? DEFAULT_CART.kg, cartL: st.replenish?.cartL ?? DEFAULT_CART.liters };
 }

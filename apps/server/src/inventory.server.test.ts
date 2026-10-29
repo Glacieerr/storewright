@@ -52,11 +52,12 @@ beforeAll(async () => {
   consoleToken = await session({ role: 'console' });
   viewer = new LiveClient({ baseUrl: base, storeId: 'demo', token: await session({ role: 'viewer' }) });
   viewer.connect();
-  await until(() => viewer.status === 'live' && !!viewer.statics);
-});
+  // 整套测试并行跑时启动数据库和演示门店较慢
+  await until(() => viewer.status === 'live' && !!viewer.statics, 15_000);
+}, 30_000);
 
 afterAll(async () => {
-  viewer.close();
+  viewer?.close();
   await close();
   await db.close();
   await new Promise<void>((r) => broker.close(() => r()));

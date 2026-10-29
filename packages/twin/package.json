@@ -1,0 +1,15 @@
+{
+  "name": "@storewright/twin",
+  "version": "0.1.0",
+  "description": "Store digital twin: sensor registry, telemetry, alert rules and impact, replay, forecast from the live state, twin health",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@storewright/domain": "0.1.0",
+    "@storewright/ops": "0.1.0"
+  }
+}

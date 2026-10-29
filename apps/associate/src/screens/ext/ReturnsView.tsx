@@ -77,7 +77,14 @@ function ReturnDetail({ r, onBack }: { r: ReturnCase; onBack: () => void }) {
   const [condition, setCondition] = useState<ReturnLine['condition']>('SEALED');
   const [qty, setQty] = useState(1);
   const o = r.orderId ? client.state.orders[r.orderId] : undefined;
-  const scan = (code: string) => void run({ type: 'ScanReturnItem', returnId: r.id, code, qty, condition }).then((ok) => ok && setQty(1));
+  const strict = !!client.state.settings?.requireScan;
+  // 扫完一件，数量和状况都回到默认（决策记录 0026：以前状况一直停在上一件选的「损坏」）
+  const scan = (code: string, tap?: boolean) =>
+    void run({ type: 'ScanReturnItem', returnId: r.id, code, qty, condition, ...(tap ? { tap: true } : {}) }).then((ok) => {
+      if (!ok) return;
+      setQty(1);
+      setCondition('SEALED');
+    });
   const done = r.lines.length > 0 && r.lines.every((l) => l.disposition);
   return (
     <div className="session">
@@ -98,7 +105,7 @@ function ReturnDetail({ r, onBack }: { r: ReturnCase; onBack: () => void }) {
             ))}
           </div>
           <div className="qty-row">
-            <span className="muted">{t('数量')}</span>
+            <span className="muted return-qty-label">{t('数量')}</span>
             <span className="stepper">
               <button onClick={() => setQty(Math.max(1, qty - 1))} aria-label={t('减少')}>
                 −
@@ -109,13 +116,13 @@ function ReturnDetail({ r, onBack }: { r: ReturnCase; onBack: () => void }) {
               </button>
             </span>
           </div>
-          <ScanBox onScan={scan} label={t('扫描退回的商品')} />
-          {o && (
+          <ScanBox onScan={(c) => scan(c)} label={t('扫描退回的商品')} />
+          {o && !strict && (
             <details className="demo-pick">
               <summary>{t('原订单商品（演示：点选代替扫描）')}</summary>
               <div className="chips">
                 {o.lines.map((l) => (
-                  <button key={l.lineId} className="chip" onClick={() => scan(l.gtin)}>
+                  <button key={l.lineId} className="chip" onClick={() => scan(l.gtin, true)}>
                     {l.name}
                   </button>
                 ))}
@@ -127,7 +134,7 @@ function ReturnDetail({ r, onBack }: { r: ReturnCase; onBack: () => void }) {
         <p className="banner info">{t('已完成 · 退款 ${0}（由外部系统处理）', (r.refundValue ?? 0).toFixed(2))}</p>
       )}
       {r.lines.map((l, i) => (
-        <ReturnLineCard key={i} r={r} line={l} index={i} />
+        <ReturnLineCard key={`${i}-${l.itemId}-${l.qty}-${l.condition}`} r={r} line={l} index={i} />
       ))}
       {r.status === 'OPEN' && (
         <button className="primary block" disabled={!done} onClick={() => void run({ type: 'CompleteReturn', returnId: r.id })}>
@@ -211,6 +218,11 @@ function ReturnLineCard({ r, line, index }: { r: ReturnCase; line: ReturnLine; i
             </button>
           ))}
         </div>
+      )}
+      {r.status === 'OPEN' && (
+        <button className="link danger" onClick={() => void run({ type: 'RemoveReturnLine', returnId: r.id, index })}>
+          {t('扫错了，删掉这一行')}
+        </button>
       )}
     </div>
   );

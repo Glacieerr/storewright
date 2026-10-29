@@ -10,14 +10,16 @@ const ComparePanel = lazy(() => import('./ComparePanel').then((m) => ({ default:
 const ReportPanel = lazy(() => import('./ReportPanel').then((m) => ({ default: m.ReportPanel })));
 const EditorPanel = lazy(() => import('./EditorPanel').then((m) => ({ default: m.EditorPanel })));
 const OpsPanel = lazy(() => import('./OpsPanel').then((m) => ({ default: m.OpsPanel })));
+const AiPanel = lazy(() => import('./AiPanel').then((m) => ({ default: m.AiPanel })));
 
 const TABS: Array<[DataTab, string]> = [
   ['live', '实时数据'],
+  ['ai', 'AI 建议'],
   ['compare', '策略对比'],
   ['report', '方案与报告'],
   ['events', '事件'],
   ['edit', '门店定制'],
-  ['ops', '门店实况'],
+  ['ops', '数字孪生'],
 ];
 
 const FILTERS: Array<[string, string, ReadonlySet<NotificationLevel> | undefined]> = [
@@ -51,6 +53,9 @@ export function DataPane() {
   const compareStatus = useApp((s) => s.compare.status);
   const multiStatus = useApp((s) => s.multiDay.status);
   const liveStatus = useApp((s) => s.live.status);
+  // AI 建议：没忽略的紧急、提醒类条数（决策记录 0020）
+  const aiOpen = useApp((s) => (s.aiAdvice.result?.advice ?? []).filter((a) => a.severity !== 'info' && !s.aiLog.some((e) => e.id === a.id)).length);
+  const aiRunning = useApp((s) => s.aiAdvice.status === 'running');
   const app = useApp.getState;
 
   return (
@@ -60,6 +65,8 @@ export function DataPane() {
           {TABS.map(([k, label]) => (
             <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'active' : ''} onClick={() => app().setTab(k)}>
               {t(label)}
+              {k === 'ai' && aiRunning && <span className="spinner" aria-label={t('分析中')} />}
+              {k === 'ai' && !aiRunning && aiOpen > 0 && <span className="tab-badge">{aiOpen}</span>}
               {k === 'compare' && compareStatus === 'running' && <span className="spinner" aria-label={t('计算中')} />}
               {k === 'report' && multiStatus === 'running' && <span className="spinner" aria-label={t('多天模拟中')} />}
               {k === 'edit' && mode === 'edit' && <span className="live-dot" aria-label={t('编辑中')} />}
@@ -74,6 +81,7 @@ export function DataPane() {
       <div className="pane-body" role="tabpanel">
         <Suspense fallback={<p className="muted pad">{t('加载中…')}</p>}>
           {tab === 'live' && <LiveData />}
+          {tab === 'ai' && <AiPanel />}
           {tab === 'compare' && <ComparePanel />}
           {tab === 'report' && <ReportPanel />}
           {tab === 'events' && <EventsTab />}

@@ -1,6 +1,6 @@
-import { expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
 import { device, Recorder } from './recorder';
-import { LIVE } from './helpers';
+import { LIVE, test } from './helpers';
 
 test('01 登录与语言', async ({ browser }) => {
   const r = new Recorder('登录与语言', 1);
@@ -12,11 +12,11 @@ test('01 登录与语言', async ({ browser }) => {
     return `名单 ${names.length} 人：${names.join('、')}`;
   }, { shot: p, device: '手机' });
   await r.step('切换到英文界面', async () => {
-    await p.getByRole('button', { name: 'EN' }).click();
+    await p.getByRole('button', { name: 'EN', exact: true }).click();
     await expect(p.getByText('Who are you?')).toBeVisible();
   }, { shot: p, device: '手机' });
   await r.step('切回中文；门店填 hardware 显示家居建材店的名单（没有熟食员工）', async () => {
-    await p.getByRole('button', { name: '中文' }).click();
+    await p.getByRole('button', { name: '中文', exact: true }).click();
     await p.getByLabel('门店').fill('hardware');
     await expect(p.getByRole('button', { name: /Jamie/ })).toBeVisible();
     // 名单按门店编号重新读取：等它换成建材店的名单

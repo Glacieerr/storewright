@@ -1,0 +1,283 @@
+/* 「你的商店」的样式（入口按钮和项目栏在页面网格里的位置在 styles.css） */
+.your-store {
+  position: fixed;
+  inset: 0;
+  /* 场景标签（drei Html）的 z-index 最高到 16777271，项目页要盖在它们上面 */
+  z-index: 16777300;
+  overflow: auto;
+  background: var(--bg);
+  color: var(--text);
+  padding: 24px max(16px, env(safe-area-inset-right, 0px)) 48px max(16px, env(safe-area-inset-left, 0px));
+  display: grid;
+  /* 单列且不超过屏幕宽度（auto 列会按最长的一行撑开，手机上横向溢出） */
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 18px;
+}
+.ys-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  justify-content: space-between;
+  align-items: flex-start;
+  max-width: 1180px;
+  width: 100%;
+  margin: 0 auto;
+}
+.ys-head h2 {
+  margin: 0 0 4px;
+  font-size: 26px;
+}
+.ys-head p {
+  max-width: 68ch;
+  margin: 0;
+}
+.ys-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.ys-actions,
+.ys-wizard,
+.ys-list {
+  max-width: 1180px;
+  width: 100%;
+  margin: 0 auto;
+}
+.ys-actions {
+  display: flex;
+  gap: 8px;
+}
+.your-store button,
+.project-bar button,
+.ys-modal button {
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+}
+.your-store button.primary,
+.project-bar button.primary,
+.ys-modal button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.your-store button.danger {
+  color: var(--alert);
+}
+.your-store button.link,
+.project-bar button.link {
+  border-color: transparent;
+  background: none;
+  text-decoration: underline;
+}
+.ys-wizard {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  display: grid;
+  gap: 12px;
+}
+.ys-wizard h3 {
+  margin: 0;
+}
+.ys-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px 18px;
+  align-items: end;
+}
+.ys-grid label {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+}
+.ys-grid input[type='number'] {
+  width: 70px;
+}
+.ys-area {
+  margin: 0;
+  font-weight: 600;
+}
+.ys-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+}
+.ys-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: grid;
+  gap: 6px;
+}
+.ys-card h3 {
+  margin: 0;
+  font-size: 17px;
+}
+.ys-card p {
+  margin: 0;
+  font-size: 13px;
+}
+.ys-empty {
+  grid-column: 1 / -1;
+  padding: 28px;
+  text-align: center;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--muted);
+}
+.ys-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 16777310;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, #000 35%, transparent);
+  padding: 16px;
+}
+.ys-modal-card {
+  background: var(--panel);
+  color: var(--text);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px 22px;
+  max-width: 520px;
+  width: 100%;
+  display: grid;
+  gap: 10px;
+}
+.ys-modal-card h3 {
+  margin: 0;
+}
+.ys-modal-card ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.ys-error {
+  color: var(--alert);
+  font-weight: 600;
+}
+.golive-list {
+  list-style: none;
+  padding: 0 !important;
+  display: grid;
+  gap: 6px;
+  max-height: 50vh;
+  overflow: auto;
+}
+.golive-list li {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 6px;
+  font-size: 13px;
+}
+.golive-list li span {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+}
+.golive-list li.ok span {
+  background: var(--accent);
+}
+.golive-list li.warn span {
+  background: var(--warn);
+}
+.golive-list li.error span {
+  background: var(--alert);
+}
+.project-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  align-items: center;
+  padding: 6px 12px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel));
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.pb-tag {
+  font-weight: 700;
+  color: var(--accent);
+}
+.pb-name {
+  font: inherit;
+  font-weight: 600;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  min-width: 160px;
+}
+.pb-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.pb-steps button {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  padding: 4px 10px !important;
+}
+.pb-steps i {
+  font-style: normal;
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--track);
+  font-size: 11px;
+}
+.pb-steps .pb-check i {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.pb-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+}
+.pb-toggle {
+  display: none;
+}
+/* 手机上项目栏收成一行：门店名称 + 「搭建步骤」开关；点开后显示保存状态、步骤和操作 */
+@media (max-width: 600px) {
+  .project-bar {
+    gap: 6px 8px;
+    padding: 6px 12px;
+  }
+  .pb-tag,
+  .project-bar:not(.open) .pb-more {
+    display: none;
+  }
+  .pb-name {
+    flex: 1;
+    min-width: 0;
+  }
+  .project-bar .pb-toggle {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+  }
+  .project-bar.open .pb-saved {
+    flex-basis: 100%;
+  }
+  .project-bar.open .pb-actions {
+    margin-left: 0;
+    flex-wrap: wrap;
+  }
+}

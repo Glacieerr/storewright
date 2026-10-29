@@ -1,6 +1,6 @@
-import { expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
 import { Recorder } from './recorder';
-import { SITE } from './helpers';
+import { SITE, test } from './helpers';
 
 /** 浏览器内演示（纯静态网站，没有后端）：展示页、引导、数据保存、重置、手机布局、英文、标签页面、建材店 */
 test('09 浏览器内演示与展示页', async ({ browser }) => {
@@ -27,15 +27,15 @@ test('09 浏览器内演示与展示页', async ({ browser }) => {
     return (await page.locator('.sc-hint').innerText()).trim();
   }, { shot: page, device: '电脑' });
 
-  await r.step('第一部手机（拣货员）同步出现批次；左栏切到「门店实况」，模拟器里出现订单', async () => {
+  await r.step('第一部手机（拣货员）同步出现批次；左栏切到「数字孪生」，三维孪生里出现订单', async () => {
     await expect(page.frameLocator('.phone iframe').first().getByText(/可以领取的批次/)).toBeVisible();
-    await page.locator('.sc-switch').getByRole('tab', { name: '门店实况' }).click();
+    await page.locator('.sc-switch').getByRole('tab', { name: '数字孪生' }).click();
     await expect(page.frameLocator('iframe.sc-sim').locator('.live-chip', { hasText: '已连接' })).toBeVisible({ timeout: 90_000 });
     await expect(page.frameLocator('iframe.sc-sim').locator('.live-chip', { hasText: /今日订单 1/ })).toBeVisible();
     await page.waitForTimeout(2000);
   }, { shot: page, device: '电脑' });
 
-  await r.step('左栏切到「全天仿真」：模拟器自己按策略跑完一整天（虚拟顾客、员工、车辆），和门店实况同时运行', async () => {
+  await r.step('左栏切到「全天仿真」：模拟器自己按策略跑完一整天（虚拟顾客、员工、车辆），和运营孪生同时运行', async () => {
     await page.locator('.sc-switch').getByRole('tab', { name: '全天仿真' }).click();
     const auto = page.frameLocator('iframe.sc-auto');
     await expect(auto.getByRole('button', { name: '暂停' })).toBeVisible({ timeout: 90_000 });
@@ -46,7 +46,7 @@ test('09 浏览器内演示与展示页', async ({ browser }) => {
     return `仿真时间 ${t1} → ${t2}（自动播放）`;
   }, { shot: page, device: '电脑' });
 
-  await r.step('左栏「上下并排」：门店实况在上，控制台在下', async () => {
+  await r.step('左栏「上下并排」：数字孪生在上，控制台在下', async () => {
     await page.locator('.sc-switch').getByRole('tab', { name: '上下并排' }).click();
     await expect(page.frameLocator('iframe.sc-sim').locator('.live-chip', { hasText: '已连接' })).toBeVisible();
     await expect(page.frameLocator('iframe.sc-console').getByRole('heading', { name: '创建测试订单' })).toBeVisible();
@@ -72,14 +72,14 @@ test('09 浏览器内演示与展示页', async ({ browser }) => {
 
   const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'zh-CN', baseURL: SITE, isMobile: true, hasTouch: true });
   const m = await phone.newPage();
-  await r.step('手机上的展示页：引导在上方，用标签切换控制台 / 手机 1 / 手机 2 / 门店实况', async () => {
+  await r.step('手机上的展示页：引导在上方，用标签切换控制台 / 手机 1 / 手机 2 / 数字孪生', async () => {
     await m.goto('/app/showcase.html');
     await expect(m.frameLocator('iframe.sc-console').getByRole('heading', { name: '创建测试订单' })).toBeVisible({ timeout: 60_000 });
   }, { shot: m, device: '手机' });
-  for (const name of ['手机 1', '门店实况']) {
+  for (const name of ['手机 1', '数字孪生']) {
     await r.step(`手机上切换到「${name}」`, async () => {
       await m.getByRole('tab', { name }).click();
-      await m.waitForTimeout(name === '门店实况' ? 4000 : 1500);
+      await m.waitForTimeout(name === '数字孪生' ? 4000 : 1500);
     }, { shot: m, device: '手机' });
   }
 

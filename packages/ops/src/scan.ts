@@ -1,4 +1,4 @@
-import { isValidLabelId, parseDigitalLink } from '@storewright/domain';
+import { isValidLabelId, parseDigitalLink, type TempZone } from '@storewright/domain';
 import { locationIndex } from './apply';
 import type { OpsState, StoreStatic } from './types';
 
@@ -10,7 +10,11 @@ import type { OpsState, StoreStatic } from './types';
  * - 订单短号：4 位短码
  * - 后仓箱子：箱标签上的 GS1 Digital Link，或手输内部箱号 C-YYMMDD-NNNNNN
  * - 后仓库位、货架货位：库位编码、货位编码
+ * - 回收专区：每个温区一个标签 RECOVERY-AMB / CHL / FRZ / HOT（决策记录 0026：移到回收专区时扫一下）
  */
+
+/** 回收专区的标签编码（每个温区一个，和暂存格位标签一起打印） */
+export const RECOVERY_CODES: Readonly<Record<TempZone, string>> = { AMBIENT: 'RECOVERY-AMB', CHILLED: 'RECOVERY-CHL', FROZEN: 'RECOVERY-FRZ', HOT: 'RECOVERY-HOT' };
 export type ScanResult =
   | { kind: 'label'; labelId: string; toteId: string; orderId: string; voided: boolean }
   | { kind: 'unknown-label'; labelId: string }
@@ -21,6 +25,7 @@ export type ScanResult =
   | { kind: 'unknown-case'; caseId: string }
   | { kind: 'bin'; code: string }
   | { kind: 'location'; locationId: string; itemIds: string[] }
+  | { kind: 'recovery'; code: string; tempZone: TempZone }
   | { kind: 'unknown'; raw: string };
 
 export function resolveScan(s: OpsState, st: StoreStatic, raw: string): ScanResult {
@@ -37,6 +42,8 @@ export function resolveScan(s: OpsState, st: StoreStatic, raw: string): ScanResu
     const c = s.cases[caseId];
     return c ? { kind: 'case', caseId, itemId: c.itemId } : { kind: 'unknown-case', caseId };
   }
+  const rz = (Object.keys(RECOVERY_CODES) as TempZone[]).find((z) => RECOVERY_CODES[z] === code);
+  if (rz) return { kind: 'recovery', code, tempZone: rz };
   if (st.slots.some((x) => x.code === code)) return { kind: 'slot', code };
   if (st.bins.some((b) => b.code === code)) return { kind: 'bin', code };
   const loc = locationIndex(st).get(code);

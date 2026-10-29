@@ -1,5 +1,6 @@
 import { ev, type PendingEvent } from '../events';
 import type { MtoTicket, OpsState } from '../types';
+import { requireScan } from '../settings';
 import { no, yes, type OpsModule } from './framework';
 
 /**
@@ -40,6 +41,10 @@ export const mtoModule: OpsModule = {
         if (t.status !== 'COOKING') return no('TICKET_STATE', { status: t.status });
         const slot = cmd.slotCode?.trim().toUpperCase();
         if (slot && ctx.statics.hotSlots?.length && !ctx.statics.hotSlots.includes(slot)) return no('SLOT_NOT_FOUND');
+        // 保温位一个位放一份（决策记录 0026：以前不检查占用）
+        if (slot && Object.values(s.mto).some((x) => x.status === 'HELD' && x.slotCode === slot)) return no('SLOT_FULL', { capacity: 1 });
+        // 门店要求扫码时，热食要扫保温位标签再放
+        if (t.hot && !slot && ctx.statics.hotSlots?.length && requireScan(s)) return no('SCAN_REQUIRED');
         return yes([ev('MtoCompleted', { ticketId: t.id, ...(slot ? { slotCode: slot } : {}), discardAt: env.at + t.holdMin * 60_000 })]);
       }
       case 'PullMto': {

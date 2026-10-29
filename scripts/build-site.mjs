@@ -30,10 +30,13 @@ writeFileSync(
 </head>
 <body>
 <p><a href="./app/showcase.html">Open the live demo</a> · <a href="./sim/">Store simulator</a> · <a href="./app/">Associate app</a></p>
+<p><a href="./LICENSE">License (AGPL-3.0)</a> · <a href="./LICENSE-docs">Documentation license (CC BY 4.0)</a> · <a href="./THIRD_PARTY_NOTICES.md">Third-party notices</a></p>
 </body>
 </html>
 `,
 );
+// 许可证和第三方组件声明随站点一起分发
+for (const f of ['LICENSE', 'LICENSE-docs', 'THIRD_PARTY_NOTICES.md']) cpSync(join(root, f), join(out, f));
 // GitHub Pages：不经过 Jekyll 处理
 writeFileSync(join(out, '.nojekyll'), '');
 console.log(`site ready: ${out}`);

@@ -1,7 +1,7 @@
 import type { RootState } from '@react-three/fiber';
 
-/** 场景画面的访问入口（截图、方案缩略图） */
-export const sceneAccess: { get?: () => RootState } = {};
+/** 场景画面的访问入口（截图、方案缩略图）；开了后期处理时 render 走同一条流水线 */
+export const sceneAccess: { get?: () => RootState; render?: () => void } = {};
 
 /**
  * 截取当前画面：重新渲染一帧后读出画布（不需要 preserveDrawingBuffer）。
@@ -10,7 +10,8 @@ export const sceneAccess: { get?: () => RootState } = {};
 export function captureScene(maxW = 0, type: 'image/png' | 'image/jpeg' = 'image/png', quality = 0.85): string | undefined {
   const st = sceneAccess.get?.();
   if (!st) return undefined;
-  st.gl.render(st.scene, st.camera);
+  if (sceneAccess.render) sceneAccess.render();
+  else st.gl.render(st.scene, st.camera);
   const src = st.gl.domElement;
   if (!maxW || src.width <= maxW) return src.toDataURL(type, quality);
   const c = document.createElement('canvas');

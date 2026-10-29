@@ -2,7 +2,7 @@
   "name": "storewright",
   "version": "0.1.0",
   "private": true,
-  "description": "Storewright — integrated store operations for mid-size grocers: online fulfillment, backroom, replenishment, staffing, and a simulation-driven operations twin.",
+  "description": "Storewright — a digital twin for grocery stores: the 3D store in sync with live operations, replay and forecast, equipment alerts, plus online fulfilment, backroom, replenishment, staffing and per-store local AI.",
   "license": "AGPL-3.0-only",
   "type": "module",
   "engines": {
@@ -22,6 +22,8 @@
     "sensitivity": "tsx apps/sim-cli/src/main.ts sensitivity",
     "ai-report": "tsx apps/sim-cli/src/main.ts ai-report",
     "industry-report": "tsx apps/sim-cli/src/main.ts industry-report",
+    "notices": "node scripts/third-party-notices.mjs",
+    "llm:eval": "tsx apps/server/src/llmEval.ts",
     "dev": "npm run dev -w @storewright/simulator",
     "build:sim": "npm run build -w @storewright/simulator",
     "server": "npm run start -w @storewright/server",

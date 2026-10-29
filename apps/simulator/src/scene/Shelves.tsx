@@ -4,11 +4,12 @@ import { useFrame, type ThreeEvent } from '@react-three/fiber';
 import { useApp } from '../state/store';
 import { deliBays } from './layout';
 import { SCENE, ZONE_COLOR } from './palette';
-import { heatColor, toonGradient } from './toon';
-import { useNightGlow } from './environment';
+import { heatColor } from './toon';
+import { env } from './environment';
+import { makeShelfMaterial } from './interior/shelfMaterial';
 import { armMenu } from './contextTarget';
 import { clock } from '../state/clock';
-import { liveClient } from '../live/link';
+import { liveClient, viewState } from '../live/link';
 import { bayAt, liveBays, stockColor, type BayStock } from './stock';
 
 const withItems = (b: BayStock | undefined, items: number | undefined): BayStock | undefined => (b && items ? { ...b, items } : b);
@@ -79,7 +80,7 @@ export function Shelves() {
     if (key === lastStock.current) return;
     lastStock.current = key;
     const highlight = new Set(mode === 'edit' ? editSel : selection?.type === 'run' ? [selection.id] : []);
-    const lb = live?.statics ? liveBays(live.state, live.statics) : undefined;
+    const lb = live?.statics ? liveBays(viewState() ?? live.state, live.statics) : undefined;
     shelves.forEach((s, i) => {
       const k = `${s.runId}|${s.bay}`;
       if (highlight.has(s.runId)) color.set(SCENE.select);
@@ -106,11 +107,19 @@ export function Shelves() {
     if (s) armMenu({ type: 'run', id: s.runId }, e);
   };
 
-  const glow = useNightGlow<THREE.MeshToonMaterial>(0.32);
+  // 货架外观：朝通道的面画出层板和商品；看热度、存量时商品被数据颜色染色
+  const material = useMemo(() => makeShelfMaterial(), []);
+  useEffect(() => {
+    (material.userData.tint as { value: number }).value = overlay === 'heat' || overlay === 'stock' || overlay === 'areas' ? 0.62 : overlay === 'none' ? 0.04 : 0.12;
+  }, [material, overlay]);
+  const warm = useMemo(() => new THREE.Color('#fff1d6'), []);
+  useFrame(() => {
+    material.emissive.copy(warm).multiplyScalar(env.night * 0.32);
+  });
   return (
     <instancedMesh
       ref={ref}
-      args={[undefined, undefined, Math.max(1, geo.shelves.length)]}
+      args={[undefined, material, Math.max(1, geo.shelves.length)]}
       castShadow
       receiveShadow
       onClick={onClick}
@@ -119,7 +128,6 @@ export function Shelves() {
       onPointerOut={() => (document.body.style.cursor = '')}
     >
       <boxGeometry args={[1, 1, 1]} />
-      <meshToonMaterial ref={glow} gradientMap={toonGradient()} />
     </instancedMesh>
   );
 }

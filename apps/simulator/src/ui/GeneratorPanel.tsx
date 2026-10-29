@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { GENERATOR_LIMITS, GENERATOR_PRESETS, randomGeneratorParams, templateParams, type GeneratorParams } from '@storewright/store-config';
+import { DEFAULT_YARD_OFFSET, GENERATOR_LIMITS, GENERATOR_PRESETS, randomGeneratorParams, templateParams, type GeneratorParams } from '@storewright/store-config';
+import { YardFields } from './YardFields';
 import { useApp } from '../state/store';
 import { t, translate } from '../i18n';
 
@@ -13,6 +14,7 @@ function NumberField({ label, value, range, step = 1, onChange }: { label: strin
 }
 
 const DEFAULT_BACKROOM = { extraDepthM: 0, rackRows: 0, rackLevels: 3, docks: 3, forklifts: 1, palletJacks: 2 };
+const DEFAULT_YARD = { side: 'RIGHT' as const, via: 'DRIVE' as const, offsetM: DEFAULT_YARD_OFFSET, slots: 0, trailerStalls: 0 };
 
 function HourSelect({ value, range, onChange }: { value: number; range: readonly [number, number]; onChange: (h: number) => void }) {
   const hours: number[] = [];
@@ -89,7 +91,7 @@ export function GeneratorPanel() {
         {t('左墙蔬果、后墙冷藏柜')}
       </label>
       <label className="check">
-        <input type="checkbox" checked={!!p.secondFloor} onChange={(e) => patch((d) => (d.secondFloor = e.target.checked ? { gmAisles: 8, bays: 16, levels: 5, elevators: 1, escalators: 1 } : null))} />
+        <input type="checkbox" checked={!!p.secondFloor} onChange={(e) => patch((d) => (d.secondFloor = e.target.checked ? { gmAisles: 0, bays: 16, levels: 5, elevators: 1, escalators: 1 } : null))} />
         {t('二楼百货区')}
       </label>
       {p.secondFloor && (
@@ -98,7 +100,7 @@ export function GeneratorPanel() {
           <NumberField label="二楼段数" value={p.secondFloor.bays} range={L.bays} onChange={(v) => patch((d) => d.secondFloor && (d.secondFloor.bays = v))} />
           <NumberField label="电梯" value={p.secondFloor.elevators ?? 1} range={L.elevators} onChange={(v) => patch((d) => d.secondFloor && (d.secondFloor.elevators = v))} />
           <NumberField label="扶梯组数" value={p.secondFloor.escalators ?? 0} range={L.escalators} onChange={(v) => patch((d) => d.secondFloor && (d.secondFloor.escalators = v))} />
-          <p className="hint">{t('电梯依次放在左前、左后、右前；扶梯（每组上下各一条）在前走廊靠近顾客入口。员工推着拣货车只能乘电梯。')}</p>
+          <p className="hint">{t('二楼通道填 0 表示按货梯的位置自动铺满二楼（二楼从左墙盖到货梯旁的卸货区，一楼其余部分是单层）。电梯依次放在左前、左后、右前；扶梯（每组上下各一条）在前走廊靠近顾客入口。员工推着拣货车只能乘电梯。')}</p>
         </>
       )}
       <label className="check">
@@ -132,6 +134,7 @@ export function GeneratorPanel() {
       <NumberField label="卸货门" value={p.backroom?.docks ?? 3} range={L.docks} onChange={(v) => patch((d) => (d.backroom = { ...(d.backroom ?? DEFAULT_BACKROOM), docks: v }))} />
       <NumberField label="叉车" value={p.backroom?.forklifts ?? 1} range={L.forklifts} onChange={(v) => patch((d) => (d.backroom = { ...(d.backroom ?? DEFAULT_BACKROOM), forklifts: v }))} />
       <NumberField label="搬运车" value={p.backroom?.palletJacks ?? 2} range={L.palletJacks} onChange={(v) => patch((d) => (d.backroom = { ...(d.backroom ?? DEFAULT_BACKROOM), palletJacks: v }))} />
+      <YardFields value={p.yard ?? DEFAULT_YARD} onChange={(v) => patch((d) => (d.yard = { ...(d.yard ?? DEFAULT_YARD), ...v }))} />
       <label>
         <span>{t('营业时间')}</span>
         <span className="inline">

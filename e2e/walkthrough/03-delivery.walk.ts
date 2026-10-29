@@ -1,6 +1,6 @@
-import { expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
 import { Recorder } from './recorder';
-import { createOrders, pickOrders, scan, signIn, stageOrders, state, tab, until, type AnyState } from './helpers';
+import { createOrders, pickOrders, scan, signIn, stageOrders, state, tab, until, test, type AnyState } from './helpers';
 
 /** 配送：两张配送订单组成一个行程 → 司机接单（验证码）→ 拣货暂存 → 司机到店 → 整个行程一次核验、记录车内位置、交付 */
 test('03 配送行程', async ({ browser }) => {
@@ -16,6 +16,8 @@ test('03 配送行程', async ({ browser }) => {
   await r.step('控制台下 2 张配送订单（立即锁单，时段在 40 分钟后）', async () => {
     const os = await createOrders(con, { type: 'DELIVERY', count: 2, lines: 3 });
     ids = os.map((o) => o.orderId);
+    // 等推送到达控制台（两套测试同时跑、机器忙的时候会慢一点）
+    await until(con, (x) => ids.every((id) => x.orders[id]));
     const s = await state(con);
     return os.map((o) => `${o.shortCode}（${o.name}，目的地 ${JSON.stringify(s.orders[o.orderId].destinationKm ?? {})} km）`).join('；');
   }, { shot: con, device: '控制台' });

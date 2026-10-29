@@ -102,7 +102,7 @@ export async function buildApp(opts: AppOptions): Promise<{ app: FastifyInstance
 
   // MQTT 传感器入口
   let mqtt: MqttBridge | undefined;
-  if (opts.mqttUrl) mqtt = await startMqttBridge(opts.mqttUrl, (storeId, cmd) => hub.submitSensor(storeId, cmd), (msg) => app.log.warn(msg));
+  if (opts.mqttUrl) mqtt = await startMqttBridge(opts.mqttUrl, (storeId, cmd) => hub.submitSensor(storeId, cmd), (msg) => app.log.warn(msg), (storeId, r) => hub.submitTelemetry(storeId, r));
 
   // 排程
   hub.start();

@@ -7,6 +7,8 @@ import type { DayMetrics } from './day';
 export interface CostParams {
   /** 员工时薪（含福利，美元） */
   wagePerHour: number;
+  /** 学生兼职工时薪（没有全职福利，美元；决策记录 0020） */
+  studentWagePerHour: number;
   /** 线上订单平均金额 */
   avgOrderValue: number;
   /** 商品毛利率 */
@@ -27,6 +29,7 @@ export interface CostParams {
 
 export const DEFAULT_COSTS: CostParams = {
   wagePerHour: 18,
+  studentWagePerHour: 14,
   avgOrderValue: 85,
   grossMargin: 0.25,
   lateOrderCost: 5,
@@ -39,6 +42,7 @@ export const DEFAULT_COSTS: CostParams = {
 
 export const COST_LABEL: Record<keyof CostParams, string> = {
   wagePerHour: '员工时薪（$）',
+  studentWagePerHour: '学生兼职时薪（$）',
   avgOrderValue: '线上订单均价（$）',
   grossMargin: '商品毛利率',
   lateOrderCost: '每张迟到订单成本（$）',
@@ -50,7 +54,7 @@ export const COST_LABEL: Record<keyof CostParams, string> = {
 };
 
 export interface EconomicsInput {
-  metrics: Pick<DayMetrics, 'orders' | 'fillRate' | 'staffedHoursTotal' | 'lateOrderPct' | 'longWaitPct' | 'handoffSessions' | 'shortValue'>;
+  metrics: Pick<DayMetrics, 'orders' | 'fillRate' | 'staffedHoursTotal' | 'studentHours' | 'lateOrderPct' | 'longWaitPct' | 'handoffSessions' | 'shortValue'>;
   /** 收货与夜班工时 */
   receivingHours: number;
   nightHours: number;
@@ -96,7 +100,7 @@ export function dayPnL(input: EconomicsInput, p: CostParams = DEFAULT_COSTS): Da
   const m = input.metrics;
   const lines: PnLLine[] = [
     { key: 'online', group: 'online', label: '线上订单毛利', value: m.orders * p.avgOrderValue * m.fillRate * p.grossMargin },
-    { key: 'labor', group: 'online', label: '拣货、暂存与交付人工', value: -m.staffedHoursTotal * p.wagePerHour },
+    { key: 'labor', group: 'online', label: '拣货、暂存与交付人工', value: -((m.staffedHoursTotal - (m.studentHours ?? 0)) * p.wagePerHour + (m.studentHours ?? 0) * p.studentWagePerHour) },
     { key: 'late', group: 'online', label: '迟到订单补偿', value: -m.orders * (m.lateOrderPct / 100) * p.lateOrderCost },
     { key: 'wait', group: 'online', label: '长等待流失', value: -m.handoffSessions * (m.longWaitPct / 100) * p.longWaitCost },
     { key: 'short', group: 'online', label: '缺货损失毛利', value: -m.shortValue * p.grossMargin },

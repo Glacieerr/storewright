@@ -10,6 +10,68 @@ export interface SopEntry {
   en: { title: string; text: string };
 }
 
+/** 新人带教的小测验（决策记录 0024 · D4）：每题的问题、选项和正确答案的序号，中英文对照 */
+export interface SopQuiz {
+  q: { zh: string; en: string };
+  options: Array<{ zh: string; en: string }>;
+  answer: number;
+}
+
+export const SOP_QUIZ: Record<string, SopQuiz[]> = {
+  'cold-chain': [
+    {
+      q: { zh: '冷链批次从什么时候开始计时？', en: 'When does the cold-chain clock start?' },
+      options: [
+        { zh: '领取批次时', en: 'When the walk is claimed' },
+        { zh: '第一件冷藏 / 冷冻商品放进框时', en: 'When the first chilled or frozen item goes in a tote' },
+        { zh: '到暂存区时', en: 'When reaching staging' },
+      ],
+      answer: 1,
+    },
+    {
+      q: { zh: '超时了先做什么？', en: 'What do you do first when the limit is passed?' },
+      options: [
+        { zh: '把已拣的冷藏 / 冷冻框送回同温区的暂存格位', en: 'Take the picked chilled / frozen totes to a staging slot of the same zone' },
+        { zh: '继续拣完再说', en: 'Finish picking first' },
+        { zh: '放到常温格位', en: 'Put them in an ambient slot' },
+      ],
+      answer: 0,
+    },
+  ],
+  'age-check': [
+    {
+      q: { zh: '顾客无法出示证件时怎么办？', en: 'What if the customer cannot show ID?' },
+      options: [
+        { zh: '整单拒交', en: 'Refuse the whole order' },
+        { zh: '取出年龄限制商品，其余照常交付', en: 'Remove the age-restricted items and hand off the rest' },
+        { zh: '先交付，之后补核验', en: 'Hand off now and check later' },
+      ],
+      answer: 1,
+    },
+  ],
+  'code-failed': [
+    {
+      q: { zh: '验证码最多可以试几次，之后怎么办？', en: 'How many code attempts, and then what?' },
+      options: [
+        { zh: '3 次，之后核对姓名和订单短号人工核验', en: '3, then verify manually with the name and order short code' },
+        { zh: '不限次数', en: 'Unlimited' },
+        { zh: '1 次，之后取消订单', en: '1, then cancel the order' },
+      ],
+      answer: 0,
+    },
+  ],
+  'staging-full': [
+    {
+      q: { zh: '冷冻格位满了，可以先放到冷藏格位吗？', en: 'Frozen slots are full — can you use a chilled slot?' },
+      options: [
+        { zh: '可以，临时放一下', en: 'Yes, temporarily' },
+        { zh: '不可以，只能放同温区的其他格位，并告诉带班负责人', en: 'No — use another slot of the same zone and tell the team lead' },
+      ],
+      answer: 1,
+    },
+  ],
+};
+
 export const SOP: SopEntry[] = [
   {
     id: 'cold-chain',

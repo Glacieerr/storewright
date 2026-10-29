@@ -51,7 +51,9 @@ const { BAY_W, RACK_D, LEVEL_H } = RACK;
  */
 export function backroomLayout(config: StoreConfig): BackroomLayout {
   const br = config.backroom;
-  const { areas, docks, frame } = storeAreas(config);
+  const { areas: all, docks, frame } = storeAreas(config);
+  // 后仓在一楼：二楼的卸货区、补货区另算（upperStock）
+  const areas = all.filter((a) => a.floorId === frame.floorId);
   const rackAreas = areas.filter((a) => a.kind === 'RACKS' || a.kind === 'OVERSTOCK');
   const zone = rackAreas.length
     ? { x0: Math.min(...rackAreas.map((a) => a.x0)), x1: Math.max(...rackAreas.map((a) => a.x1)), z0: Math.min(...rackAreas.map((a) => a.z0)), z1: Math.max(...rackAreas.map((a) => a.z1)) }
@@ -156,6 +158,55 @@ function nearestAisle(b: BackroomLayout, z: number): number {
     }
   }
   return best;
+}
+
+/**
+ * 二楼的卸货区与补货区（决策记录 0019）：一楼收货区旁的货梯通上来，托盘在二楼卸货区放下，
+ * 再用搬运车摆进补货区地面（二楼没有叉车）；夜班从这里给二楼的货架补货。只有两层的门店才有。
+ */
+export interface UpperStock {
+  floorId: string;
+  /** 楼层高度序号（1 = 二楼） */
+  level: number;
+  /** 货梯（两层同一位置）：中心与门口（门朝 +X，收货区一侧） */
+  lift: { x: number; z: number };
+  liftDoor: { x: number; z: number };
+  unload: { x0: number; x1: number; z0: number; z1: number };
+  stock?: { x0: number; x1: number; z0: number; z1: number };
+  /** 地面托盘位：先卸货区、再补货区 */
+  spots: Array<{ x: number; z: number }>;
+  /** 补货区通往二楼卖场的门（在后走廊上） */
+  door: { x: number; z: number };
+}
+
+export function upperStock(config: StoreConfig): UpperStock | undefined {
+  const { areas, frame } = storeAreas(config);
+  const lift = frame.lift;
+  if (!lift) return undefined;
+  const floor = config.layout.floors.find((f) => f.id === lift.upperFloorId);
+  const mine = areas.filter((a) => a.floorId === lift.upperFloorId);
+  const unload = mine.find((a) => a.kind === 'UNLOAD');
+  if (!floor || !unload) return undefined;
+  const stock = mine.find((a) => a.kind === 'OVERSTOCK' || a.kind === 'RACKS' || a.kind === 'BULK');
+  const spots: Array<{ x: number; z: number }> = [];
+  for (const r of [unload, ...(stock ? [stock] : [])]) {
+    for (let z = r.z0 + 1; z < r.z1 - 0.6; z += 1.6) for (let x = r.x0 + 1; x < r.x1 - 0.6; x += 1.6) spots.push({ x, z });
+  }
+  // 卸货区里离货梯近的托盘位先用
+  spots.sort((a, b) => Math.hypot(a.x - lift.x, a.z - lift.z) - Math.hypot(b.x - lift.x, b.z - lift.z));
+  const runs = config.layout.runs.filter((r) => r.floorId === floor.id);
+  const back = runs.length ? Math.max(...runs.map((r) => Math.max(r.start.y, r.end.y))) : unload.z0 - 2;
+  const doorX = stock ? (stock.x0 + stock.x1) / 2 : (unload.x0 + unload.x1) / 2;
+  return {
+    floorId: floor.id,
+    level: floor.level,
+    lift: { x: lift.x, z: lift.z },
+    liftDoor: { x: lift.x + 1.8, z: lift.z },
+    unload: { x0: unload.x0, x1: unload.x1, z0: unload.z0, z1: unload.z1 },
+    ...(stock ? { stock: { x0: stock.x0, x1: stock.x1, z0: stock.z0, z1: stock.z1 } } : {}),
+    spots,
+    door: { x: doorX, z: back },
+  };
 }
 
 export function routeLength(pts: Array<{ x: number; z: number }>): number {

@@ -6,7 +6,7 @@ import { DEFAULT_DEMAND, generateCatalog, generateOrders } from '@storewright/sy
 import { replay } from './apply';
 import type { OpsCommand } from './commands';
 import type { AnyOpsEvent } from './events';
-import { planogramByItem, replBatches, sellableCases, shelfNow } from './inventory';
+import { planogramByItem, replBatches, sellableCases, shelfNow, usableCases } from './inventory';
 import { resolveScan } from './scan';
 import { buildBins, buildPlanogram, execute, initialInventory, orderInfoFrom, type OpsContext } from './server';
 import { emptyState, type OpsState, type PlanogramEntry, type StoreStatic } from './types';
@@ -123,11 +123,11 @@ describe('收货与上架（决策 I-01～I-05）', () => {
     const frozen = statics.planogram.find((p) => p.tempZone === 'FROZEN') as PlanogramEntry;
     st.ok({ type: 'CreateAsn', supplier: 'DC', lines: [dry, chem, frozen].map((p) => ({ itemId: p.itemId, gtin: p.gtin, name: p.name, cases: 2, packQty: p.packQty })) });
     const receiptId = Object.keys(st.s.receipts)[0] as string;
-    expect(st.code({ type: 'ReceiveCases', receiptId, gtin: dry.gtin, cases: 1 }, 'X1')).toBe('RECEIPT_NOT_ARRIVED');
-    st.ok({ type: 'ArriveTruck', receiptId });
-    // 用 12 位 UPC 也能识别（GTIN 统一补齐为 14 位）
+    // 第一次扫箱就算卡车到了（决策记录 0026）；用 12 位 UPC 也能识别（GTIN 统一补齐为 14 位）
     const got = st.ok({ type: 'ReceiveCases', receiptId, gtin: dry.gtin.slice(2), cases: 3 }, 'X1');
-    const caseIds = got[0]?.type === 'CasesReceived' ? got[0].payload.caseIds : [];
+    expect(got.map((e) => e.type)).toEqual(['TruckArrived', 'CasesReceived']);
+    const recd = got.find((e) => e.type === 'CasesReceived');
+    const caseIds = recd?.type === 'CasesReceived' ? recd.payload.caseIds : [];
     expect(caseIds).toHaveLength(3);
     for (const id of caseIds) expect(id).toMatch(/^C-\d{6}-\d{6}$/);
     st.ok({ type: 'ReceiveCases', receiptId, gtin: chem.gtin, cases: 1, damaged: true }, 'X1');
@@ -259,9 +259,42 @@ describe('补货任务（决策 R-05、X-04）', () => {
       8,
     );
     expect(batches.map((b) => b.map((t) => t.id))).toEqual([['t2'], ['t3', 't1']]);
+    // 推车的装载上限（决策记录 0026）：超重、超体积另起一批；一箱就超的单独成批
+    const heavy = [
+      { id: 'h1', area: 'B', priority: 1, kg: 60, l: 40 },
+      { id: 'h2', area: 'B', priority: 2, kg: 60, l: 40 },
+      { id: 'h3', area: 'B', priority: 3, kg: 60, l: 40 },
+      { id: 'h4', area: 'B', priority: 4, kg: 200, l: 10 },
+      { id: 'h5', area: 'B', priority: 5, kg: 5, l: 500 },
+      { id: 'h6', area: 'B', priority: 6, kg: 5, l: 200 },
+    ];
+    const load = { kg: 150, liters: 600, weight: (t: (typeof heavy)[number]) => t.kg, volume: (t: (typeof heavy)[number]) => t.l };
+    expect(batchByArea(heavy, 8, load).map((b) => b.map((t) => t.id))).toEqual([['h1', 'h2'], ['h3'], ['h4'], ['h5'], ['h6']]);
+    expect(batchByArea(heavy, 2).map((b) => b.length)).toEqual([2, 2, 2]);
     const abc = classifyAbc(Array.from({ length: 10 }, (_, i) => ({ id: `i${i}`, value: i === 0 ? 100 : 1 })));
     expect(abc.get('i0')).toBe('A');
     expect([...abc.values()].filter((c) => c === 'C').length).toBeGreaterThan(0);
+  });
+});
+
+describe('补货推车的装载上限（决策记录 0026）', () => {
+  it('陈列表里有每箱的重量和体积；按门店的推车上限分批，不给门店数据时仍只按 8 个任务分', () => {
+    expect(statics.planogram.every((p) => (p.caseKg ?? 0) > 0 && (p.caseL ?? 0) > 0)).toBe(true);
+    const run = statics.planogram[0]?.runId;
+    const items = statics.planogram.filter((p) => p.runId === run).slice(0, 6);
+    expect(items.length).toBeGreaterThan(2);
+    const s = emptyState();
+    items.forEach((p, i) => {
+      s.repl[`R${i}`] = { id: `R${i}`, locationId: p.locationId, itemId: p.itemId, area: run as string, reason: 'LOW', suggestedUnits: 1, priority: i, createdAt: 0, status: 'OPEN' };
+    });
+    expect(replBatches(s).map((b) => b.length)).toEqual([items.length]);
+    const kgOf = (id: string) => statics.planogram.find((p) => p.itemId === id)?.caseKg ?? 0;
+    const cartKg = Math.max(...items.map((p) => p.caseKg ?? 0)) + 0.1;
+    const small = { ...statics, replenish: { ...statics.replenish, cartKg, cartL: 10_000 } };
+    const batches = replBatches(s, small);
+    expect(batches.length).toBeGreaterThan(1);
+    for (const b of batches) expect(b.length === 1 || b.reduce((n, t) => n + kgOf(t.itemId), 0) <= cartKg).toBe(true);
+    expect(batches.flat().map((t) => t.id).sort()).toEqual(Object.keys(s.repl).sort());
   });
 });
 
@@ -327,6 +360,61 @@ describe('Exception 与闭环（决策 X-01～X-04）', () => {
     expect(replay(st.log, emptyState(), statics)).toEqual(st.s);
   });
 
+  // 流程梳理发现的问题（决策记录 0025）
+  it('箱子里不够时按实际取出的件数记；订单交付后，没找到的补取作废，已经找到的放回货架', () => {
+    const st = new Store();
+    const o = orders.find((x) => x.lines.some((l) => l.qty >= 2 && byItem.get(l.itemId))) as Order;
+    const line = o.lines.find((l) => l.qty >= 2 && byItem.get(l.itemId));
+    if (!line) throw new Error('line');
+    const p = byItem.get(line.itemId) as PlanogramEntry;
+    // 后仓只有一箱、箱里只剩 1 件
+    const [caseId] = st.stock(p, 1);
+    // 测试里直接改箱子的件数（不检查重放）
+    (st.s.cases[caseId as string] as { units: number }).units = 1;
+    const { orderId, exceptionId } = pickedOrder(st, o, line.itemId);
+    st.ok({ type: 'ClaimException', exceptionId }, 'X1');
+    st.ok({ type: 'ExceptionFound', exceptionId, caseId: caseId as string, binEmpty: true }, 'X1');
+    expect(st.s.exceptions[exceptionId]?.units).toBe(1);
+    // 顾客到店、交付（还没送到暂存）
+    st.ok({ type: 'CheckIn', orderId, bay: '1' }, 'customer');
+    st.ok({ type: 'StartPrep', key: orderId }, 'H1');
+    for (const id of st.s.orders[orderId]?.toteIds ?? []) st.ok({ type: 'ScanPrepTote', key: orderId, labelId: st.s.totes[id]?.labelId ?? '' }, 'H1');
+    st.ok({ type: 'VerifyCode', key: orderId, code: 'AAAA' }, 'H1');
+    st.ok({ type: 'CompleteHandoff', key: orderId, removeAgeItems: true }, 'H1');
+    expect(st.code({ type: 'DeliverException', exceptionId, slotCode: 'X' }, 'X1')).toBe('ORDER_COMPLETED');
+    // 放回货架：货架估算加上实际取出的 1 件
+    expect(st.code({ type: 'ReturnExceptionItems', exceptionId }, 'P1')).toBe('EXCEPTION_NOT_YOURS');
+    const before = shelfNow(st.s, p).est;
+    st.ok({ type: 'ReturnExceptionItems', exceptionId }, 'X1');
+    expect(st.s.exceptions[exceptionId]?.status).toBe('VOID');
+    expect(shelfNow(st.s, p).est).toBe(Math.min(p.capacity, before + 1));
+    // 另一张订单：补取还没人领就交付了，作废
+    const o2 = orders.filter((x) => x.id !== o.id).find((x) => x.lines.some((l) => byItem.get(l.itemId))) as Order;
+    const line2 = o2.lines.find((l) => byItem.get(l.itemId)) as Order['lines'][number];
+    st.stock(byItem.get(line2.itemId) as PlanogramEntry, 1);
+    const second = pickedOrder(st, o2, line2.itemId);
+    st.ok({ type: 'CheckIn', orderId: second.orderId, bay: '2' }, 'customer');
+    st.ok({ type: 'StartPrep', key: second.orderId }, 'H1');
+    for (const id of st.s.orders[second.orderId]?.toteIds ?? []) st.ok({ type: 'ScanPrepTote', key: second.orderId, labelId: st.s.totes[id]?.labelId ?? '' }, 'H1');
+    st.ok({ type: 'VerifyCode', key: second.orderId, code: 'AAAA' }, 'H1');
+    st.ok({ type: 'CompleteHandoff', key: second.orderId, removeAgeItems: true }, 'H1');
+    expect(st.s.exceptions[second.exceptionId]?.status).toBe('VOID');
+  });
+
+  it('召回中的箱子不能从待检放回可售；保质期写法不对时说明是日期', () => {
+    const st = new Store();
+    const p = [...byItem.values()][3] as PlanogramEntry;
+    const [caseId] = st.stock(p, 1);
+    st.ok({ type: 'ChangeCaseStatus', caseId: caseId as string, status: 'QA' }, 'X1');
+    st.s.recalls = { RC1: { id: 'RC1', title: 't', itemIds: [p.itemId], lots: [], openedAt: st.now, by: 'L1', status: 'OPEN', steps: {}, affected: { shelf: {}, cases: [], totes: [], openOrders: [], doneOrders: [] } } };
+    expect(st.code({ type: 'ChangeCaseStatus', caseId: caseId as string, status: 'SELLABLE' }, 'X1')).toBe('ITEM_RECALLED');
+    expect(st.code({ type: 'ChangeCaseStatus', caseId: caseId as string, status: 'SCRAP' }, 'X1')).toBe('OK');
+    st.ok({ type: 'CreateAsn', supplier: 'S', lines: [{ itemId: p.itemId, gtin: p.gtin, name: p.name, cases: 1, packQty: p.packQty }] });
+    const r = Object.keys(st.s.receipts)[0] as string;
+    st.ok({ type: 'ArriveTruck', receiptId: r }, 'X1');
+    expect(st.code({ type: 'ReceiveCases', receiptId: r, gtin: p.gtin, cases: 1, expiry: '2026/11/01' }, 'X1')).toBe('DATE_INVALID');
+  });
+
   it('后仓也找不到（幽灵库存）：记录可疑、生成盘点任务；盘点后修正箱子并清除可疑', () => {
     const st = new Store();
     const o = orders.find((x) => x.lines.length >= 2 && byItem.get(x.lines[1]?.itemId ?? '')) as Order;
@@ -369,5 +457,74 @@ describe('Exception 与闭环（决策 X-01～X-04）', () => {
     const counts = st.ok({ type: 'Tick', release: false }).filter((e) => e.type === 'CycleCountCreated');
     expect(counts.length).toBeGreaterThan(0);
     expect(counts.length).toBeLessThanOrEqual(3);
+  });
+});
+
+describe('一次找不到只盘这个库位、盘点放回队列、核对和盘点扫码（决策记录 0026）', () => {
+  it('补货时说了找过的库位：只盘这个库位，别的库位的箱子照样能用；没说时整个商品标为可疑', () => {
+    const st = new Store();
+    const p = [...byItem.values()].find((x) => x.tempZone === 'AMBIENT') as PlanogramEntry;
+    st.stock(p, 1);
+    // 第二箱放到另一个库位
+    const other = statics.bins.find((b) => b.status === 'SELLABLE' && b.tempZone === p.tempZone && b.area === p.area && b.code !== st.s.cases[sellableCases(st.s, p.itemId)[0]?.id ?? '']?.binCode);
+    const ev = { seq: st.s.seq + 1, at: st.now, actor: 'system', type: 'InventoryLoaded', payload: { cases: [{ caseId: 'C-261020-000999', itemId: p.itemId, gtin: p.gtin, name: p.name, packQty: p.packQty, units: p.packQty, binCode: other?.code ?? '' }] } } as AnyOpsEvent;
+    replay([ev], st.s, statics);
+    st.log.push(ev);
+    st.ok({ type: 'RequestReplenishment', itemId: p.itemId }, 'R1');
+    const task = Object.values(st.s.repl).find((x) => x.itemId === p.itemId && x.status === 'OPEN');
+    if (!task) throw new Error('task');
+    st.ok({ type: 'ClaimReplenishment', taskIds: [task.id] }, 'R1');
+    const first = usableCases(st.s, p.itemId)[0];
+    st.ok({ type: 'CancelReplenishment', taskId: task.id, binCode: first?.binCode ?? '' }, 'R1');
+    expect(st.s.suspect[p.itemId]).toBeUndefined();
+    expect(Object.values(st.s.counts).filter((c) => c.status === 'OPEN').map((c) => c.binCode)).toEqual([first?.binCode]);
+    expect(usableCases(st.s, p.itemId).map((c) => c.binCode)).not.toContain(first?.binCode);
+    expect(usableCases(st.s, p.itemId).length).toBeGreaterThan(0);
+  });
+
+  it('盘点放回队列；扫了库位就核对；要求扫码时必须扫库位；核对货架要扫货位', () => {
+    const st = new Store();
+    const p = [...byItem.values()][5] as PlanogramEntry;
+    const [caseId] = st.stock(p, 1);
+    const bin = st.s.cases[caseId as string]?.binCode as string;
+    st.ok({ type: 'CreateCount', binCode: bin });
+    const count = Object.values(st.s.counts).find((c) => c.binCode === bin) as NonNullable<OpsState['counts'][string]>;
+    st.ok({ type: 'ClaimCount', countId: count.id }, 'X1');
+    expect(st.code({ type: 'ReleaseCount', countId: count.id }, 'R1')).toBe('COUNT_TAKEN');
+    st.ok({ type: 'ReleaseCount', countId: count.id }, 'X1');
+    expect(st.s.counts[count.id]?.status).toBe('OPEN');
+    st.ok({ type: 'ClaimCount', countId: count.id }, 'X1');
+    expect(st.code({ type: 'CompleteCount', countId: count.id, results: [{ itemId: p.itemId, counted: 1 }], binCode: 'NOPE' }, 'X1')).toBe('LOCATION_MISMATCH');
+    st.ok({ type: 'SetStoreSettings', requireScan: true });
+    expect(st.code({ type: 'CompleteCount', countId: count.id, results: [{ itemId: p.itemId, counted: 1 }] }, 'X1')).toBe('SCAN_REQUIRED');
+    st.ok({ type: 'CompleteCount', countId: count.id, results: [{ itemId: p.itemId, counted: 1 }], binCode: bin }, 'X1');
+    expect(st.s.counts[count.id]?.status).toBe('DONE');
+    expect(replay(st.log, emptyState(), statics)).toEqual(st.s);
+  });
+});
+
+describe('货架上的批次任务、补取放回队列（决策记录 0026）', () => {
+  it('过期的批次自动生成「下架」任务（每批一次）；做完后批次和货架估算减掉；降价采纳后给补货员「贴折扣签」任务', () => {
+    const st = new Store();
+    const p = [...byItem.values()].find((x) => x.tempZone === 'AMBIENT') as PlanogramEntry;
+    st.stock(p, 1);
+    st.s.shelfLots = { [p.itemId]: [{ lot: 'OLD1', expiry: '2026-10-01', units: 5, at: st.now, caseId: 'C-1' }, { lot: 'NEW1', expiry: '2027-01-01', units: 7, at: st.now, caseId: 'C-2' }] };
+    (st.s.shelf as Record<string, { est: number }>)[p.itemId] = { ...(st.s.shelf[p.itemId] ?? {}), est: 12 } as never;
+    const out = st.ok({ type: 'Tick', release: false }, 'system');
+    const pull = out.find((e) => e.type === 'ShelfCheckRequested');
+    expect(pull?.type === 'ShelfCheckRequested' && pull.payload).toMatchObject({ reason: 'PULL', lot: 'OLD1', expected: 5 });
+    expect(st.ok({ type: 'Tick', release: false }, 'system').some((e) => e.type === 'ShelfCheckRequested' && e.payload.reason === 'PULL')).toBe(false);
+    const task = Object.values(st.s.checks).find((c) => c.reason === 'PULL') as NonNullable<OpsState['checks'][string]>;
+    st.ok({ type: 'ConfirmShelf', itemId: p.itemId, units: 5, checkId: task.id }, 'R1');
+    expect(st.s.checks[task.id]?.status).toBe('DONE');
+    expect(st.s.shelfLots?.[p.itemId]?.map((l) => l.lot)).toEqual(['NEW1']);
+    expect(st.s.shelf[p.itemId]?.est).toBe(7);
+    // 降价：采纳后同时生成「贴折扣签」任务
+    const draft = { module: 'EXPIRY' as const, target: `${p.itemId}|NEW1`, action: { kind: 'MARKDOWN', params: { itemId: p.itemId, lot: 'NEW1', pct: 0.3 } }, confidence: 0.6, reasons: [], alternatives: [], model: { id: 'expiry-risk', version: 1, kind: 'k' }, expiresAt: st.now + 3_600_000 };
+    st.ok({ type: 'IssueRecommendation', draft }, 'ai');
+    const rec = Object.values(st.s.recs).find((r) => r.module === 'EXPIRY') as NonNullable<OpsState['recs'][string]>;
+    const accepted = st.ok({ type: 'AcceptRecommendation', recId: rec.id });
+    expect(accepted.map((e) => e.type)).toEqual(['RecommendationResolved', 'MarkdownApplied', 'ShelfCheckRequested']);
+    expect(Object.values(st.s.checks).find((c) => c.reason === 'MARKDOWN')).toMatchObject({ lot: 'NEW1', pct: 0.3, expected: 7, status: 'OPEN' });
   });
 });

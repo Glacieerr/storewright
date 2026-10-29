@@ -85,3 +85,26 @@ describe('事件日志', () => {
     expect(log.events.map((e) => e.t)).toEqual([10, 11]);
   });
 });
+
+describe('GS1 条码数据（决策记录 0024 · G3）', () => {
+  it('三种写法都能读出商品条码、批号、保质期、数量；送货单按商品和批号合并', async () => {
+    const { formatGs1, gs1Date, parseDeliveryNote, parseGs1 } = await import('./gs1');
+    expect(gs1Date('261130')).toBe('2026-11-30');
+    expect(gs1Date('260200')).toBe('2026-02-28');
+    expect(gs1Date('261332')).toBeUndefined();
+    expect(parseGs1('(01)00012345678905(17)261130(10)L2310A(37)6')).toEqual({ gtin: '00012345678905', expiry: '2026-11-30', lot: 'L2310A', count: 6 });
+    const GS = String.fromCharCode(29);
+    expect(parseGs1(`]d201000123456789051726113010L2310A${GS}376`)).toEqual({ gtin: '00012345678905', expiry: '2026-11-30', lot: 'L2310A', count: 6 });
+    expect(parseGs1('https://id.gs1.org/01/00012345678905/10/L2310A?17=261130')).toMatchObject({ gtin: '00012345678905', lot: 'L2310A', expiry: '2026-11-30' });
+    expect(parseGs1('hello')).toBeUndefined();
+    // 单独一个商品条码不是 GS1 数据（扫普通条码时不能误读）
+    expect(parseGs1('012345678905')).toBeUndefined();
+    expect(parseGs1('00012345678905')).toBeUndefined();
+    const note = parseDeliveryNote(['(400)R0003', formatGs1({ gtin: '12345678905', lot: 'A1', expiry: '2026-12-01', count: 2 }), formatGs1({ gtin: '12345678905', lot: 'A1', count: 1 }), formatGs1({ gtin: '00036000291452', count: 3 })].join('\n'));
+    expect(note?.order).toBe('R0003');
+    expect(note?.lines).toEqual([
+      { gtin: '00012345678905', cases: 3, lot: 'A1', expiry: '2026-12-01' },
+      { gtin: '00036000291452', cases: 3 },
+    ]);
+  });
+});

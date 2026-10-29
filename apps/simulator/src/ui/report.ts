@@ -180,7 +180,7 @@ footer { margin-top: 32px; font-size: 12px; color: var(--muted); }
 <body>
 <main>
 <h1>${esc(d.title)}</h1>
-<p class="muted">${esc(t('生成时间：{0} · Storewright 门店运营模拟器', d.generatedAt.toLocaleString(locale())))}</p>
+<p class="muted">${esc(t('生成时间：{0} · Storewright 门店数字孪生', d.generatedAt.toLocaleString(locale())))}</p>
 ${d.screenshot ? `<img class="shot" src="${d.screenshot}" alt="${esc(t('当前场景截图'))}">` : ''}
 <h2>${esc(t('方案概览'))}</h2>
 <div class="cards">${cards}</div>
@@ -201,7 +201,7 @@ export function reportMarkdown(d: ReportData): string {
   const lines: string[] = [];
   const row = (cells: string[]) => `| ${cells.map(md).join(' | ')} |`;
   const sep = (n: number) => `|${' --- |'.repeat(n)}`;
-  lines.push(`# ${d.title}`, '', t('生成时间：{0} · Storewright 门店运营模拟器', d.generatedAt.toLocaleString(locale())), '');
+  lines.push(`# ${d.title}`, '', t('生成时间：{0} · Storewright 门店数字孪生', d.generatedAt.toLocaleString(locale())), '');
   lines.push(`## ${t('方案概览')}`, '');
   for (const c of d.columns) {
     lines.push(`### ${md(c.name)}`, '');

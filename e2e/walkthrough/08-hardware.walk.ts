@@ -1,6 +1,6 @@
-import { expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
 import { Recorder } from './recorder';
-import { createOrders, signIn, state, tab, until, type AnyState } from './helpers';
+import { createOrders, signIn, state, tab, until, test, type AnyState } from './helpers';
 
 /** 第二个行业：家居建材店（同一个服务器上的另一个门店） */
 test('08 家居建材店', async ({ browser }) => {

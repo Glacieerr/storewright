@@ -170,3 +170,79 @@ export function evaluateSubstitution(
   for (const [k, v] of Object.entries(acc)) metrics[k] = { acceptTop1: r3(v.top1 / Math.max(1, n)), ndcg3: r3(k === 'oracle' ? 1 : v.ndcg / Math.max(1, n)), n };
   return { params, metrics };
 }
+
+/**
+ * 个性化值不值得做（决策记录 0023 · B4）：在全店的学习排序上，按每位顾客自己以前的反应加三项调整——
+ * 换了品牌、贵了、有机降级时这位顾客比全店模型预计的接受得多还是少（残差的经验贝叶斯收缩，新顾客没有调整）。按记录先后，前 70% 训练全店模型、后 30% 评估；每位顾客的调整只用这条记录之前的记录。
+ * 比较「推荐第一名的期望接受率」：全店模型、个性化、知道真实偏好（上限）。提高至少 1 个百分点、而且下限大于 0 才建议做。
+ */
+export function evaluatePersonalization(
+  logs: ReadonlyArray<SubstitutionLog & { customer?: string }>,
+  items: ReadonlyMap<string, SubItem>,
+  trainFrac = 0.7,
+): { global: number; personal: number; oracle: number; lift: number; liftLow: number; n: number; repeatShare: number; worth: boolean } {
+  const pops = [...items.values()].map((i) => i.popularity).sort((a, b) => a - b);
+  const popRef = pops[Math.floor(pops.length / 2)] ?? 1e-3;
+  const cut = Math.floor(logs.length * trainFrac);
+  const rows = logs.slice(0, cut).flatMap((l) => {
+    const o = items.get(l.originalId);
+    const c = items.get(l.shownId);
+    return o && c ? [{ x: subFeatures(o, c, popRef), accepted: l.accepted }] : [];
+  });
+  const params = fitSubstitution(rows, popRef);
+  // 三项「关系」：换了品牌、贵了（> 5%）、有机降级
+  const dims = (o: SubItem, c: SubItem): [boolean, boolean, boolean] => {
+    const x = subFeatures(o, c, popRef);
+    return [!x[2], (x[8] as number) > Math.log(1.05), (x[7] as number) === 1];
+  };
+  // 每位顾客、每项关系：实际接受减去全店模型预计的接受（残差）、预计的方差；调整 = 残差 ÷（方差 + 先验强度），
+  // 相当于从 0 出发走一步牛顿法的经验贝叶斯收缩：记录少时接近 0，记录多、一直比模型预计的多（少）接受时才调整
+  const PRIOR = 4;
+  const history = new Map<string, Array<{ r: number; w: number }>>();
+  let g = 0;
+  let pz = 0;
+  let orc = 0;
+  let n = 0;
+  let repeat = 0;
+  const diffs: number[] = [];
+  logs.forEach((l, idx) => {
+    const o = items.get(l.originalId);
+    const cs = l.candidateIds.map((id) => items.get(id)).filter((x): x is SubItem => !!x);
+    const shown = items.get(l.shownId);
+    const h = l.customer ? (history.get(l.customer) ?? [0, 1, 2].map(() => ({ r: 0, w: 0 }))) : undefined;
+    if (idx >= cut && o && cs.length) {
+      n++;
+      if (h && h.some((x) => x.w > 0)) repeat++;
+      const adj = h ? h.map((x) => x.r / (x.w + PRIOR)) : [0, 0, 0];
+      const score = (c: SubItem, personal: boolean) => {
+        let z = dot(subFeatures(o, c, popRef), params.beta);
+        if (personal) dims(o, c).forEach((on, d) => (z += on ? (adj[d] as number) : 0));
+        return z;
+      };
+      const pick = (personal: boolean) => [...cs].sort((a, b) => score(b, personal) - score(a, personal) || a.id.localeCompare(b.id))[0] as SubItem;
+      const pg = l.trueP[pick(false).id] ?? 0;
+      const pp = l.trueP[pick(true).id] ?? 0;
+      g += pg;
+      pz += pp;
+      diffs.push(pp - pg);
+      orc += Math.max(...cs.map((c) => l.trueP[c.id] ?? 0));
+    }
+    // 记下这位顾客这次的反应（之后的记录才能用）
+    if (h && o && shown && l.customer) {
+      const p = sigmoid(dot(subFeatures(o, shown, popRef), params.beta));
+      dims(o, shown).forEach((on, d) => {
+        if (!on) return;
+        const x = h[d] as { r: number; w: number };
+        x.r += (l.accepted ? 1 : 0) - p;
+        x.w += p * (1 - p);
+      });
+      history.set(l.customer, h);
+    }
+  });
+  const mean = (v: number) => (n ? v / n : 0);
+  const lift = mean(pz) - mean(g);
+  const sd = Math.sqrt(diffs.reduce((a, d) => a + (d - lift) ** 2, 0) / Math.max(1, diffs.length - 1));
+  const liftLow = lift - 1.96 * (sd / Math.sqrt(Math.max(1, diffs.length)));
+  const r4 = (v: number) => Math.round(v * 10000) / 10000;
+  return { global: r4(mean(g)), personal: r4(mean(pz)), oracle: r4(mean(orc)), lift: r4(lift), liftLow: r4(liftLow), n, repeatShare: r4(n ? repeat / n : 0), worth: lift >= 0.01 && liftLow > 0 };
+}

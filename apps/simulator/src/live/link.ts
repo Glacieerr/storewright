@@ -1,15 +1,47 @@
 import { LiveClient } from '@storewright/ops/client';
 import { createHubLink, requestHubPort, type HubLink } from '@storewright/ops/hub-link';
+import type { OpsState } from '@storewright/ops';
 import { useApp } from '../state/store';
 
 /**
- * 门店实况：以查看者身份连接 Storewright 后端，订阅员工端产生的实时事件。
+ * 门店实况（数字孪生的运营孪生）：以查看者身份连接 Storewright 后端，订阅员工端产生的实时事件和设备遥测。
  * 客户端放在模块里（不进入 React 状态），每次变化只把 liveVersion 加一，界面据此重新渲染。
  */
 let client: LiveClient | undefined;
 
 export function liveClient(): LiveClient | undefined {
   return client;
+}
+
+/**
+ * 场景和面板看到的门店（决策记录 0016）：回放时是回放到的那一刻，否则是实时状态。
+ * 回放的状态由 twin.ts 取回后放在这里；场景里所有实时图层都从这里读。
+ */
+let replay: { at: number; state: OpsState } | undefined;
+
+export function setReplayState(r: { at: number; state: OpsState } | undefined): void {
+  replay = r;
+  const st = useApp.getState();
+  useApp.setState({ liveVersion: st.liveVersion + 1 });
+}
+
+export function viewState(): OpsState | undefined {
+  return replay?.state ?? client?.state;
+}
+
+/** 场景里的「现在」：回放时是回放到的时刻，否则是服务端时钟的现在 */
+export function viewNow(): number {
+  return replay?.at ?? (client ? client.now() : Date.now());
+}
+
+export function isReplaying(): boolean {
+  return replay !== undefined;
+}
+
+/** 收到孪生推送：只通知界面，数据由 twin.ts 处理 */
+let twinHandler: ((frame: unknown) => void) | undefined;
+export function setTwinHandler(fn: (frame: unknown) => void): void {
+  twinHandler = fn;
 }
 
 export async function connectLive(url: string, storeId: string): Promise<void> {
@@ -28,6 +60,8 @@ export async function connectLive(url: string, storeId: string): Promise<void> {
       baseUrl: base,
       storeId,
       token,
+      twin: true,
+      onTwin: (f) => twinHandler?.(f),
       onChange: () => {
         if (client !== c) return;
         const st = useApp.getState();
@@ -97,6 +131,8 @@ export async function connectDemoLive(bridgeUrl: string, storeId: string): Promi
       baseUrl: '',
       storeId,
       token,
+      twin: true,
+      onTwin: (f) => twinHandler?.(f),
       WebSocketImpl: l.WebSocket as unknown as typeof WebSocket,
       fetchImpl: l.fetch as unknown as typeof fetch,
       onChange: () => {
@@ -116,11 +152,12 @@ export async function connectDemoLive(bridgeUrl: string, storeId: string): Promi
 export function disconnectLive(): void {
   client?.close();
   client = undefined;
+  replay = undefined;
   const st = useApp.getState();
   if (st.live.status !== 'off') useApp.setState({ live: { ...st.live, status: 'off' }, liveView: false, liveVersion: st.liveVersion + 1 });
 }
 
-/** 某个暂存格位里的实时框数（场景用） */
+/** 某个暂存格位里的框数（场景用；回放时是那一刻的） */
 export function liveSlotCount(code: string): number {
-  return client?.state.slots[code]?.length ?? 0;
+  return viewState()?.slots[code]?.length ?? 0;
 }

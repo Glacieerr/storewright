@@ -47,3 +47,13 @@ export const SCENE = {
   select: '#ff5a36',
 };
 
+/** 季节的地面与草坪颜色（卡通风格：比写实更饱和、更明快）；三维场景和小地图共用 */
+export const GROUND_PALETTE: Record<string, { ground: string; grass: string }> = {
+  spring: { ground: '#a9d47e', grass: '#9fd072' },
+  summer: { ground: '#93c46a', grass: '#86bd5c' },
+  autumn: { ground: '#b8c878', grass: '#a9c46a' },
+  winter: { ground: '#c9c4a6', grass: '#bdbb98' },
+};
+/** 城市街区的硬质铺地 */
+export const URBAN_GROUND = '#cfd2c4';
+

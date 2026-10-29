@@ -1,6 +1,6 @@
-import { expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
 import { Recorder } from './recorder';
-import { signIn, state, tab, until, type AnyState } from './helpers';
+import { signIn, state, tab, until, test, type AnyState } from './helpers';
 
 /** 门店 AI：建议列表与理由、否决必须选原因、运行模式与锁定、人员调动、模型仓库（重新训练、上线检查、回滚）、本地助手与门店经验 */
 test('06 门店 AI', async ({ browser }) => {
@@ -56,17 +56,27 @@ test('06 门店 AI', async ({ browser }) => {
     await expect(leadRow.getByRole('button', { name: '自动执行' })).toBeDisabled();
   }, { shot: lead, device: '带班负责人手机' });
 
-  await r.step('人员：把一名拣货员临时调到交付，固定另一名（AI 不会建议调动固定名单上的人）', async () => {
-    const card = lead.locator('li').filter({ hasText: 'Sam' }).filter({ has: lead.getByRole('button', { name: /调到交付/ }) }).first();
-    await card.getByRole('button', { name: /调到交付/ }).click();
-    await until(lead, (s) => s.roles?.A03 === 'HANDOFF');
-    const other = lead.locator('li').filter({ hasText: 'Jordan' }).filter({ has: lead.getByRole('button', { name: '固定' }) }).first();
-    await other.getByRole('button', { name: '固定' }).click();
+  // 在岗人员与调配（决策记录 0025）：顶栏的「在岗」按钮，所有设备都能看；带班负责人在这里调人
+  await r.step('人员：顶栏「在岗」里把一名拣货员临时调到交付 1 小时（到时间自动回拣货），固定另一名（AI 不会建议调动固定名单上的人）', async () => {
+    await lead.locator('button.team-btn').click();
+    const sheet = lead.getByRole('dialog', { name: '在岗人员' });
+    const sam = sheet.locator('.team-row', { hasText: 'Sam' });
+    await sam.getByRole('button', { name: '调配' }).click();
+    await sam.getByRole('button', { name: /调到交付/ }).click();
+    await until(lead, (s) => s.roles?.A03 === 'HANDOFF' && !!s.roleChanges?.A03?.until);
+    const jordan = sheet.locator('.team-row', { hasText: 'Jordan' });
+    await jordan.getByRole('button', { name: '调配' }).click();
+    await jordan.getByRole('button', { name: '固定' }).click();
     await until(lead, (s) => !!s.staffLocks?.A02);
-    return 'Sam → 交付（临时）；Jordan 固定';
-  }, { shot: lead, device: '带班负责人手机', fullPage: true });
+    await sheet.locator('section[aria-label="交付"]').scrollIntoViewIfNeeded();
+    const row = (await sheet.locator('.team-row', { hasText: 'Sam' }).innerText()).replace(/\n/g, ' ');
+    return `${row}；Jordan 固定（面板留着截图，下一步先关掉）`;
+  }, { shot: lead, device: '带班负责人手机' });
 
   await r.step('重新训练：候选模型与当前版本在同样的数据上比较，过了上线检查才上线', async () => {
+    // 上一步留着的「在岗人员」面板：按 Esc 关掉
+    await lead.keyboard.press('Escape');
+    await expect(lead.getByRole('dialog', { name: '在岗人员' })).toHaveCount(0);
     await lead.getByRole('tab', { name: '模型' }).click();
     await lead.getByRole('button', { name: '重新训练' }).click();
     const toast = lead.locator('.toast', { hasText: /已上线|没有通过/ }).last();

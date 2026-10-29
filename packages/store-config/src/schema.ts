@@ -80,7 +80,33 @@ export const StagingRackSchema = z.object({
   z: z.number().optional(),
 });
 
-const AREA_KIND = z.enum(['UNLOAD', 'RECEIVING_HOLD', 'QA', 'RTV', 'RETURNS', 'PALLETS', 'BALER', 'RACKS', 'COOLER', 'FREEZER', 'OVERSTOCK', 'BULK', 'CAGE', 'CHEM', 'CHARGING', 'STAGING', 'STAGING_DELIVERY', 'STAGING_OVERSIZED', 'HOT_HOLD', 'PARCEL', 'RECOVERY']);
+const AREA_KIND = z.enum([
+  'UNLOAD',
+  'RECEIVING_HOLD',
+  'QA',
+  'RTV',
+  'RETURNS',
+  'PALLETS',
+  'BALER',
+  'RACKS',
+  'COOLER',
+  'FREEZER',
+  'OVERSTOCK',
+  'BULK',
+  'CAGE',
+  'CHEM',
+  'CHARGING',
+  'STAGING',
+  'STAGING_DELIVERY',
+  'STAGING_OVERSIZED',
+  'STAGING_COOLER',
+  'STAGING_FREEZER',
+  'HOT_HOLD',
+  'PARCEL',
+  'RECOVERY',
+  'PASSAGE',
+  'OVERFLOW',
+]);
 
 /** 区域（决策记录 0013）：收货、后仓存储、暂存的每一块地面，矩形，单位米 */
 export const AreaSchema = z.object({
@@ -97,6 +123,15 @@ export const AreaSchema = z.object({
   /** 占用超过这个比例时提醒，默认 0.85 */
   alertAt: z.number().gt(0).max(1).optional(),
   label: z.string().optional(),
+});
+
+/** 卸货场的设置（决策记录 0019），缺省值见 yardSettings() */
+export const YardSchema = z.object({
+  side: z.enum(['RIGHT', 'LEFT']).optional(),
+  via: z.enum(['DRIVE', 'STREET']).optional(),
+  offsetM: z.number().min(0).max(40).optional(),
+  slots: z.number().int().min(0).max(6).optional(),
+  trailerStalls: z.number().int().min(0).max(10).optional(),
 });
 
 /** 卸货门：一楼后墙上的位置（米） */
@@ -285,6 +320,11 @@ export const StoreConfigSchema = z.object({
       pickupBays: z.number().int().min(0).max(30).default(0),
       /** 顾客入口在门店正面的位置（米）；不给时放在正面约 42% 处 */
       entranceX: z.number().optional(),
+      /**
+       * 卸货场（决策记录 0019）：进场道路在门店哪一侧、接主路（专用后勤通道）还是经侧面的支路（路口有信号灯）、
+       * 后勤通道离停车场多远；待命车位数（0 = 按场地自动）与甩挂车位数（停放甩下的挂车）
+       */
+      yard: YardSchema.optional(),
     })
     .default({ parkingRows: 0, pickupBays: 0 }),
   /**
@@ -296,7 +336,7 @@ export const StoreConfigSchema = z.object({
       extraDepthM: z.number().min(0).max(40).default(0),
       rackRows: z.number().int().min(0).max(10).default(0),
       rackLevels: z.number().int().min(2).max(5).default(3),
-      docks: z.number().int().min(1).max(4).default(3),
+      docks: z.number().int().min(1).max(10).default(3),
       forklifts: z.number().int().min(0).max(4).default(1),
       palletJacks: z.number().int().min(0).max(6).default(2),
     })
@@ -329,6 +369,7 @@ export type StagingRackConfig = z.infer<typeof StagingRackSchema>;
 export type AreaConfig = z.infer<typeof AreaSchema>;
 export type DockConfig = z.infer<typeof DockSchema>;
 export type PickupBayConfig = z.infer<typeof PickupBaySchema>;
+export type YardConfig = z.infer<typeof YardSchema>;
 export type CategoryConfig = z.infer<typeof CategorySchema>;
 export type RulesConfig = z.infer<typeof RulesSchema>;
 export type SizeRule = Rule<SizeClass>;

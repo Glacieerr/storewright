@@ -1,16 +1,16 @@
 import { useEffect, useState } from 'react';
 import * as THREE from 'three';
 import { Html } from '@react-three/drei';
-import { handoffBoard, type BoardColor } from '@storewright/ops';
+import { currentRole, handoffBoard, type BoardColor } from '@storewright/ops';
 import { useApp } from '../state/store';
-import { liveClient } from '../live/link';
+import { isReplaying, liveClient, viewNow, viewState } from '../live/link';
+import { ROLE_COLOR } from '../live/roles';
 import { t } from '../i18n';
 
 /**
  * 门店实况叠加层：员工显示在最近一次扫描的位置（货位或暂存格位，不做室内定位），
- * 到店顾客显示在签到填写的取货车位上，颜色与交付看板一致。
+ * 到店顾客显示在签到填写的取货车位上，颜色与交付看板一致。回放时显示回放到的那一刻（决策记录 0016）。
  */
-const ROLE_COLOR: Record<string, string> = { PICK: '#2f9e62', STAGE: '#8a5cd0', HANDOFF: '#e8812f', LEAD: '#2f7fd0' };
 const BOARD_COLOR: Record<BoardColor, string> = { GREY: '#8a96a3', YELLOW: '#e0b020', BLUE: '#2f7fd0', RED: '#d64545' };
 /** 超过这个时间没有扫描的员工不再显示 */
 const STALE_MS = 30 * 60_000;
@@ -28,9 +28,9 @@ export function LiveOverlay() {
   }, [status]);
   const c = liveClient();
   if (status === 'off' || !c?.statics) return null;
-  const s = c.state;
+  const s = viewState() ?? c.state;
   const st = c.statics;
-  const sNow = now + c.offset;
+  const sNow = isReplaying() ? viewNow() : now + c.offset;
 
   const people: Array<{ id: string; name: string; role: string; x: number; y: number; z: number }> = [];
   for (const [id, a] of Object.entries(s.activity)) {
@@ -46,7 +46,8 @@ export function LiveOverlay() {
       const slot = geo.slots.get(a.lastSlotCode);
       if (slot) p = { x: slot.x, y: slot.y, z: slot.z + 0.9 };
     }
-    if (p) people.push({ id, name: who.name, role: who.role, ...p });
+    // 颜色按此刻的岗位（被临时调动的人显示新岗位的颜色）
+    if (p) people.push({ id, name: who.name, role: currentRole(st, s, id, sNow) ?? who.role, ...p });
   }
 
   const bays = geo.lot.spots.filter((sp) => sp.kind === 'pickup');

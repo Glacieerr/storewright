@@ -19,6 +19,8 @@ export interface SubstitutionEvent {
   /** 候选 → 这位顾客真实的接受概率 */
   trueP: Record<string, number>;
   customerType: { brandLoyal: boolean; priceSensitive: boolean; organicStrict: boolean };
+  /** 固定的顾客（opts.customers 给了时）：同一位顾客的偏好不变，用来评估个性化（决策记录 0023 · B4） */
+  customer?: string;
 }
 
 /** 硬约束：同类别、同温区、年龄限制一致、不是同一件商品、名字不同 */
@@ -57,7 +59,7 @@ function trueAcceptance(o: Item, c: Item, t: SubstitutionEvent['customerType'], 
   return 1 / (1 + Math.exp(-u));
 }
 
-export function generateSubstitutionEvents(items: readonly Item[], opts: { seed: number; events?: number; maxCandidates?: number }): SubstitutionEvent[] {
+export function generateSubstitutionEvents(items: readonly Item[], opts: { seed: number; events?: number; maxCandidates?: number; customers?: number }): SubstitutionEvent[] {
   const rng = createRng(hashString(`${opts.seed}:subs`));
   const grocery = items.filter((i) => i.fulfillmentType === 'GROCERY');
   const pops = grocery.map((i) => i.popularity).sort((a, b) => a - b);
@@ -66,17 +68,22 @@ export function generateSubstitutionEvents(items: readonly Item[], opts: { seed:
   const weights = pool.map((o) => o.popularity);
   const out: SubstitutionEvent[] = [];
   const n = opts.events ?? 4000;
+  // 固定的顾客（常客买得多）
+  const people = Array.from({ length: opts.customers ?? 0 }, (_, k) => ({ id: `C${k + 1}`, type: { brandLoyal: rng.chance(0.3), priceSensitive: rng.chance(0.35), organicStrict: rng.chance(0.6) }, intercept: rng.normal(-0.8, 0.6) }));
+  const peopleW = people.map((_, k) => 1 / (1 + k * 0.05));
   for (let i = 0; i < n; i++) {
     const o = pool[rng.weightedIndex(weights)] as Item;
     const all = substituteCandidates(grocery, o);
     const cands = rng.shuffle([...all]).slice(0, opts.maxCandidates ?? 10);
-    const type = { brandLoyal: rng.chance(0.3), priceSensitive: rng.chance(0.35), organicStrict: o.attributes.organic === true && rng.chance(0.6) };
-    const intercept = rng.normal(-0.8, 0.6);
+    // 固定的顾客：偏好和基础接受度属于顾客本人（坚持有机只在原商品是有机时起作用）
+    const who = people.length ? (people[rng.weightedIndex(peopleW)] as (typeof people)[number]) : undefined;
+    const type = who ? { ...who.type, organicStrict: o.attributes.organic === true && who.type.organicStrict } : { brandLoyal: rng.chance(0.3), priceSensitive: rng.chance(0.35), organicStrict: o.attributes.organic === true && rng.chance(0.6) };
+    const intercept = who ? who.intercept : rng.normal(-0.8, 0.6);
     const trueP: Record<string, number> = {};
     for (const c of cands) trueP[c.id] = Math.round(trueAcceptance(o, c, type, popRef, intercept) * 10000) / 10000;
     const ranked = ruleOrder(o, cands);
     const shown = rng.chance(0.6) ? (ranked[0] as Item) : (ranked[rng.int(0, Math.min(4, ranked.length - 1))] as Item);
-    out.push({ originalId: o.id, candidateIds: cands.map((c) => c.id), shownId: shown.id, accepted: rng.chance(trueP[shown.id] as number), trueP, customerType: type });
+    out.push({ originalId: o.id, candidateIds: cands.map((c) => c.id), shownId: shown.id, accepted: rng.chance(trueP[shown.id] as number), trueP, customerType: type, ...(who ? { customer: who.id } : {}) });
   }
   return out;
 }

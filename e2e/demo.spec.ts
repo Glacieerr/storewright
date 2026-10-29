@@ -1,4 +1,3 @@
-import { existsSync } from 'node:fs';
 import { expect, test } from './fixtures';
 
 /**
@@ -22,11 +21,12 @@ test('两个标签页通过浏览器里的门店中枢实时同步；标签页�
   }
   await expect(picker.getByText(/可以领取的批次/)).toBeVisible();
   await picker.getByRole('button', { name: '领取这个批次' }).first().click();
-  await expect(picker.getByText(/第 1 步：给框贴标签并扫描/)).toBeVisible();
+  // 贴标签可以先逐个扫，也可以第一次往框里放东西时再扫（决策记录 0026）
+  await expect(picker.getByText(/贴标签：已扫 \d+ \/ \d+ 个框/)).toBeVisible();
   // 控制台同步看到批次已被领取
   await expect.poll(() => consolePage.locator('.kpi, .stat, .card').filter({ hasText: '拣货批次' }).count()).toBeGreaterThan(0);
 
-  const href = await picker.getByRole('link', { name: '打印本批标签' }).getAttribute('href');
+  const href = await picker.getByRole('link', { name: '打印本批标签' }).first().getAttribute('href');
   expect(href).toContain('label.html#');
   const label = await context.newPage();
   await label.goto(`/app/${href?.replace(/^\.\//, '')}`);
@@ -36,17 +36,70 @@ test('两个标签页通过浏览器里的门店中枢实时同步；标签页�
 test('展示页：模拟器经过桥接页面连到同一个中枢，员工手机和控制台都在线', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/app/showcase.html?layout=split');
-  // 门店实况、控制台、全天仿真（第一次切换时才加载）、两部手机
+  // 数字孪生、控制台、全天仿真（第一次切换时才加载）、两部手机
   const frames = page.locator('iframe');
   await expect(frames).toHaveCount(5);
   const sim = page.frameLocator('iframe.sc-sim');
   await expect(sim.locator('.live-chip', { hasText: '已连接' })).toBeVisible({ timeout: 90_000 });
   const phone = page.frameLocator('.phone iframe').first();
   await expect(phone.locator('.link-state.live')).toBeVisible({ timeout: 60_000 });
-  // 控制台下单后，模拟器的门店实况里出现订单
+  // 控制台下单后，模拟器的数字孪生里出现订单
   const con = page.frameLocator('iframe.sc-console');
   await con.getByRole('button', { name: '创建', exact: true }).click();
   await expect(sim.locator('.live-chip', { hasText: /今日订单 1/ })).toBeVisible();
+});
+
+test('数字孪生：设备故障变成告警，带班负责人在手机上确认、报修；孪生时间轴回放到过去、推演未来；告警解除后在手机上关报修单（决策记录 0016、0026）', async ({ page }) => {
+  test.setTimeout(480_000);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto('/app/showcase.html?layout=split');
+  const con = page.frameLocator('iframe.sc-console');
+  const sim = page.frameLocator('iframe.sc-sim');
+  await expect(con.getByRole('heading', { name: '设备与告警' })).toBeVisible({ timeout: 90_000 });
+  await expect(sim.locator('.live-chip', { hasText: '已连接' })).toBeVisible({ timeout: 90_000 });
+  // 设备读数出现在控制台和三维孪生里
+  await expect(con.locator('.twin-readings li', { hasText: '暂存冷藏柜' }).locator('b')).toHaveText(/°C/, { timeout: 60_000 });
+  // 场景小的时候设备牌按重要程度去重叠，暂存冷藏柜的牌可能暂时被别的牌挡住：只要求它在场景里、至少有一块设备牌看得见
+  await expect(sim.locator('.twin-label', { hasText: '暂存冷藏柜' })).toHaveCount(1, { timeout: 60_000 });
+  await expect(sim.locator('.twin-label:not(.declutter-hidden)').first()).toBeVisible();
+
+  await con.getByRole('button', { name: '暂存冷藏柜故障' }).click();
+  // 温度升过严重线（约 1 分钟）：孪生里设备牌变红，控制台出现告警
+  await expect(sim.locator('.twin-label.s-alarm', { hasText: '暂存冷藏柜' })).toBeVisible({ timeout: 150_000 });
+  await expect(con.locator('.twin-alert.alarm', { hasText: '暂存冷藏柜' })).toBeVisible();
+
+  // 带班负责人的手机：顶部的告警条，确认
+  await page.locator('.phone select').first().selectOption('A08');
+  const lead = page.frameLocator('.phone iframe').first();
+  const banner = lead.locator('.alert-banner.alarm');
+  await expect(banner).toBeVisible({ timeout: 60_000 });
+  await banner.locator('.alert-banner-head').click();
+  await lead.getByRole('button', { name: '确认，我来处理' }).click();
+  await expect(lead.getByText('已确认，正在处理')).toBeVisible();
+  await expect(page.locator('.sc-steps li').nth(6)).toHaveClass(/done/);
+  // 报修：这台设备管着的暂存格位暂停放新框
+  await banner.locator('.alert-banner-head').click();
+  await lead.getByRole('button', { name: '报修', exact: true }).click();
+  await expect(lead.getByText(/已报修/)).toBeVisible();
+
+  // 孪生时间轴：回放到过去（场景上方说明回放到哪一刻），回到实时，推演未来
+  await sim.getByRole('button', { name: '◀ 回放' }).click();
+  await expect(sim.locator('.twin-card.replay')).toBeVisible({ timeout: 30_000 });
+  await sim.getByRole('button', { name: '实时', exact: true }).click();
+  await expect(sim.locator('.twin-card')).toHaveCount(0);
+  await sim.getByRole('button', { name: '推演 ▶' }).click();
+  await expect(sim.locator('.twin-card.forecast')).toContainText('预计');
+  // 孪生面板：推演表和告警
+  await sim.getByRole('button', { name: '孪生面板' }).click();
+  await expect(sim.locator('.twin-drawer table.twin-kpi')).toContainText('顾客平均等待');
+  await expect(sim.locator('.twin-drawer .twin-alerts')).toContainText('温度过高');
+  await con.getByRole('button', { name: '全部修复' }).click();
+  // 告警解除以后，带班负责人的手机顶部改为「报修单（1）」，点开就能关单（写操作指南时发现，决策记录 0026 第 8 节）
+  const tickets = lead.locator('.alert-banner', { hasText: '报修单（1）' });
+  await expect(tickets).toBeVisible({ timeout: 240_000 });
+  await tickets.locator('.alert-banner-head').click();
+  await lead.getByRole('button', { name: '修好了，关单' }).click();
+  await expect(lead.locator('.alert-banner')).toHaveCount(0);
 });
 
 test('家居建材店（第二个行业）也能在浏览器里打开，没有熟食模块', async ({ page }) => {
@@ -66,6 +119,28 @@ test('展示页的引导按实时状态打勾；关闭所有页面后数据还�
   await con.getByRole('button', { name: '创建', exact: true }).click();
   await expect(page.locator('.sc-steps li').first()).toHaveClass(/done/);
   await expect(page.locator('.sc-steps li').nth(1)).toHaveClass(/current/);
+
+  // 中枢先回复、再按顺序写进 IndexedDB：等这张订单真正保存下来再关页面（机器忙的时候写入会排一会儿队）
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () =>
+            new Promise<number>((resolve) => {
+              const r = indexedDB.open('storewright-demo');
+              r.onerror = () => resolve(0);
+              r.onsuccess = () => {
+                const db = r.result;
+                if (!db.objectStoreNames.contains('events')) return resolve(0);
+                const all = db.transaction('events').objectStore('events').getAll();
+                all.onsuccess = () => resolve((all.result as Array<{ e: { type: string } }>).filter((x) => x.e.type === 'OrderCreated').length);
+                all.onerror = () => resolve(0);
+              };
+            }),
+        ),
+      { timeout: 30_000 },
+    )
+    .toBeGreaterThan(0);
 
   // 关闭这个网站的所有页面（中枢随之结束），再打开：从浏览器存储恢复
   await page.close();
@@ -117,9 +192,7 @@ test('自动运营（双线并行）：虚拟员工领取自动运营的批次�
   await expect(card).toContainText('已停止');
 });
 
-test('你的商店：新建门店 → 编辑器 → 开业检查；免费版的实时沙盒提示专业版', async ({ page }) => {
-  // 「你的商店」是在线版的付费部分，代码在私有仓库；公开仓库的持续集成里没有它
-  test.skip(!existsSync('private/your-store-app/src/index.tsx'), '没有「你的商店」的私有模块');
+test('你的商店：新建门店 → 编辑器 → 开业检查 → 实时沙盒；门店可以复制、导出', async ({ page, context }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.addInitScript(() => localStorage.setItem('storewright.tour.seen', '1'));
   await page.goto('/sim/?yours');
@@ -131,15 +204,19 @@ test('你的商店：新建门店 → 编辑器 → 开业检查；免费版的�
   await page.locator('.pb-steps').getByRole('button', { name: /开业检查/ }).click();
   await expect(page.locator('.golive')).toContainText('可以开业');
   await page.getByRole('button', { name: '知道了' }).click();
-  await page.locator('.project-bar').getByRole('button', { name: '实时沙盒' }).click();
-  // 免费版：打开项目页并直接提示专业版
-  await expect(page.locator('.your-store')).toBeVisible();
-  await expect(page.locator('.ys-modal')).toContainText('专业版');
-  // 关掉提示后，门店卡片上的「实时沙盒」也会提示
-  await page.locator('.ys-modal').getByRole('button', { name: '以后再说' }).click();
-  await expect(page.locator('.ys-modal')).toHaveCount(0);
-  await page.locator('.ys-card').getByRole('button', { name: '实时沙盒' }).click();
-  await expect(page.locator('.ys-modal')).toContainText('专业版');
+  // 实时沙盒在新标签页打开展示页，浏览器里的门店中枢按这家门店建店
+  const [sandbox] = await Promise.all([context.waitForEvent('page'), page.locator('.project-bar').getByRole('button', { name: '实时沙盒' }).click()]);
+  await expect(sandbox).toHaveURL(/showcase\.html\?project=/);
+  await expect(sandbox.locator('.sc-head h1')).toContainText('E2E Store', { timeout: 60_000 });
+  await sandbox.close();
+  // 门店数量不限：复制出第二家（新的排在前面），再导出成门店文件
+  await page.locator('.project-bar').getByRole('button', { name: '我的门店' }).click();
+  await expect(page.locator('.ys-card')).toHaveCount(1);
+  await page.locator('.ys-card').getByRole('button', { name: '复制' }).click();
+  await expect(page.locator('.ys-card')).toHaveCount(2);
+  await expect(page.locator('.ys-card').first()).toContainText('E2E Store 副本');
+  const [file] = await Promise.all([page.waitForEvent('download'), page.locator('.ys-card').first().getByRole('button', { name: '导出' }).click()]);
+  expect(file.suggestedFilename()).toMatch(/\.storewright\.json$/);
 });
 
 test('手机宽度的模拟器：顶栏收成一行，点「设置」展开其余控件；场景占屏幕的大部分，没有横向滚动', async ({ page }) => {

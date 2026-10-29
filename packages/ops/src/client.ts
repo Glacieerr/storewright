@@ -38,6 +38,10 @@ export interface LiveClientOptions {
   WebSocketImpl?: typeof WebSocket;
   fetchImpl?: typeof fetch;
   pingMs?: number;
+  /** 订阅数字孪生的遥测推送（模拟器、控制台；员工手机不订阅，决策记录 0016） */
+  twin?: boolean;
+  /** 收到一帧孪生推送（内容见 @storewright/twin 的 TwinFrame） */
+  onTwin?: (frame: unknown) => void;
 }
 
 interface Queued {
@@ -65,6 +69,8 @@ export class LiveClient {
   /** 每次状态变化加一，界面用它判断是否重新渲染 */
   version = 0;
   outbox: Queued[] = [];
+  /** 最近一帧孪生推送（订阅了孪生时） */
+  twinFrame: unknown;
   private ws: WebSocket | undefined;
   private retry = 0;
   private timer: ReturnType<typeof setTimeout> | undefined;
@@ -147,6 +153,13 @@ export class LiveClient {
       this.setStatus('offline');
       return { ok: true, events: [], queued: true };
     }
+  }
+
+  /** 读取门店接口（带会话令牌），例如 /twin、/twin/at?t=…；失败时抛出错误 */
+  async getJson<T>(path: string): Promise<T> {
+    const res = await this.fetcher(this.url(path), { headers: { authorization: `Bearer ${this.o.token}` } });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return (await res.json()) as T;
   }
 
   private url(path: string, ws = false): string {
@@ -264,6 +277,7 @@ export class LiveClient {
         if (Number(m.seq) < this.state.seq) this.ws?.send(JSON.stringify({ t: 'resync', after: 0 }));
         this.setStatus('live');
         this.startPing();
+        if (this.o.twin) this.ws?.send(JSON.stringify({ t: 'twin', on: true }));
         void this.flush();
         break;
       }
@@ -279,6 +293,10 @@ export class LiveClient {
         break;
       case 'events':
         this.apply(m.events as AnyOpsEvent[]);
+        break;
+      case 'twin':
+        this.twinFrame = m;
+        this.o.onTwin?.(m);
         break;
       case 'pong': {
         const sent = this.pings.get(Number(m.id));

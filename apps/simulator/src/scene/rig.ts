@@ -1,4 +1,4 @@
-import { roundCorners, TimedPath, type Dynamics, type PathState, type Pt } from './lot';
+import { TimedPath, type Dynamics, type PathLike, type PathState } from './lot';
 import { SEMI } from './vehicles';
 
 /**
@@ -41,7 +41,7 @@ export class ForwardRig implements RigPath {
   private readonly s = { x: 0, z: 0, heading: 0 } as PathState;
 
   constructor(
-    readonly path: TimedPath,
+    readonly path: PathLike,
     trailer0?: number,
   ) {
     this.duration = path.duration;
@@ -114,6 +114,7 @@ export class ReverseRig implements RigPath {
     out.accel = this.a.accel ?? 0;
     out.steer = Math.max(-0.6, Math.min(0.6, angDiff(k.th, tractor)));
     out.dist = this.a.dist ?? 0;
+    out.lat = 0;
     out.reversing = true;
   }
 
@@ -122,85 +123,4 @@ export class ReverseRig implements RigPath {
     this.at(this.duration, out);
     return out;
   }
-}
-
-/** 半挂车靠台：前进驶过卸货门 → 倒车让挂车后轴沿圆弧退进卸货口 → 卸货 → 前进驶离 */
-export interface SemiDockPlan {
-  entry: ForwardRig;
-  back: ReverseRig;
-  leave: ForwardRig;
-  parked: RigPose;
-}
-
-export function planSemiDock(opts: {
-  startX: number;
-  inLane: number;
-  outLane: number;
-  endX: number;
-  serviceX: number;
-  zTurn: number;
-  doorX: number;
-  wallZ: number;
-  roadEdgeZ: number;
-}): SemiDockPlan {
-  const { startX, inLane, outLane, endX, serviceX, zTurn, doorX, wallZ, roadEdgeZ } = opts;
-  const speed = (a: Pt, b: Pt) => (Math.max(a.z, b.z) < roadEdgeZ - 1 ? 11 : 4.5);
-  // 挂车后轴要在卸货门左侧 22 米处（圆角最多是相邻两段长度的一半，所以留足 2 × 10 米）
-  const pullX = doorX - 22 - L;
-  const entry = new ForwardRig(
-    new TimedPath(
-      roundCorners(
-        [
-          { x: startX, z: inLane },
-          { x: serviceX, z: inLane },
-          { x: serviceX, z: zTurn },
-          { x: pullX, z: zTurn },
-        ],
-        9,
-      ),
-      speed,
-      false,
-      { ...TRUCK_DYN, v0: 'cap' },
-    ),
-  );
-  const e = entry.end();
-  const axle = { x: e.x - L * Math.sin(e.trailer), z: e.z - L * Math.cos(e.trailer) };
-  // 后退方向 = 挂车车头的反方向；先直退 2 米，再沿半径 10 米的圆弧转到垂直于后墙，最后直退靠台
-  // （12 米的挂车沿 10 米半径倒车，铰接角约 50°）
-  const back = new ReverseRig(
-    new TimedPath(
-      roundCorners(
-        [
-          axle,
-          { x: axle.x - 2 * Math.sin(e.trailer), z: axle.z - 2 * Math.cos(e.trailer) },
-          { x: doorX, z: axle.z },
-          { x: doorX, z: wallZ + 0.6 + (SEMI.kingpinToRear - L) },
-        ],
-        10,
-      ),
-      () => 1.4,
-      true,
-      { accel: 0.5, decel: 0.8, lat: 0.8, wheelbase: 4 },
-    ),
-  );
-  const parked = back.end();
-  const leave = new ForwardRig(
-    new TimedPath(
-      roundCorners(
-        [
-          { x: parked.x, z: parked.z },
-          { x: parked.x, z: zTurn },
-          { x: serviceX, z: zTurn },
-          { x: serviceX, z: outLane },
-          { x: endX, z: outLane },
-        ],
-        9,
-      ),
-      speed,
-      false,
-      { ...TRUCK_DYN, v1: 'cap' },
-    ),
-    parked.trailer,
-  );
-  return { entry, back, leave, parked };
 }

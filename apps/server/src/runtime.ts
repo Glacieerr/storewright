@@ -17,6 +17,8 @@ export class StoreRuntime {
   state: OpsState = emptyState();
   /** 最近的事件，用于断线重连时快速补发 */
   private recent: AnyOpsEvent[] = [];
+  /** 事件记录里第一条事件的时间（复盘只看系统在运行的时段） */
+  firstEventAt: number | undefined;
   private queue: Promise<unknown> = Promise.resolve();
   /** 门店里的服务（AI、自动运营、客流仿真）：每条命令的事件立即收到 */
   private readonly listeners = new Set<(m: HubMessage) => void>();
@@ -59,6 +61,11 @@ export class StoreRuntime {
     return this.listeners.size + this.devices.size;
   }
 
+  /** 内存里最近的事件（最多 recentLimit 条；问数里查某张订单的经过用） */
+  recentEvents(): readonly AnyOpsEvent[] {
+    return this.recent;
+  }
+
   /** seq 之后的事件；太旧（不在内存中）时返回 undefined，调用方改发快照 */
   eventsAfter(seq: number): AnyOpsEvent[] | undefined {
     if (seq >= this.state.seq) return [];
@@ -75,6 +82,7 @@ export class StoreRuntime {
     this.pending = [];
     this.state = emptyState();
     this.recent = [];
+    this.firstEventAt = undefined;
     for (const l of [...this.listeners, ...this.devices]) l({ t: 'reset' });
   }
 
@@ -115,6 +123,7 @@ export class StoreRuntime {
 
   private remember(events: readonly AnyOpsEvent[]): void {
     if (!events.length) return;
+    this.firstEventAt ??= events[0]?.at;
     this.recent.push(...events);
     if (this.recent.length > this.recentLimit) this.recent.splice(0, this.recent.length - this.recentLimit);
   }

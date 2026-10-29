@@ -5,11 +5,13 @@ import { useEffect, type RefObject } from 'react';
  * 通道号挤在一起）。每 250 毫秒按屏幕位置检查一次：重要的标签先放，和已经放好的标签重叠的暂时隐藏（加 declutter-hidden，
  * visibility: hidden，不改变布局，所以下一次还能量到它的位置）。员工和车辆的实时标签不参与（它们一直在动）。
  */
-const SELECTOR = '.scene-label.area-label, .scene-label.run-label, .scene-label.floor-label';
+const SELECTOR = '.scene-label.area-label, .scene-label.run-label, .scene-label.floor-label, .scene-label.twin-label';
 
 /** 越大越先放 */
 function priority(el: HTMLElement): number {
   const c = el.classList;
+  // 数字孪生的设备牌（决策记录 0016）：告警的最先放，温度牌比区域名重要（设备牌里已经带着区域名）
+  if (c.contains('twin-label')) return c.contains('s-alarm') ? 8 : c.contains('kind-TEMP') ? 5 : 3;
   if (c.contains('pickup-label') || c.contains('floor-label')) return 5;
   if (c.contains('handle-label')) return 6;
   if (c.contains('alert')) return 4;

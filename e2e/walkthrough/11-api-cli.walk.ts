@@ -1,7 +1,7 @@
 import { execSync } from 'node:child_process';
-import { expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
 import { Recorder } from './recorder';
-import { LIVE } from './helpers';
+import { LIVE, test } from './helpers';
 
 /** 接口与命令行：健康检查、权限、传感器与 POS 接入、标签（SVG / ZPL）、仿真与报告命令 */
 test('11 接口与命令行', async ({ request }) => {

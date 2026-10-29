@@ -1,6 +1,6 @@
-import { expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
 import { Recorder } from './recorder';
-import { SITE } from './helpers';
+import { SITE, test } from './helpers';
 
 /** 运营模拟器：视角、建筑剖切、叠加层、门店模板（含建材店）、策略对比、方案与报告、布局编辑、导览与巡游 */
 test('10 运营模拟器', async ({ browser }) => {

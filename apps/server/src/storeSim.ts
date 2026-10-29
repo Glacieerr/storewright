@@ -68,13 +68,13 @@ export class StoreSim {
    */
   private storeHour = 9;
 
-  start(speed = 30): void {
+  /** startHour：从门店时间的几点开始（测试用，结果不随打开的时间变化）；不填时营业时间内从现在的钟点开始，否则从早上 9 点开始 */
+  start(speed = 30, startHour?: number): void {
     this.status.speed = Math.max(1, Math.min(600, speed));
     if (this.timer) return;
-    // 营业时间内打开：从现在的钟点开始；否则从早上 9 点开始
     const d = new Date();
     const h = d.getHours() + d.getMinutes() / 60;
-    this.storeHour = h >= 8 && h < 21 ? h : 9;
+    this.storeHour = startHour ?? (h >= 8 && h < 21 ? h : 9);
     this.status.storeHour = this.storeHour;
     for (const p of this.rt.statics.planogram) if (!this.truth.has(p.itemId)) this.truth.set(p.itemId, Math.round(shelfNow(this.rt.state, p).est));
     this.unsub = this.rt.subscribe((m) => {

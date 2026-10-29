@@ -13,6 +13,9 @@ export interface CaseLabelData {
   name: string;
   packQty: number;
   receivedAt: number;
+  /** 批号、保质期（决策记录 0026：收货时记下的印在箱标签上） */
+  lot?: string;
+  expiry?: string;
 }
 
 export const CASE_LABEL_WIDTH = 812;
@@ -68,6 +71,7 @@ export function caseLabelSvg(d: CaseLabelData): string {
   s += `<text x="28" y="226" font-family="${FONT}" font-weight="900" font-size="54">${d.packQty} EA</text>`;
   s += `<text x="270" y="176" font-family="${FONT}" font-size="22" font-weight="600">RECEIVED</text>`;
   s += `<text x="270" y="222" font-family="${MONO}" font-weight="700" font-size="36">${ymd(d.receivedAt)}</text>`;
+  if (d.lot || d.expiry) s += `<text x="28" y="272" font-family="${MONO}" font-weight="700" font-size="24">${esc([d.lot ? `LOT ${d.lot}` : '', d.expiry ? `EXP ${d.expiry}` : ''].filter(Boolean).join('  '))}</text>`;
   s += qrSvgPath(caseDigitalLink(d.gtin, d.caseId), 548, 28, 240);
   s += `<text x="668" y="292" font-family="${FONT}" font-size="18" text-anchor="middle">GS1 Digital Link</text>`;
   if (upc) {
@@ -95,6 +99,7 @@ export function caseLabelZpl(d: CaseLabelData): string {
     `^FO28,180^A0N,54,54^FD${d.packQty} EA^FS`,
     '^FO270,152^A0N,22,22^FDRECEIVED^FS',
     `^FO270,184^A0N,36,36^FD${ymd(d.receivedAt)}^FS`,
+    ...(d.lot || d.expiry ? [`^FO28,250^A0N,24,24${zplField([d.lot ? `LOT ${d.lot}` : '', d.expiry ? `EXP ${d.expiry}` : ''].filter(Boolean).join('  '))}`] : []),
     `^FO560,28^BQN,2,5^FDMA,${caseDigitalLink(d.gtin, d.caseId)}^FS`,
     upc ? `^FO96,320^BY4^BUN,170,Y,N,Y^FD${upc.slice(0, 11)}^FS` : `^FO28,330^A0N,40,40${zplField(d.gtin)}`,
     '^XZ',

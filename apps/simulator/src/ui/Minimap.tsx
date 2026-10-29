@@ -3,7 +3,8 @@ import { useApp } from '../state/store';
 import { framePositions } from '../scene/framePositions';
 import { cameraState } from '../scene/cameraState';
 import { siteFor } from '../scene/useSite';
-import { ROLE_COLOR } from '../scene/palette';
+import { riverX } from '../scene/terrain/waterPlan';
+import { GROUND_PALETTE, ROLE_COLOR, URBAN_GROUND } from '../scene/palette';
 import { t } from '../i18n';
 
 /** 画布上记录当前的映射参数，点击时反算世界坐标 */
@@ -48,9 +49,42 @@ export function Minimap() {
         g.fillRect(u(x + w / 2), v(z + d / 2), w * k, d * k);
       };
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
-      g.fillStyle = s.ground.color;
+      // 地面颜色与三维场景一致（按季节；城市街区是浅灰的硬质铺地）
+      const season = site.season ?? 'autumn';
+      g.fillStyle = s.style === 'urban' && season !== 'winter' ? URBAN_GROUND : (GROUND_PALETTE[season]?.ground ?? s.ground.color);
       g.fillRect(0, 0, W, H);
+      // 水系：湖（岸线多边形）和河道（沿中心线的一条带子）
+      const water = s.water;
+      g.fillStyle = '#74c6d6';
+      g.beginPath();
+      water.lake.shore.forEach((p, i) => (i ? g.lineTo(u(p.x), v(p.z)) : g.moveTo(u(p.x), v(p.z))));
+      g.closePath();
+      g.fill();
+      const r = water.river;
+      const zs: number[] = [];
+      for (let z = r.zWeir; z <= maxZ + 4; z += 2) zs.push(z);
+      g.beginPath();
+      zs.forEach((z, i) => (i ? g.lineTo(u(riverX(r, z) - r.half), v(z)) : g.moveTo(u(riverX(r, z) - r.half), v(z))));
+      for (const z of [...zs].reverse()) g.lineTo(u(riverX(r, z) + r.half), v(z));
+      g.closePath();
+      g.fill();
+      // 出海水道和海湾（决策记录 0019）
+      const o = water.outlet;
+      if (o) {
+        rect(o.x, (o.z0 + o.z1) / 2, o.half * 2, o.z1 - o.z0, '#74c6d6');
+        g.beginPath();
+        g.ellipse(u(o.bay.cx), v(o.bay.cz), o.bay.rx * k, o.bay.rz * k, 0, 0, Math.PI * 2);
+        g.fill();
+      }
       for (const a of s.asphalt) rect(a.x, a.z, a.w, a.d, '#9aa1a8');
+      // 出入口的喇叭口
+      g.fillStyle = '#9aa1a8';
+      for (const poly of s.asphaltPolys) {
+        g.beginPath();
+        poly.forEach((p, i) => (i ? g.lineTo(u(p.x), v(p.z)) : g.moveTo(u(p.x), v(p.z))));
+        g.closePath();
+        g.fill();
+      }
       rect((geo.lot.minX + geo.lot.maxX) / 2, geo.lot.edgeZ / 2, geo.lot.maxX - geo.lot.minX, -geo.lot.edgeZ, '#b3b9bf');
       for (const p of geo.lot.spots.slice(0, geo.lot.pickupCount)) rect(p.x, p.z, 2.6, 5, '#f2b27a');
       for (const f of geo.floors) if (f.level === 0) rect((f.minX + f.maxX) / 2, (f.minZ + f.maxZ) / 2, f.maxX - f.minX, f.maxZ - f.minZ, '#efe7d6');

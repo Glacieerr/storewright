@@ -6,9 +6,9 @@ import { toonGradient } from './toon';
 import { useNightGlow } from './environment';
 
 /**
- * 人物：躯干、头、头发（短发 / 长发 / 帽子 / 光头）、双臂、双腿和可选的手推车，全部实例化绘制。
- * 走路时手臂和腿交替摆动（按真实时间摆动，高倍速播放时也不会抽搐），站立时自然下垂。
- * 发型、发色、肤色和身高由 seed 决定（同一个人始终一样）；孩子用较小的 scale。
+ * 人物（基础轮廓）：上身（衣服颜色）、下身（裤子颜色）和头三个圆润的部件，加上可选的手推车，全部实例化绘制。
+ * 不画四肢和五官，只保留能看出岗位颜色和朝向的轮廓；走路时身体轻微起伏、前倾。
+ * 肤色和身高由 seed 决定（同一个人始终一样）；孩子用较小的 scale。
  */
 
 export interface PersonState {
@@ -37,24 +37,15 @@ const CART_PICK = new THREE.Color(SCENE.cart);
 const CART_SHOP = new THREE.Color('#b8c2cc');
 const CART_STOCK = new THREE.Color('#3f6b4f');
 const SKINS = ['#f1d3b8', '#e8bf9a', '#d6a37c', '#b9805a', '#8d5a3b', '#f5dcc6'].map((c) => new THREE.Color(c));
-const HAIRS = ['#2b2420', '#4a3426', '#6b4a2f', '#a07a4f', '#d8c090', '#8a8a8a', '#1c1c1c'].map((c) => new THREE.Color(c));
-const CAPS = ['#c0392b', '#2c3e50', '#27ae60', '#f39c12', '#ecf0f1'].map((c) => new THREE.Color(c));
 
-/** 由 seed 得到稳定的外貌：发型 0 光头 / 1 短发 / 2 长发 / 3 帽子，肤色、发色、身高系数 */
-function looks(seed: number): { hair: number; skin: THREE.Color; hairColor: THREE.Color; height: number } {
+/** 由 seed 得到稳定的外貌：肤色、身高系数 */
+function looks(seed: number): { skin: THREE.Color; height: number } {
   let h = Math.floor(Math.abs(seed) * 1000 + 17) >>> 0;
   h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d) >>> 0;
   h = Math.imul(h ^ (h >>> 12), 0x297a2d39) >>> 0;
   // 0 ≤ r < 1（除以 256，保证下标不越界）
   const r = (k: number) => ((h >>> k) & 0xff) / 256;
-  const hs = r(0);
-  const hair = hs < 0.08 ? 0 : hs < 0.55 ? 1 : hs < 0.85 ? 2 : 3;
-  return {
-    hair,
-    skin: SKINS[Math.floor(r(8) * SKINS.length)] as THREE.Color,
-    hairColor: hair === 3 ? (CAPS[Math.floor(r(16) * CAPS.length)] as THREE.Color) : (HAIRS[Math.floor(r(16) * HAIRS.length)] as THREE.Color),
-    height: 0.92 + r(24) * 0.16,
-  };
+  return { skin: SKINS[Math.floor(r(8) * SKINS.length)] as THREE.Color, height: 0.92 + r(24) * 0.16 };
 }
 
 interface Props {
@@ -66,103 +57,116 @@ interface Props {
   onContext?: (index: number, e: ThreeEvent<MouseEvent>) => void;
 }
 
+/** 购物车 / 拣货车：车筐（四面细框 + 底）、推把、底架和四个小轮（单位尺寸，按 cart 类型缩放） */
+function cartGeometry(): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = [];
+  const add = (w: number, h: number, d: number, x: number, y: number, z: number) => {
+    const g = new THREE.BoxGeometry(w, h, d);
+    g.translate(x, y, z);
+    parts.push(g.toNonIndexed());
+  };
+  // 车筐：底、两侧、前后（细框，看起来是空的）
+  add(0.52, 0.03, 0.78, 0, 0.62, 0);
+  for (const sx of [-0.26, 0.26]) {
+    add(0.03, 0.34, 0.78, sx, 0.79, 0);
+    add(0.03, 0.03, 0.78, sx, 0.97, 0);
+  }
+  add(0.52, 0.34, 0.03, 0, 0.79, 0.39);
+  add(0.52, 0.03, 0.03, 0, 0.97, -0.39);
+  // 推把
+  add(0.56, 0.04, 0.04, 0, 1.04, -0.46);
+  for (const sx of [-0.25, 0.25]) add(0.03, 0.12, 0.03, sx, 0.99, -0.43);
+  // 底架与轮子
+  add(0.4, 0.03, 0.7, 0, 0.18, 0.02);
+  for (const sx of [-0.2, 0.2]) for (const sz of [-0.3, 0.32]) add(0.04, 0.1, 0.1, sx, 0.06, sz);
+  for (const sx of [-0.2, 0.2]) add(0.03, 0.46, 0.03, sx, 0.4, -0.3);
+  const merged = new THREE.BufferGeometry();
+  let n = 0;
+  for (const g of parts) n += g.getAttribute('position').count;
+  const pos = new Float32Array(n * 3);
+  const nrm = new Float32Array(n * 3);
+  let o = 0;
+  for (const g of parts) {
+    pos.set(g.getAttribute('position').array as Float32Array, o * 3);
+    nrm.set(g.getAttribute('normal').array as Float32Array, o * 3);
+    o += g.getAttribute('position').count;
+  }
+  merged.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  merged.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+  return merged;
+}
+
 export function People({ max, fill, onSelect, onContext }: Props) {
   const people = useMemo(() => makePeople(max), [max]);
-  const torso = useRef<THREE.InstancedMesh>(null);
+  const upper = useRef<THREE.InstancedMesh>(null);
+  const lower = useRef<THREE.InstancedMesh>(null);
   const head = useRef<THREE.InstancedMesh>(null);
-  const legs = useRef<THREE.InstancedMesh>(null);
-  const arms = useRef<THREE.InstancedMesh>(null);
   const cart = useRef<THREE.InstancedMesh>(null);
-  const hairTop = useRef<THREE.InstancedMesh>(null);
-  const hairBack = useRef<THREE.InstancedMesh>(null);
-  const glowHair = useNightGlow<THREE.MeshToonMaterial>(0.3);
-  const glowT = useNightGlow<THREE.MeshToonMaterial>(0.35);
-  const glowH = useNightGlow<THREE.MeshToonMaterial>(0.35);
+  const glowU = useNightGlow<THREE.MeshToonMaterial>(0.35);
   const glowL = useNightGlow<THREE.MeshToonMaterial>(0.3);
-  const glowA = useNightGlow<THREE.MeshToonMaterial>(0.35);
+  const glowH = useNightGlow<THREE.MeshToonMaterial>(0.35);
   const glowC = useNightGlow<THREE.MeshToonMaterial>(0.3);
 
   useFrame(() => {
-    const T = torso.current;
+    const U = upper.current;
+    const L = lower.current;
     const H = head.current;
-    const L = legs.current;
-    const A = arms.current;
     const C = cart.current;
-    const HT = hairTop.current;
-    const HB = hairBack.current;
-    if (!T || !H || !L || !A || !C || !HT || !HB) return;
+    if (!U || !L || !H || !C) return;
     const n = Math.min(max, fill(people));
     const now = performance.now() / 1000;
     let carts = 0;
-    let tops = 0;
-    let backs = 0;
     for (let i = 0; i < n; i++) {
       const p = people[i] as PersonState;
       const s = p.scale;
       const look = looks(p.seed);
-      // 孩子（scale 小）走得快一点、摆得更频
+      // 走路：按真实时间起伏（高倍速播放时也不会抽搐），身体略微前倾、左右轻晃
       const freq = s < 1 ? 10 : 8;
-      const swing = p.moving ? Math.sin(now * freq + p.seed) * 0.55 : 0;
-      const bob = p.moving ? Math.abs(Math.cos(now * freq + p.seed)) * 0.04 * s : 0;
+      const ph = now * freq + p.seed;
+      const bob = p.moving ? Math.abs(Math.cos(ph)) * 0.035 * s : 0;
+      const lean = p.moving ? 0.07 : 0;
+      const sway = p.moving ? Math.sin(ph) * 0.035 : 0;
       base.position.set(p.x, p.y + bob, p.z);
-      base.rotation.set(0, p.heading, 0);
+      base.rotation.set(lean, p.heading, sway, 'YXZ');
       base.scale.set(s, s * look.height, s);
       base.updateMatrix();
-      // 部件在人物局部坐标中的位置；四肢几何体的原点在关节处，绕关节摆动
-      const put = (mesh: THREE.InstancedMesh, idx: number, x: number, y: number, z: number, rx: number, sx: number, sy: number, sz: number) => {
-        part.position.set(x, y, z);
-        part.rotation.set(rx, 0, 0);
-        part.scale.set(sx, sy, sz);
+      const put = (mesh: THREE.InstancedMesh, idx: number, y: number, z = 0) => {
+        part.position.set(0, y, z);
+        part.rotation.set(0, 0, 0);
+        part.scale.set(1, 1, 1);
         part.updateMatrix();
         mesh.setMatrixAt(idx, m4.multiplyMatrices(base.matrix, part.matrix));
       };
-      put(T, i, 0, 0.98, 0, 0, 1, 1, 1);
-      T.setColorAt(i, p.shirt);
-      put(H, i, 0, 1.56, 0, 0, 1, 1, 1);
+      put(U, i, 1.12);
+      U.setColorAt(i, p.shirt);
+      put(L, i, 0.47);
+      L.setColorAt(i, p.pants);
+      put(H, i, 1.6);
       H.setColorAt(i, look.skin);
-      // 头发：短发和长发是头顶的半球，长发再加脑后一片；帽子是彩色帽顶加帽檐
-      if (look.hair > 0 && tops < max) {
-        put(HT, tops, 0, look.hair === 3 ? 1.61 : 1.6, -0.01, 0, look.hair === 3 ? 1.12 : 1.08, look.hair === 3 ? 0.78 : 0.8, look.hair === 3 ? 1.12 : 1.08);
-        HT.setColorAt(tops++, look.hairColor);
-      }
-      if (look.hair === 2 && backs < max * 2) {
-        put(HB, backs, 0, 1.5, -0.13, 0, 0.3, 0.32, 0.1);
-        HB.setColorAt(backs++, look.hairColor);
-      }
-      if (look.hair === 3 && backs < max * 2) {
-        put(HB, backs, 0, 1.63, 0.15, 0, 0.26, 0.03, 0.16);
-        HB.setColorAt(backs++, look.hairColor);
-      }
-      // 腿：髋关节在 0.72 米高处；推车时手臂前伸
-      put(L, i * 2, 0.1, 0.72, 0, swing, 0.13, 0.7, 0.15);
-      put(L, i * 2 + 1, -0.1, 0.72, 0, -swing, 0.13, 0.7, 0.15);
-      L.setColorAt(i * 2, p.pants);
-      L.setColorAt(i * 2 + 1, p.pants);
-      const armRest = p.cart !== 'none' ? -1.1 : 0;
-      put(A, i * 2, 0.27, 1.28, 0, armRest + (p.cart !== 'none' ? 0 : -swing), 0.1, 0.55, 0.1);
-      put(A, i * 2 + 1, -0.27, 1.28, 0, armRest + (p.cart !== 'none' ? 0 : swing), 0.1, 0.55, 0.1);
-      A.setColorAt(i * 2, p.shirt);
-      A.setColorAt(i * 2 + 1, p.shirt);
       if (p.cart !== 'none' && carts < max) {
-        // 补货车更高，装满纸箱
-        if (p.cart === 'stocking') put(C, carts, 0, 0.75, 0.85, 0, 0.62, 1.3, 1.0);
-        else put(C, carts, 0, 0.5, 0.75, 0, 0.55, 0.55, 0.8);
+        // 推车：车放在人前面（不跟着身体前倾），补货车更高
+        base.rotation.set(0, p.heading, 0);
+        base.position.set(p.x, p.y, p.z);
+        base.scale.setScalar(s);
+        base.updateMatrix();
+        part.position.set(0, 0, p.cart === 'stocking' ? 0.82 : 0.72);
+        part.rotation.set(0, 0, 0);
+        part.scale.set(p.cart === 'stocking' ? 1.15 : 1, p.cart === 'stocking' ? 1.45 : 1, p.cart === 'stocking' ? 1.2 : 1);
+        part.updateMatrix();
+        C.setMatrixAt(carts, m4.multiplyMatrices(base.matrix, part.matrix));
         C.setColorAt(carts, p.cart === 'picking' ? CART_PICK : p.cart === 'stocking' ? CART_STOCK : CART_SHOP);
         carts++;
       }
     }
     for (let i = n; i < max; i++) {
-      T.setMatrixAt(i, HIDDEN);
+      U.setMatrixAt(i, HIDDEN);
       H.setMatrixAt(i, HIDDEN);
     }
-    T.count = n;
+    U.count = n;
+    L.count = n;
     H.count = n;
-    L.count = n * 2;
-    A.count = n * 2;
     C.count = carts;
-    HT.count = tops;
-    HB.count = backs;
-    for (const m of [T, H, L, A, C, HT, HB]) {
+    for (const m of [U, L, H, C]) {
       m.instanceMatrix.needsUpdate = true;
       if (m.instanceColor) m.instanceColor.needsUpdate = true;
     }
@@ -178,34 +182,22 @@ export function People({ max, fill, onSelect, onContext }: Props) {
     onContext(e.instanceId, e);
   };
 
-  // 腿和手臂的几何体原点在顶端（关节处），向下延伸
-  const limb = useMemo(() => new THREE.BoxGeometry(1, 1, 1).translate(0, -0.5, 0), []);
+  const cartGeo = useMemo(() => cartGeometry(), []);
   return (
     <group>
-      <instancedMesh ref={torso} args={[undefined, undefined, max]} frustumCulled={false} castShadow onClick={click} onContextMenu={context}>
-        <capsuleGeometry args={[0.2, 0.42, 4, 10]} />
-        <meshToonMaterial ref={glowT} color="#ffffff" gradientMap={toonGradient()} />
+      <instancedMesh ref={upper} args={[undefined, undefined, max]} frustumCulled={false} castShadow onClick={click} onContextMenu={context}>
+        <capsuleGeometry args={[0.2, 0.34, 6, 16]} />
+        <meshToonMaterial ref={glowU} color="#ffffff" gradientMap={toonGradient()} />
       </instancedMesh>
-      <instancedMesh ref={head} args={[undefined, undefined, max]} frustumCulled={false} castShadow onClick={click} onContextMenu={context}>
-        <sphereGeometry args={[0.16, 12, 10]} />
-        <meshToonMaterial ref={glowH} color="#ffffff" gradientMap={toonGradient()} />
-      </instancedMesh>
-      <instancedMesh ref={hairTop} args={[undefined, undefined, max]} frustumCulled={false}>
-        <sphereGeometry args={[0.16, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        <meshToonMaterial ref={glowHair} color="#ffffff" gradientMap={toonGradient()} />
-      </instancedMesh>
-      <instancedMesh ref={hairBack} args={[undefined, undefined, max * 2]} frustumCulled={false}>
-        <boxGeometry args={[1, 1, 1]} />
-        <meshToonMaterial color="#ffffff" gradientMap={toonGradient()} />
-      </instancedMesh>
-      <instancedMesh ref={legs} args={[limb, undefined, max * 2]} frustumCulled={false} castShadow>
+      <instancedMesh ref={lower} args={[undefined, undefined, max]} frustumCulled={false} castShadow onClick={click} onContextMenu={context}>
+        <capsuleGeometry args={[0.16, 0.58, 6, 14]} />
         <meshToonMaterial ref={glowL} color="#ffffff" gradientMap={toonGradient()} />
       </instancedMesh>
-      <instancedMesh ref={arms} args={[limb, undefined, max * 2]} frustumCulled={false}>
-        <meshToonMaterial ref={glowA} color="#ffffff" gradientMap={toonGradient()} />
+      <instancedMesh ref={head} args={[undefined, undefined, max]} frustumCulled={false} castShadow onClick={click} onContextMenu={context}>
+        <sphereGeometry args={[0.165, 18, 14]} />
+        <meshToonMaterial ref={glowH} color="#ffffff" gradientMap={toonGradient()} />
       </instancedMesh>
-      <instancedMesh ref={cart} args={[undefined, undefined, max]} frustumCulled={false} castShadow>
-        <boxGeometry args={[1, 1, 1]} />
+      <instancedMesh ref={cart} args={[cartGeo, undefined, max]} frustumCulled={false} castShadow>
         <meshToonMaterial ref={glowC} color="#ffffff" gradientMap={toonGradient()} />
       </instancedMesh>
     </group>

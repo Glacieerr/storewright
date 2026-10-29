@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addArea, addDock, addRun, AREA_KINDS, goLiveCheck, backroomLayout, materializeAreas, moveArea, moveDock, rectsOverlap, removeArea, removeDock, resizeArea, storeAreas, backroomRoute, createTemplate, distributeRuns, fitsInside, formatSlotCode, GENERATOR_PRESETS, generateStoreConfig, moveRuns, moveStaging, pasteRuns, planRun, randomGeneratorParams, rotateRun, runSpan, StoreModel, templateParams, validateStoreConfig, walkSegments } from './index';
+import { addArea, addDock, addRun, AREA_KINDS, goLiveCheck, backroomLayout, maxDocks, upperStock, yardSettings, DEFAULT_YARD_OFFSET, materializeAreas, moveArea, moveDock, rectsOverlap, removeArea, removeDock, resizeArea, storeAreas, backroomRoute, createTemplate, distributeRuns, fitsInside, formatSlotCode, GENERATOR_PRESETS, generateStoreConfig, moveRuns, moveStaging, pasteRuns, planRun, randomGeneratorParams, rotateRun, runSpan, StoreModel, templateParams, validateStoreConfig, walkSegments } from './index';
 
 describe('门店模板', () => {
   for (const t of ['small', 'medium', 'large'] as const) {
@@ -199,9 +199,11 @@ describe('后仓（库存仓库）', () => {
     expect(validateStoreConfig(cfg).ok).toBe(true);
   });
 
-  it('模板的后仓设置为默认值，后仓不改变店内行走网络；叉车路线起止正确', () => {
+  it('模板的后仓设置（中型店两台叉车），后仓不改变店内行走网络；叉车路线起止正确', () => {
     const t = createTemplate('medium');
-    expect(t.backroom).toEqual({ extraDepthM: 0, rackRows: 0, rackLevels: 3, docks: 3, forklifts: 1, palletJacks: 2 });
+    expect(t.backroom).toEqual({ extraDepthM: 0, rackRows: 0, rackLevels: 3, docks: 3, forklifts: 2, palletJacks: 2 });
+    expect(createTemplate('small').backroom.forklifts).toBe(1);
+    expect(createTemplate('large').backroom.forklifts).toBe(3);
     const b = backroomLayout(t);
     expect(b.rows.length).toBeGreaterThanOrEqual(1);
     const loc = b.locations[0];
@@ -397,7 +399,8 @@ describe('区域编辑（决策记录 0013）', () => {
     expect(after.areas.map((a) => [a.id, a.kind, a.x0, a.z1, a.capacity])).toEqual(before.areas.map((a) => [a.id, a.kind, a.x0, a.z1, a.capacity]));
     expect(after.docks.map((d) => d.x)).toEqual(before.docks.map((d) => d.x));
     expect(backroomLayout(c).capacity).toBe(backroomLayout(createTemplate('medium')).capacity);
-    expect(c.staging.racks.every((r) => r.areaId === 'STAGING-1')).toBe(true);
+    // 冷藏、冷冻订单货架在线上订单冷藏库、冷冻库里，其余在暂存区（决策记录 0019）
+    for (const r of c.staging.racks) expect(r.areaId).toBe(r.tempZone === 'CHILLED' ? 'STAGING_COOLER-1' : r.tempZone === 'FROZEN' ? 'STAGING_FREEZER-1' : 'STAGING-1');
     expect(validateStoreConfig(c).ok).toBe(true);
 
     // 新建：放在空地上，不和已有区域重叠
@@ -406,10 +409,12 @@ describe('区域编辑（决策记录 0013）', () => {
     for (const a of c.areas!) if (a.id !== id && a.floorId === added.floorId) expect(rectsOverlap(a, added), a.id).toBe(false);
     expect(validateStoreConfig(c).ok).toBe(true);
 
-    // 移动暂存区：按区域网格摆放的暂存货架跟着走
-    const zs = storeAreas(c).racks.map((r) => r.z);
-    moveArea(c, 'STAGING-1', 0, 1);
-    expect(storeAreas(c).racks.map((r) => Math.round((r.z - 1) * 10) / 10)).toEqual(zs.map((z) => Math.round(z * 10) / 10));
+    // 移动暂存区：按区域网格摆放的暂存货架跟着走（冷库里的不动）
+    const inStaging = () => storeAreas(c).racks.filter((r) => r.areaId === 'STAGING-1');
+    const zs = inStaging().map((r) => r.z);
+    // 往前挪（后面紧挨着连通通道和冷库）
+    moveArea(c, 'STAGING-1', 0, -1);
+    expect(inStaging().map((r) => Math.round((r.z + 1) * 10) / 10)).toEqual(zs.map((z) => Math.round(z * 10) / 10));
     expect(validateStoreConfig(c).ok).toBe(true);
 
     // 改大小：货架区变小，托盘位变少
@@ -426,9 +431,9 @@ describe('区域编辑（决策记录 0013）', () => {
     removeArea(c, id);
     expect(validateStoreConfig(c).ok).toBe(true);
 
-    // 删除暂存区：货架回到默认网格
+    // 删除暂存区：货架回到默认网格（冷库里的货架不动）
     removeArea(c, 'STAGING-1');
-    expect(c.staging.racks.every((r) => r.areaId === undefined)).toBe(true);
+    expect(c.staging.racks.filter((r) => r.tempZone !== 'CHILLED' && r.tempZone !== 'FROZEN').every((r) => r.areaId === undefined)).toBe(true);
 
     // 卸货门
     const d = addDock(c);
@@ -465,5 +470,125 @@ describe('开业检查（「你的商店」，决策记录 0013）', () => {
     const bad = goLiveCheck(c, 246, v.ok ? [] : v.issues);
     const codes = bad.map((i) => `${i.level}:${i.code}:${i.params.kind ?? ''}`);
     expect(codes).toEqual(expect.arrayContaining(['error:AREA_MISSING:UNLOAD', 'error:AREA_MISSING:RACKS', 'warn:COLD_STORAGE:COOLER', 'warn:REEFER_DOOR:', 'error:RACK_CAPACITY:', 'error:CONFIG_ISSUE:']));
+  });
+});
+
+describe('卸货门、线上订单区的连通与冷库、二楼（决策记录 0019）', () => {
+  it('卸货门数量可以自定义（最多 10 个，门店太窄时少排）；随机门店的卸货门数和卸货场设置有变化', () => {
+    for (const n of [1, 6, 10]) {
+      const c = generateStoreConfig({ ...templateParams('medium'), backroom: { extraDepthM: 0, rackRows: 0, rackLevels: 3, docks: n, forklifts: 2, palletJacks: 2 } });
+      const sa = storeAreas(c);
+      expect(sa.docks).toHaveLength(Math.min(n, maxDocks(c.layout.floors[0]!.widthM)));
+      // 间距 5 米，都在收货区的范围里
+      const xs = sa.docks.map((d) => d.x).sort((a, b) => a - b);
+      for (let k = 1; k < xs.length; k++) expect(xs[k]! - xs[k - 1]!).toBeCloseTo(5, 6);
+      expect(validateStoreConfig(c).ok).toBe(true);
+    }
+    expect(createTemplate('small').backroom.docks).toBe(2);
+    expect(createTemplate('large').backroom.docks).toBe(5);
+    const docks = new Set<number>();
+    const sides = new Set<string>();
+    for (let seed = 1; seed <= 40; seed++) {
+      const p = randomGeneratorParams(seed);
+      docks.add(p.backroom!.docks);
+      sides.add(`${p.yard!.side}-${p.yard!.via}`);
+      expect(validateStoreConfig(generateStoreConfig(p)).ok).toBe(true);
+    }
+    expect(docks.size).toBeGreaterThanOrEqual(4);
+    expect(sides.size).toBeGreaterThanOrEqual(3);
+    // 缺省的卸货场设置
+    expect(yardSettings(createTemplate('medium'))).toEqual({ side: 'RIGHT', via: 'DRIVE', offsetM: DEFAULT_YARD_OFFSET, slots: 0, trailerStalls: 0 });
+  });
+
+  it('线上订单区：冷藏、冷冻订单货架在步入式冷库里；连通通道从暂存区通到收货区，旁边是溢流位；区域互不重叠', () => {
+    for (const t of ['medium', 'large'] as const) {
+      const c = createTemplate(t);
+      const sa = storeAreas(c);
+      const get = (k: string) => sa.areas.find((a) => a.kind === k)!;
+      const cooler = get('STAGING_COOLER');
+      const freezer = get('STAGING_FREEZER');
+      expect(cooler.tempZone).toBe('CHILLED');
+      expect(freezer.tempZone).toBe('FROZEN');
+      for (const r of sa.racks) {
+        const room = r.tempZone === 'CHILLED' ? cooler : r.tempZone === 'FROZEN' ? freezer : undefined;
+        if (!room) continue;
+        expect(r.x - r.length / 2, r.rackId).toBeGreaterThanOrEqual(room.x0);
+        expect(r.x + r.length / 2, r.rackId).toBeLessThanOrEqual(room.x1);
+        expect(r.z, r.rackId).toBeGreaterThanOrEqual(room.z0);
+        expect(r.z, r.rackId).toBeLessThanOrEqual(room.z1);
+      }
+      // 冷库的格位算进暂存容量
+      expect(cooler.capacity).toBeGreaterThan(0);
+      const staging = get('STAGING');
+      const passage = get('PASSAGE');
+      const unload = sa.areas.filter((a) => a.floorId === 'F1' && (a.kind === 'UNLOAD' || a.kind === 'RECEIVING_HOLD' || a.kind === 'QA' || a.kind === 'RTV'));
+      // 通道一头挨着暂存区，另一头挨着收货区
+      expect(passage.z0 - staging.z1).toBeLessThan(0.5);
+      expect(Math.min(...unload.map((a) => a.z0)) - passage.z1).toBeLessThan(0.5);
+      expect(unload.some((a) => a.x0 < passage.x1 && a.x1 > passage.x0)).toBe(true);
+      expect(passage.x1 - passage.x0).toBeGreaterThanOrEqual(3);
+      expect(get('OVERFLOW').capacity).toBeGreaterThan(4);
+      const f1 = sa.areas.filter((a) => a.floorId === 'F1');
+      for (let i = 0; i < f1.length; i++) for (let j = i + 1; j < f1.length; j++) expect(rectsOverlap(f1[i]!, f1[j]!), `${f1[i]!.id} / ${f1[j]!.id}`).toBe(false);
+    }
+    // 没有冷链的建材店：没有冷库，仍有连通通道
+    const hw = storeAreas(createTemplate('hardware'));
+    expect(hw.areas.some((a) => a.kind === 'STAGING_COOLER')).toBe(false);
+    expect(hw.areas.some((a) => a.kind === 'PASSAGE')).toBe(true);
+  });
+
+  it('两层的门店：二楼和一楼一样深、宽到货梯外侧；货梯在一楼收货区旁、二楼卸货区旁；二楼有卸货区和补货区，没有线上订单区', () => {
+    const c = createTemplate('large');
+    const [f1, f2] = c.layout.floors;
+    expect(f2!.depthM).toBe(f1!.depthM);
+    expect(f2!.widthM).toBeLessThanOrEqual(f1!.widthM);
+    const lift = upperStock(c)!.lift;
+    expect(f2!.widthM).toBeGreaterThan(lift.x + 1.8 + 7);
+    const sa = storeAreas(c);
+    const up = sa.areas.filter((a) => a.floorId === 'F2');
+    expect(up.map((a) => a.kind).sort()).toEqual(['OVERSTOCK', 'UNLOAD']);
+    expect(up.some((a) => AREA_KINDS[a.kind].group === 'STAGING')).toBe(false);
+    const us = upperStock(c)!;
+    expect(us.floorId).toBe('F2');
+    // 货梯在两层都不压货架；二楼的托盘位在卸货区或补货区里
+    const shelvesF2 = c.layout.runs.filter((r) => r.floorId === 'F2');
+    const backF2 = Math.max(...shelvesF2.map((r) => Math.max(r.start.y, r.end.y)));
+    expect(us.lift.z).toBeGreaterThan(backF2 + 1.5);
+    expect(us.spots.length).toBeGreaterThan(10);
+    // 一楼的后仓布局不受二楼区域影响
+    const b = backroomLayout(c);
+    expect(b.receiving.z1).toBeLessThanOrEqual(f1!.depthM);
+    expect(b.locations.every((l) => l.areaId !== 'OVERSTOCK-2')).toBe(true);
+    expect(validateStoreConfig(c).ok).toBe(true);
+    // 写进配置后结果不变
+    materializeAreas(c);
+    expect(upperStock(c)!.spots.length).toBe(us.spots.length);
+    expect(validateStoreConfig(c).ok).toBe(true);
+    // 单层门店没有
+    expect(upperStock(createTemplate('medium'))).toBeUndefined();
+  });
+
+  it('二楼通道 0 = 按货梯位置铺满二楼：二楼比一楼窄、货架一直排到货梯前；填了具体数字时照填的数排', () => {
+    const c = createTemplate('large');
+    const [f1, f2] = c.layout.floors;
+    const lift = upperStock(c)!.lift;
+    // 大型店一楼 90 米宽，二楼只盖到货梯旁的卸货区外侧，一楼其余部分是单层
+    expect(f2!.widthM).toBeLessThan(f1!.widthM);
+    expect(f2!.widthM).toBeCloseTo(lift.x + 1.8 + 7 + 2.5, 1);
+    const aisles = c.layout.runs.filter((r) => r.floorId === 'F2' && r.kind === 'AISLE');
+    const lastX = Math.max(...aisles.map((r) => r.start.x));
+    // 最后一条通道离右墙 12 米（右侧走廊和通道）加不到一个通道间距，离货梯不远
+    expect(f2!.widthM - lastX).toBeLessThan(12 + 3.2);
+    expect(Math.abs(lastX - lift.x)).toBeLessThan(6);
+    expect(aisles.length).toBeGreaterThan(10);
+    // 每条通道都有品类（品类少于通道时相邻几条通道同一品类）
+    expect(aisles.every((r) => r.categoryIds.length > 0)).toBe(true);
+    // 填了具体数字：照填的数排，二楼仍然盖到货梯
+    const p = templateParams('large');
+    p.secondFloor = { ...p.secondFloor!, gmAisles: 6 };
+    const c6 = generateStoreConfig(p);
+    expect(c6.layout.runs.filter((r) => r.floorId === 'F2' && r.kind === 'AISLE')).toHaveLength(6);
+    expect(c6.layout.floors[1]!.widthM).toBeGreaterThan(upperStock(c6)!.lift.x + 1.8 + 7);
+    expect(validateStoreConfig(c6).ok).toBe(true);
   });
 });

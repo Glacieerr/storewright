@@ -4,11 +4,12 @@ import { useFrame } from '@react-three/fiber';
 import { handoffBoard } from '@storewright/ops';
 import { backroomLayout } from '@storewright/store-config';
 import { useApp } from '../state/store';
-import { liveClient } from '../live/link';
+import { isReplaying, liveClient, viewNow, viewState } from '../live/link';
 import { entryPath, exitPaths, type ParkingSpot, type PathState } from './lot';
 import { useSiteLayout } from './useSite';
 import { SEMI, TRAILER_WHEELS, trailerGeometry, vehicleGeometry, WHEEL_LAYOUT, wheelGeometry, type VehicleType, type WheelSpec } from './vehicles';
 import { toonGradient } from './toon';
+import { setBayStatus, type BayState } from './street/BayLamps';
 
 /**
  * 门店实况里的车辆（决策记录 0013）：顾客到店签到后，按顾客填的车型和颜色开进取货车位，交付完成后倒出车位驶离；
@@ -43,14 +44,15 @@ interface LiveCar {
   /** 到店（真实时间，毫秒）与离开 */
   arrivedAt: number;
   leftAt?: number;
+  /** 车位立牌状态灯 */
+  bayState?: BayState;
 }
 
 function Wheels({ type, specs }: { type: VehicleType; specs?: readonly WheelSpec[] }) {
-  const g = wheelGeometry();
   return (
     <>
       {(specs ?? WHEEL_LAYOUT[type]).map((w, i) => (
-        <mesh key={i} geometry={g} position={[w.x, w.r, w.z]} scale={[w.w, w.r, w.r]}>
+        <mesh key={i} geometry={wheelGeometry(w.truck ? 'truck' : 'car')} position={[w.x, w.r, w.z]} scale={[w.w, w.r, w.r]}>
           <meshToonMaterial vertexColors gradientMap={toonGradient()} />
         </mesh>
       ))}
@@ -96,15 +98,16 @@ export function LiveFleet() {
   const cars = useMemo(() => {
     const out = new Map<string, LiveCar>();
     if (status === 'off' || !c?.statics) return out;
-    const s = c.state;
-    const rows = handoffBoard(s, c.statics, now + c.offset).filter((r) => r.arrivedAt !== undefined);
+    const s = viewState() ?? c.state;
+    const rows = handoffBoard(s, c.statics, isReplaying() ? viewNow() : now + c.offset).filter((r) => r.arrivedAt !== undefined);
     rows.forEach((r, k) => {
       const bayNo = Number(r.bay);
       const hit = bays.find(({ sp }) => sp.id !== undefined && sp.id === r.bay) ?? (Number.isInteger(bayNo) && bayNo >= 1 ? bays[bayNo - 1] : undefined) ?? bays[k % Math.max(1, bays.length)];
       if (!hit) return;
       const vehicleText = r.kind === 'TRIP' ? s.trips[r.key]?.vehicle : s.orders[r.key]?.vehicle;
       const v = r.kind === 'TRIP' ? { type: 'van' as VehicleType, color: '#f2f3ef' } : vehicleFromText(vehicleText, (['sedan', 'suv', 'hatch'] as VehicleType[])[k % 3]);
-      out.set(r.key, { key: r.key, type: v.type, color: v.color, spot: hit.sp, spotIndex: hit.i, arrivedAt: (r.arrivedAt as number) - c.offset });
+      const bayState: BayState = r.session ? 'serving' : r.color === 'RED' ? 'longWait' : 'waiting';
+      out.set(r.key, { key: r.key, type: v.type, color: v.color, spot: hit.sp, spotIndex: hit.i, arrivedAt: (r.arrivedAt as number) - c.offset, bayState });
     });
     for (const [k, car] of lastCars.current) if (!out.has(k) && !departed.current.has(k)) departed.current.set(k, { ...car, leftAt: Date.now() });
     lastCars.current = out;
@@ -119,7 +122,7 @@ export function LiveFleet() {
     const doors = backroomLayout(model.config).docks;
     const f0 = geo.floors[0];
     if (!f0 || !doors.length) return [];
-    return Object.values(c.state.receipts)
+    return Object.values((viewState() ?? c.state).receipts)
       .filter((r) => r.arrivedAt !== undefined && r.closedAt === undefined)
       .slice(0, doors.length)
       .map((r, i) => {
@@ -129,9 +132,12 @@ export function LiveFleet() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, version, c, model, geo]);
 
-  // 动画：刚到的车从路上开进车位，刚离开的车倒出车位驶离
+  // 动画：刚到的车从路上开进车位，刚离开的车倒出车位驶离；取货车位立牌的状态灯跟着实时情况
   useFrame(() => {
     const t = Date.now();
+    const bayMap = new Map<number, BayState>();
+    for (const car of cars.values()) if (car.bayState) bayMap.set(car.spotIndex, car.bayState);
+    setBayStatus(bayMap);
     const all = [...cars.values(), ...departed.current.values()];
     for (const car of all) {
       const g = groups.current.get(car.key);

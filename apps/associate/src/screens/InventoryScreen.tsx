@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { t } from '../i18n';
 import { useLive } from '../live';
-import { areaUsage, roleOf } from '@storewright/ops';
+import { rememberedSub, rememberSub, useIntent, type InventorySection } from '../nav';
+import { areaUsage, currentRole } from '@storewright/ops';
 import { AreaBoard } from './inventory/AreaView';
 import { CountView, PutAwayView, ReceiveView } from './inventory/BackroomViews';
 import { ExceptionView } from './inventory/ExceptionView';
 import { ReplenishView } from './inventory/ReplenishView';
 
-type Section = 'repl' | 'exception' | 'receive' | 'putaway' | 'count' | 'area';
+type Section = InventorySection;
 
 const DEFAULT: Record<string, Section> = { RESTOCK: 'repl', BACKROOM: 'receive', LEAD: 'exception' };
 
@@ -15,8 +16,14 @@ const DEFAULT: Record<string, Section> = { RESTOCK: 'repl', BACKROOM: 'receive',
 export function InventoryScreen() {
   const { client, auth } = useLive();
   const s = client.state;
-  const role = roleOf(client.statics, client.state, auth.actor) ?? '';
-  const [section, setSection] = useState<Section>(DEFAULT[role] ?? 'repl');
+  const role = currentRole(client.statics, client.state, auth.actor, client.now()) ?? '';
+  // 记住上次的子页（决策记录 0026）；提醒和「下一步」可以直接打开某个子页
+  const [section, setSectionState] = useState<Section>(() => (rememberedSub('inventory') as Section | undefined) ?? DEFAULT[role] ?? 'repl');
+  const setSection = (k: Section) => {
+    rememberSub('inventory', k);
+    setSectionState(k);
+  };
+  useIntent('inventory', setSection);
   const badge = {
     repl: Object.values(s.repl).filter((x) => x.status === 'OPEN').length + Object.values(s.checks).filter((x) => x.status === 'OPEN').length,
     exception: Object.values(s.exceptions).filter((x) => x.status === 'OPEN').length,

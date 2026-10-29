@@ -491,6 +491,32 @@ table.cmp th {
 table.cmp .current {
   background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
+.deliveries summary {
+  cursor: pointer;
+  font-size: 12px;
+  margin: 4px 0 6px;
+}
+.deliveries table.cmp td:first-child {
+  white-space: nowrap;
+}
+.deliveries .kind {
+  color: var(--muted);
+}
+.deliveries .late {
+  color: var(--warn);
+}
+button.linklike {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--accent);
+  cursor: pointer;
+  text-align: left;
+}
+button.linklike:hover {
+  text-decoration: underline;
+}
 table.cmp tr.group td {
   color: var(--muted);
   font-weight: 600;
@@ -1873,7 +1899,7 @@ kbd {
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
 }
 
-/* 门店实况 */
+/* 数字孪生（原门店实况）的作业面板 */
 .ops-panel .field {
   display: grid;
   gap: 4px;
@@ -1990,12 +2016,13 @@ kbd {
 
 /* ---------- 嵌在展示页里：只留场景、视角和建筑切换（数据面板和时间轴在展示页的其他画面里） ---------- */
 .app.embedded {
-  grid-template-rows: auto minmax(0, 1fr);
-  grid-template-areas: 'top' 'work';
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas: 'top' 'work' 'time';
   height: 100%;
   min-height: 0;
 }
-.app.embedded .timeline,
+/* 孪生时间轴保留（回放 · 实时 · 推演，决策记录 0016），仿真的时间轴不显示 */
+.app.embedded .timeline:not(.twin-timeline),
 .app.embedded .data-pane,
 .app.embedded .divider,
 .app.embedded .topbar > label.field,
@@ -2113,7 +2140,7 @@ kbd {
   color: #fff;
 }
 
-/* 「你的商店」的入口按钮（页面本身在线上版的私有模块里，决策记录 0013） */
+/* 「你的商店」的入口按钮（项目页和项目栏的样式在 yourStore/yourStore.css，决策记录 0013） */
 .your-store-btn {
   margin-left: 8px;
   padding: 4px 10px;
@@ -2138,4 +2165,538 @@ a:focus-visible,
 [tabindex]:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* ---------- 数字孪生（决策记录 0016） ---------- */
+.scene-label.twin-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+.scene-label.twin-label i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.scene-label.twin-label b {
+  font-variant-numeric: tabular-nums;
+}
+.scene-label.twin-label.s-alarm {
+  background: #fde8e8;
+  color: #8f1d1d;
+  border-color: #d64545;
+  animation: twin-blink 1s ease-in-out infinite;
+}
+.scene-label.twin-label.s-warn {
+  background: #fff6dc;
+  color: #5c4100;
+}
+.scene-label.twin-label.s-stale,
+.scene-label.twin-label.s-no_data {
+  color: #555d64;
+}
+@keyframes twin-blink {
+  50% {
+    box-shadow: 0 0 0 4px rgba(214, 69, 69, 0.35);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scene-label.twin-label.s-alarm {
+    animation: none;
+  }
+}
+.twin-panel {
+  margin-bottom: 4px;
+}
+.twin-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.twin-mode {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel-2));
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+.twin-mode.m-replay {
+  background: color-mix(in srgb, var(--info) 14%, var(--panel-2));
+  border-color: color-mix(in srgb, var(--info) 45%, var(--border));
+}
+.twin-mode.m-forecast {
+  background: color-mix(in srgb, #8a6bd6 16%, var(--panel-2));
+  border-color: color-mix(in srgb, #8a6bd6 50%, var(--border));
+}
+.twin-score {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+}
+.twin-score.good {
+  color: var(--text);
+  background: color-mix(in srgb, #2f9e62 16%, var(--panel-2));
+}
+.twin-score.fair {
+  background: color-mix(in srgb, #e0a020 22%, var(--panel-2));
+}
+.twin-score.poor {
+  background: color-mix(in srgb, var(--alert) 18%, var(--panel-2));
+}
+.twin-facts {
+  font-size: 12px;
+}
+.twin-facts dd {
+  margin: 0;
+}
+.warn-text {
+  color: var(--warn);
+}
+.good-text {
+  color: var(--accent);
+  font-weight: 700;
+}
+.twin-sensors {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.twin-sensor {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  padding: 5px 2px;
+  cursor: pointer;
+}
+.twin-sensor:hover {
+  background: var(--panel-2);
+}
+.twin-sensor i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+}
+.twin-sensor .grow {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.twin-sensor .spark {
+  width: 72px;
+  height: 22px;
+  flex: none;
+}
+.twin-sensor b {
+  min-width: 62px;
+  text-align: right;
+}
+.twin-sensor .small {
+  min-width: 34px;
+}
+.twin-plans {
+  margin: 6px 0 8px;
+}
+table.twin-kpi {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+table.twin-kpi th,
+table.twin-kpi td {
+  text-align: right;
+  padding: 3px 4px;
+  border-bottom: 1px solid var(--border);
+}
+table.twin-kpi th:first-child,
+table.twin-kpi td:first-child {
+  text-align: left;
+}
+table.twin-kpi th {
+  font-weight: 600;
+  color: var(--muted);
+}
+.twin-alerts .grow b {
+  font-weight: 700;
+}
+.timeline.twin-timeline {
+  gap: 10px;
+}
+.twin-modes {
+  display: flex;
+  gap: 4px;
+}
+.twin-modes button {
+  font-size: 12px;
+  padding: 4px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.twin-modes button.active {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+.dot-live {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #d64545;
+}
+.twin-track {
+  position: relative;
+}
+.twin-track .twin-past,
+.twin-track .twin-future {
+  position: absolute;
+  top: 35%;
+  bottom: 35%;
+  border-radius: 4px;
+  pointer-events: none;
+}
+.twin-track .twin-past {
+  left: 0;
+  background: color-mix(in srgb, var(--info) 30%, var(--track));
+}
+.twin-track .twin-future {
+  right: 0;
+  background: repeating-linear-gradient(45deg, color-mix(in srgb, #8a6bd6 30%, var(--track)) 0 6px, var(--track) 6px 12px);
+}
+.twin-track .now-mark {
+  position: absolute;
+  top: 10%;
+  bottom: 10%;
+  width: 2px;
+  margin-left: -1px;
+  background: #d64545;
+  pointer-events: none;
+}
+.twin-track .alert-tick {
+  position: absolute;
+  top: 18%;
+  width: 7px;
+  height: 7px;
+  margin-left: -3.5px;
+  border-radius: 50%;
+  background: #d64545;
+  pointer-events: none;
+}
+.twin-track .alert-tick.warn {
+  background: #e0a020;
+}
+.twin-card {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  /* 场景标签（drei Html）的 z-index 很高：孪生的说明、面板和按钮要盖在它们上面（导览层仍在最上面） */
+  z-index: 2147482000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  max-width: min(92%, 720px);
+  padding: 7px 12px;
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  font-size: 13px;
+}
+.twin-card.replay {
+  border-color: color-mix(in srgb, var(--info) 60%, var(--border));
+}
+.twin-card.forecast {
+  border-color: color-mix(in srgb, #8a6bd6 60%, var(--border));
+}
+@media (max-width: 600px) {
+  .twin-modes button {
+    padding: 4px 7px;
+  }
+  .twin-card {
+    top: 6px;
+    font-size: 12px;
+  }
+}
+
+.app.embedded .timeline.twin-timeline {
+  padding: 4px 10px;
+  gap: 8px;
+}
+.app.embedded .twin-timeline .track {
+  height: 28px;
+}
+.twin-drawer-btn {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 2147482000;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+.twin-drawer-btn.on {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+.twin-drawer-btn em {
+  font-style: normal;
+  font-size: 11px;
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #b91c1c;
+  color: #fff;
+  text-align: center;
+}
+.twin-drawer {
+  position: absolute;
+  top: 46px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 2147482000;
+  width: min(380px, calc(100% - 24px));
+  overflow: auto;
+  padding: 12px;
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+/* AI 建议（决策记录 0020） */
+.ai-panel .ai-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+.tab-badge {
+  display: inline-block;
+  min-width: 16px;
+  padding: 0 5px;
+  margin-left: 4px;
+  border-radius: 8px;
+  background: var(--warn);
+  color: #fff;
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+}
+.advice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+.advice {
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--muted);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--panel, var(--bg));
+}
+.advice.warn {
+  border-left-color: var(--warn);
+}
+.advice.critical {
+  border-left-color: #c0392b;
+}
+.advice.adopted {
+  border-left-color: var(--accent);
+}
+.advice.dismissed {
+  opacity: 0.6;
+}
+.advice-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 11px;
+  color: var(--muted);
+}
+.advice-head .sev {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.advice-head .sev.warn {
+  background: var(--warn);
+}
+.advice-head .sev.critical {
+  background: #c0392b;
+}
+.advice h4 {
+  margin: 4px 0 2px;
+  font-size: 13px;
+}
+.advice-body {
+  margin: 0 0 6px;
+  font-size: 12px;
+}
+.advice-why ul {
+  list-style: none;
+  margin: 2px 0 6px;
+  padding: 0;
+}
+.advice-why li {
+  position: relative;
+  font-size: 12px;
+  padding: 1px 0 1px 6px;
+}
+.advice-why .why-bar {
+  position: absolute;
+  left: 0;
+  top: 2px;
+  bottom: 2px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-radius: 3px;
+  z-index: 0;
+}
+.advice-why li span:last-child {
+  position: relative;
+}
+.advice-why b,
+.advice-effect b,
+.advice-conf b {
+  font-size: 11px;
+  color: var(--muted);
+  margin-right: 6px;
+}
+.advice-effect {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.advice-effect .gain {
+  color: var(--accent);
+}
+.advice-effect .loss {
+  color: var(--warn);
+}
+.advice-conf {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.conf-bar {
+  display: inline-block;
+  width: 70px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  overflow: hidden;
+}
+.conf-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+.advice-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+.advice-actions .ok {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+}
+ul.adopted {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+}
+ul.adopted li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+.ai-plan {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-top: 10px;
+  background: var(--panel-2, var(--panel));
+}
+.ai-plan summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+}
+.ai-plan .plan-sec {
+  margin-top: 6px;
+  font-size: 12px;
+}
+.ai-plan .plan-sec b {
+  color: var(--muted);
+  font-size: 11px;
+}
+.ai-plan .plan-sec ul {
+  margin: 2px 0 0;
+  padding-left: 18px;
+}
+.ai-plan .chips {
+  margin-top: 6px;
+}
+.ai-plan > button.chip {
+  margin-top: 8px;
+}
+.ai-panel table.cmp td.gain {
+  color: var(--accent);
+  font-weight: 600;
+}
+.ai-panel table.cmp td.loss {
+  color: var(--warn);
+  font-weight: 600;
+}
+
+/* 在岗人员（决策记录 0025） */
+.ops-team .role-dot {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 50%;
+}
+.ops-team li.short b {
+  color: var(--alert);
 }

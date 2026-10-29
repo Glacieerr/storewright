@@ -1,4 +1,5 @@
 import type { TemplateName } from '@storewright/store-config';
+import type { StudentShift } from './students';
 import { DEFAULT_DEMAND, type DemandScenario } from '@storewright/synth';
 import type { TrafficParams } from './traffic';
 import type { IncidentParams } from './incidents';
@@ -177,6 +178,8 @@ export interface SimScenario {
   incidents?: IncidentParams;
   /** 覆盖 AI 的效果大小（敏感性分析用）；不设置时用 AI_EFFECTS */
   aiEffects?: Partial<typeof AI_EFFECTS>;
+  /** 学生兼职工当天的班次（决策记录 0020）：在全职排班之外加人，按各自的上岗、下岗时刻 */
+  students?: StudentShift[];
 }
 
 export const DEFAULT_TIMES: TimeParams = {

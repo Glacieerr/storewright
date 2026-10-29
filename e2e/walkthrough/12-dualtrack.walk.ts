@@ -1,6 +1,6 @@
-import { expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
 import { Recorder } from './recorder';
-import { createOrders, signIn, state, until, type AnyState } from './helpers';
+import { createOrders, signIn, state, until, test, type AnyState } from './helpers';
 
 /** 双线并行（决策记录 0013）：自动运营的虚拟顾客和虚拟员工做一条线，你在手机上做另一条线，分开批次、分开行程，共用暂存区和货架 */
 test('12 双线并行：自动运营与你的操作', async ({ browser }) => {

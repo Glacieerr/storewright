@@ -1,5 +1,19 @@
-import { expect, type Browser, type Page } from '@playwright/test';
+import { expect, test as base, type Browser, type Locator, type Page } from '@playwright/test';
 import { device, DESK, PHONE } from './recorder';
+
+/**
+ * 走查用的 test：每一节走完关掉这一节打开的所有浏览器上下文。各节都用 browser.newContext() 自己开页面，
+ * 不关的话前面几节的模拟器（三维画面，无界面的 Chrome 用软件渲染）一直在后台渲染，拖慢后面的节直到超时。
+ */
+export const test = base.extend<{ closeContexts: void }>({
+  closeContexts: [
+    async ({ browser }, use) => {
+      await use();
+      await Promise.all(browser.contexts().map((c) => c.close().catch(() => undefined)));
+    },
+    { auto: true },
+  ],
+});
 
 export const LIVE = 'http://127.0.0.1:8798';
 export const SITE = 'http://127.0.0.1:4178';
@@ -33,6 +47,33 @@ export async function scan(p: Page, label: string, code: string): Promise<void> 
   const box = p.getByLabel(label, { exact: true });
   await box.fill(code);
   await box.press('Enter');
+}
+
+/** 采纳一张 AI 建议；涉及人、钱、顾客的动作还要点「确认执行」（决策记录 0026） */
+export async function accept(card: Locator): Promise<void> {
+  await card.getByRole('button', { name: '采纳' }).click();
+  const confirm = card.getByRole('button', { name: '确认执行' });
+  if (await confirm.waitFor({ state: 'visible', timeout: 1500 }).then(() => true, () => false)) await confirm.click();
+}
+
+/** 补货：领取的整批先取箱（演示：点每一行代替扫箱子），再按货位逐个扫描货位标签上架（决策记录 0026）；返回完成的任务数 */
+export async function restockClaimed(p: Page): Promise<number> {
+  const claimed = Object.values((await state(p)).repl as Record<string, AnyState>).filter((x) => x.status === 'CLAIMED');
+  for (let i = 0; i < claimed.length; i++) {
+    const row = p.locator('.batch-cases .row-btn:not([disabled])').first();
+    if (!(await row.count())) break;
+    await row.click();
+  }
+  let done = 0;
+  for (const x of claimed) {
+    await scan(p, '扫描箱子或货位标签', x.locationId);
+    const btn = p.getByRole('button', { name: '完成上架' });
+    if (!(await btn.waitFor({ state: 'visible', timeout: 3000 }).then(() => true, () => false))) continue;
+    await btn.click();
+    await expect.poll(async () => (await state(p)).repl[x.id]?.status).not.toBe('CLAIMED');
+    done++;
+  }
+  return done;
 }
 
 export async function tab(p: Page, name: string): Promise<void> {

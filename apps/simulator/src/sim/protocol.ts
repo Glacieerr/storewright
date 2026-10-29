@@ -1,5 +1,6 @@
 import type { StoreConfig, TemplateName } from '@storewright/store-config';
-import type { AssociateTrace, AutoServiceMetrics, DayMetrics, Disruption, EquipmentTrace, InboundMetrics, PalletRecord, PharmacyResult, Role, ServiceJob, Staffing, StagingChange, Truck, WorkerTrace } from '@storewright/sim-engine';
+import type { ScenarioDigest } from '../state/scenarios';
+import type { AssociateTrace, AutoServiceMetrics, DayMetrics, Disruption, EquipmentTrace, InboundMetrics, PalletRecord, PharmacyResult, Role, ServiceJob, Staffing, StagingChange, StudentShift, Truck, WorkerTrace, InboundAdjust, Advice, FrontInput } from '@storewright/sim-engine';
 
 export type PolicyName = 'baseline' | 'optimized' | 'efficiency';
 
@@ -24,6 +25,11 @@ export interface SimRequest {
   /** 「多变」天气：按季节和周边环境的随机种子生成一天的天气 */
   season?: string;
   weatherSeed?: number;
+  /** 星期几（0 = 周一，默认周四）：决定当天来哪些供应商直送（决策记录 0019） */
+  weekday?: number;
+  /** 周边的问题：附近有学校（上学放学高峰）、主路上有铁路道口（决策记录 0019） */
+  school?: boolean;
+  railway?: boolean;
   /** 事件提醒等文字的语言 */
   lang?: 'zh' | 'en';
   /** 突发状况：随机小状况、随机大事件、手动触发的大事件 */
@@ -34,6 +40,10 @@ export interface SimRequest {
   restockRequests?: Array<{ itemId: string; t: number }>;
   /** AI 模块（Phase 5c）：按预测排班（总工时不变）、修正到店时间、替代推荐 */
   ai?: boolean;
+  /** 学生兼职工（决策记录 0020）：名单人数与可以做的岗位；不给时没有 */
+  students?: { count: number; roles: Role[] };
+  /** 采纳的 AI 建议对到货、后仓的改动（决策记录 0020）：挪预约、收货员人数、货位分配、货梯顺序 */
+  inbound?: InboundAdjust;
 }
 
 export interface ShelfEventInfo {
@@ -155,7 +165,7 @@ export interface Timeline {
   /** 货架存量模块（开启时） */
   shelf?: ShelfTimeline;
   /** 本次仿真使用的道路拥堵设置 */
-  traffic: { level: number; profile: number[] };
+  traffic: { level: number; profile: number[]; extra?: Array<{ from: number; to: number; add: number }>; railway?: { headwaySec: number; closeSec: number } };
   autoService: AutoServiceTimeline[];
   /** 店内药房（没有药房时为空） */
   pharmacy?: { counters: number; visits: PharmacyResult['visits']; metrics: PharmacyResult['metrics'] };
@@ -163,6 +173,8 @@ export interface Timeline {
   incidents: { disruptions: Disruption[]; small: Array<{ t: number; kind: string; ref?: string }> };
   /** 到货车辆、托盘、收货员与夜班、叉车与搬运车 */
   inbound: { trucks: Truck[]; pallets: PalletRecord[]; workers: WorkerTrace[]; equipment: EquipmentTrace[]; metrics: InboundMetrics; nightCrew: number };
+  /** 当天来上班的学生兼职工和各自的班次（决策记录 0020） */
+  students: StudentShift[];
   simMs: number;
 }
 
@@ -199,11 +211,44 @@ export interface DayDigest {
   pharmacyServed: number;
 }
 
-export type WorkerRequest = SimRequest | CompareRequest | MultiDayRequest;
+/** AI 建议（决策记录 0020）：按当前方案找问题，换几个随机种子看会不会反复出现，试动作得出预计效果 */
+export interface AdviseRequest {
+  type: 'advise';
+  reqId: number;
+  base: Omit<SimRequest, 'type' | 'reqId'>;
+  /** 前场（主线程按停车场模型算好）：每小时到店的顾客、停车场占用、各楼层的收银台 */
+  front?: FrontInput;
+}
+
+export interface AdviceResult {
+  advice: Advice[];
+  /** 看了哪几天（随机种子）；第一个是当前方案 */
+  seeds: number[];
+  ms: number;
+}
+
+/** 采纳与不采纳对比（决策记录 0020）：同一天按几组设置各跑一遍，只返回汇总 */
+export interface WhatIfRequest {
+  type: 'whatif';
+  reqId: number;
+  runs: Array<Omit<SimRequest, 'type' | 'reqId'>>;
+}
+
+export interface WhatIfDigest {
+  digest: ScenarioDigest;
+  /** 卸货场排队的总分钟、放到溢流位的托盘、各温区暂存最满的比例 */
+  yardWaitMin: number;
+  overflowPallets: number;
+  stagingPeak: Record<'AMBIENT' | 'CHILLED' | 'FROZEN', number>;
+}
+
+export type WorkerRequest = SimRequest | CompareRequest | MultiDayRequest | AdviseRequest | WhatIfRequest;
 
 export type SimResponse =
   | { type: 'result'; reqId: number; timeline: Timeline }
   | { type: 'compare'; reqId: number; results: PolicyDigest[] }
   | { type: 'multiDay'; reqId: number; days: DayDigest[] }
+  | { type: 'advice'; reqId: number; result: AdviceResult }
+  | { type: 'whatif'; reqId: number; digests: WhatIfDigest[] }
   | { type: 'progress'; reqId: number; done: number; total: number }
   | { type: 'error'; reqId: number; message: string };

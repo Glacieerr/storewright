@@ -29,6 +29,7 @@ export interface ControlsLike {
 /** 当前镜头在地面上的可视范围（小地图用）：四个角的 (x, z)，以及目标点 */
 export { cameraState } from './cameraState';
 import { cameraState } from './cameraState';
+import { useSiteLayout } from './useSite';
 
 const ndc = [
   [-1, -1],
@@ -140,6 +141,7 @@ function isTyping(e: KeyboardEvent): boolean {
 
 function ViewRig({ view }: { view: ViewMode }) {
   const { center, span, zoom, distance, box } = useFrameBounds(view);
+  const ground = useSiteLayout().ground;
   const camRef = useRef<THREE.Camera | null>(null);
   const controls = useRef<ControlsLike | null>(null);
   const [camera, setCamera] = useState<THREE.Camera | null>(null);
@@ -356,10 +358,9 @@ function ViewRig({ view }: { view: ViewMode }) {
       }
     }
 
-    // 平移范围：目标点不离开门店和停车场外 80 米
-    const m = 80;
-    const cx = Math.min(box.maxX + m, Math.max(box.minX - m, c.target.x));
-    const cz = Math.min(box.maxZ + m, Math.max(box.minZ - m, c.target.z));
+    // 平移范围：目标点不离开沙盘（周边街区；有出海口时包括海湾，决策记录 0019），也不小于门店本身
+    const cx = Math.min(Math.max(box.maxX, ground.x + ground.w / 2), Math.max(Math.min(box.minX, ground.x - ground.w / 2), c.target.x));
+    const cz = Math.min(Math.max(box.maxZ, ground.z + ground.d / 2), Math.max(Math.min(box.minZ, ground.z - ground.d / 2), c.target.z));
     if (cx !== c.target.x || cz !== c.target.z) {
       const d = new THREE.Vector3(cx - c.target.x, 0, cz - c.target.z);
       c.target.add(d);

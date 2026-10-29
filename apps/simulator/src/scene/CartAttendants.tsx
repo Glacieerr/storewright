@@ -75,16 +75,21 @@ export function CartAttendants() {
     if (!m) return;
     let i = 0;
     for (const c of plan.corrals) {
+      // 两侧是栏杆：三根立柱、上中下三道横杆（不是实心板，透过去能看到车）
       for (const dx of [-0.95, 0.95]) {
-        tmp.position.set(c.x + dx, 0.5, c.z);
-        tmp.scale.set(0.07, 0.9, c.d);
         tmp.rotation.set(0, 0, 0);
-        tmp.updateMatrix();
-        m.setMatrixAt(i++, tmp.matrix);
-        tmp.position.set(c.x + dx, 0.92, c.z);
-        tmp.scale.set(0.1, 0.08, c.d + 0.1);
-        tmp.updateMatrix();
-        m.setMatrixAt(i++, tmp.matrix);
+        for (const dz of [-c.d / 2, 0, c.d / 2]) {
+          tmp.position.set(c.x + dx, 0.5, c.z + dz);
+          tmp.scale.set(0.07, 1.0, 0.07);
+          tmp.updateMatrix();
+          m.setMatrixAt(i++, tmp.matrix);
+        }
+        for (const y of [0.18, 0.55, 0.95]) {
+          tmp.position.set(c.x + dx, y, c.z);
+          tmp.scale.set(0.06, 0.06, c.d);
+          tmp.updateMatrix();
+          m.setMatrixAt(i++, tmp.matrix);
+        }
       }
       tmp.position.set(c.x, 1.05, c.z - c.d / 2);
       tmp.scale.set(1.9, 0.08, 0.08);
@@ -200,9 +205,9 @@ export function CartAttendants() {
   if (!plan.corrals.length) return null;
   return (
     <group>
-      <instancedMesh key={`r${plan.corrals.length}`} ref={rails} args={[undefined, undefined, plan.corrals.length * 5]} frustumCulled={false}>
+      <instancedMesh key={`r${plan.corrals.length}`} ref={rails} args={[undefined, undefined, plan.corrals.length * 13]} frustumCulled={false} castShadow>
         <boxGeometry />
-        <meshToonMaterial color="#8c969e" gradientMap={toonGradient()} />
+        <meshToonMaterial color="#aeb7bf" gradientMap={toonGradient()} />
       </instancedMesh>
       <instancedMesh key={`s${plan.corrals.length}`} ref={signs} args={[undefined, undefined, plan.corrals.length]} frustumCulled={false}>
         <boxGeometry />

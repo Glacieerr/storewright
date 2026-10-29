@@ -2,13 +2,13 @@ import { useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { Html } from '@react-three/drei';
 import { areaUsage } from '@storewright/ops';
-import { backroomLayout, type ResolvedArea } from '@storewright/store-config';
+import { backroomLayout, upperStock, type ResolvedArea } from '@storewright/store-config';
 import { useApp } from '../state/store';
 import { useClock } from '../state/clock';
-import { liveClient } from '../live/link';
+import { liveClient, viewState } from '../live/link';
 import { t } from '../i18n';
 import { toonGradient } from './toon';
-import { AREA_NAME } from '../ui/areaNames';
+import { AREA_NAME, UPPER_STOCK_NAME } from '../ui/areaNames';
 
 /**
  * 区域（决策记录 0013）：收货区、后仓、暂存区的每一块地面按类型着色、描边并标注名称；
@@ -40,13 +40,19 @@ const AREA_COLOR: Record<string, string> = {
   HOT_HOLD: '#f5c8a6',
   PARCEL: '#e2d3bf',
   RECOVERY: '#f0caca',
+  STAGING_COOLER: '#cde7f6',
+  STAGING_FREEZER: '#d4daf6',
+  PASSAGE: '#efe9da',
+  OVERFLOW: '#efd9b0',
 };
 
 const EDGE = '#5f6b72';
-const WALL_COLOR: Record<string, string> = { COOLER: '#eef6fb', FREEZER: '#e7ecfb' };
+const WALL_COLOR: Record<string, string> = { COOLER: '#eef6fb', FREEZER: '#e7ecfb', STAGING_COOLER: '#eef6fb', STAGING_FREEZER: '#e7ecfb' };
 
-export function areaName(a: Pick<ResolvedArea, 'kind' | 'label'>): string {
-  return a.label || t(AREA_NAME[a.kind] ?? a.kind);
+export function areaName(a: Pick<ResolvedArea, 'kind' | 'label'> & { floorId?: string }): string {
+  if (a.label) return a.label;
+  if (a.kind === 'OVERSTOCK' && a.floorId && a.floorId !== 'F1') return t(UPPER_STOCK_NAME);
+  return t(AREA_NAME[a.kind] ?? a.kind);
 }
 
 /** 占用率 → 颜色（绿 → 黄 → 红） */
@@ -99,6 +105,9 @@ export function Areas() {
   const simGeo = useApp((s) => s.simGeo);
   const draftGeo = useApp((s) => s.geo);
   const simModel = useApp((s) => s.simModel);
+  const draft = useApp((s) => s.draft);
+  // 货梯（两层的门店，决策记录 0019）：一楼收货区旁到二楼卸货区，两层同一位置
+  const lift = useMemo(() => upperStock(mode === 'edit' && draft ? draft : simModel.config), [mode, draft, simModel]);
   const overlay = useApp((s) => s.overlay);
   const floor = useApp((s) => s.floor);
   const buildingView = useApp((s) => s.buildingView);
@@ -118,7 +127,7 @@ export function Areas() {
     if (overlay !== 'areas') return m;
     const c = liveClient();
     if (liveStatus === 'live' && c?.statics?.areas) {
-      for (const u of areaUsage(c.state, c.statics)) if (u.tracked) m.set(u.area.id, u.rate);
+      for (const u of areaUsage(viewState() ?? c.state, c.statics)) if (u.tracked) m.set(u.area.id, u.rate);
       return m;
     }
     const s = timeline?.series;
@@ -129,6 +138,9 @@ export function Areas() {
       const cap = backroomLayout(simModel.config).capacity || 1;
       for (const a of geo.areas) {
         if (a.group === 'STAGING' && (a.kind === 'STAGING' || a.kind === 'STAGING_DELIVERY')) m.set(a.id, staging);
+        // 线上订单冷藏库、冷冻库：各自温区的暂存占用
+        if (a.kind === 'STAGING_COOLER') m.set(a.id, occ[1] ?? 0);
+        if (a.kind === 'STAGING_FREEZER') m.set(a.id, occ[2] ?? 0);
         if (a.kind === 'RACKS') m.set(a.id, Math.min(1, (s.rackUsed[i] ?? 0) / cap));
       }
     }
@@ -167,11 +179,38 @@ export function Areas() {
         walls.push({ x: a.x0 + seg / 2, y, z: a.z0, w: seg, h, d: tW, color: wc });
         walls.push({ x: a.x1 - seg / 2, y, z: a.z0, w: seg, h, d: tW, color: wc });
         // 门头上的蓝色 / 紫色色条
-        walls.push({ x: cx, y: y + h - 0.3, z: a.z0, w: door, h: 0.3, d: tW, color: a.kind === 'COOLER' ? '#5aa9d6' : '#6f76d8' });
+        walls.push({ x: cx, y: y + h - 0.3, z: a.z0, w: door, h: 0.3, d: tW, color: a.kind.endsWith('COOLER') ? '#5aa9d6' : '#6f76d8' });
+      }
+      // 连通通道：地面上一串指向暂存区的箭头（人字纹）
+      if (a.kind === 'PASSAGE') {
+        const along = d >= w;
+        const len = along ? d : w;
+        for (let k = 1.5; k < len - 0.8; k += 2.4) {
+          const px = along ? cx : a.x0 + k;
+          const pz = along ? a.z0 + k : cz;
+          edges.push({ x: px, y: y + 0.007, z: pz, w: along ? Math.min(1.6, w * 0.5) : 0.18, h: 0.012, d: along ? 0.18 : Math.min(1.6, d * 0.5), color: '#c9b37a' });
+        }
+      }
+    }
+    // 货梯井：3 × 3 米，四面围墙，门朝收货区 / 二楼卸货区（+X），每层一段
+    if (lift) {
+      for (const fid of [geo.floors[0]?.floorId ?? 'F1', lift.floorId]) {
+        if (!visibleFloor(fid)) continue;
+        const y = floorY.get(fid) ?? 0;
+        const { x, z } = lift.lift;
+        const h = 3.2;
+        const c = '#9aa3a8';
+        walls.push({ x, y, z: z - 1.5, w: 3, h, d: 0.2, color: c });
+        walls.push({ x, y, z: z + 1.5, w: 3, h, d: 0.2, color: c });
+        walls.push({ x: x - 1.5, y, z, w: 0.2, h, d: 3, color: c });
+        walls.push({ x: x + 1.5, y, z: z - 1.05, w: 0.2, h, d: 0.9, color: c });
+        walls.push({ x: x + 1.5, y, z: z + 1.05, w: 0.2, h, d: 0.9, color: c });
+        walls.push({ x: x + 1.5, y: y + 2.6, z, w: 0.22, h: 0.6, d: 1.2, color: '#f0b429' });
+        tiles.push({ x, y: y + 0.01, z, w: 2.8, h: 0.012, d: 2.8, color: '#7d878c' });
       }
     }
     return { tiles, edges, walls };
-  }, [areas, floorY, usage, overlay]);
+  }, [areas, floorY, usage, overlay, lift, geo.floors]);
 
   const showLabels = buildingView !== 'exterior' && (mode === 'sim' || mode === 'edit');
   return (
@@ -195,6 +234,15 @@ export function Areas() {
             </Html>
           );
         })}
+      {showLabels &&
+        lift &&
+        [geo.floors[0]?.floorId ?? 'F1', lift.floorId]
+          .filter((fid) => visibleFloor(fid))
+          .map((fid) => (
+            <Html key={`lift-${fid}`} position={[lift.lift.x, (floorY.get(fid) ?? 0) + 3.8, lift.lift.z]} center className="scene-label area-label kind-LIFT">
+              {t('货梯')}
+            </Html>
+          ))}
     </group>
   );
 }

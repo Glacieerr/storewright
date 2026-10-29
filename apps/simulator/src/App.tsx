@@ -1,7 +1,12 @@
-import { lazy, Suspense, useEffect, useRef, type CSSProperties } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type CSSProperties } from 'react';
+import { activeAlerts } from '@storewright/ops';
+import { viewState } from './live/link';
 import { TopBar } from './ui/TopBar';
 import { Inspector, Legend } from './ui/Inspector';
 import { TimelineBar } from './ui/TimelineBar';
+import { TwinStageCard, TwinTimeline } from './ui/TwinTimeline';
+// 嵌在展示页里没有数据面板：孪生面板放在场景上的抽屉里（按需加载）
+const TwinPanel = lazy(() => import('./ui/TwinPanel').then((m) => ({ default: m.TwinPanel })));
 import { DataPane } from './ui/DataPane';
 import { Toasts } from './ui/Toasts';
 import { Minimap } from './ui/Minimap';
@@ -10,7 +15,10 @@ import { ShortcutHelp } from './ui/ShortcutHelp';
 import { IncidentBanner } from './ui/IncidentBanner';
 import { Tour, TourInvite } from './ui/Tour';
 import { CinematicOverlay } from './ui/CinematicOverlay';
-import { useYourStore } from './extensions';
+// 「你的商店」（决策记录 0013、0027）：项目页和项目栏在一个模块里，打开时才下载
+const loadYourStore = () => import('./yourStore');
+const YourStorePage = lazy(() => loadYourStore().then((m) => ({ default: m.YourStorePage })));
+const ProjectBar = lazy(() => loadYourStore().then((m) => ({ default: m.ProjectBar })));
 import { pendingMenu } from './scene/contextTarget';
 import { useLabelDeclutter } from './scene/declutter';
 import { useApp } from './state/store';
@@ -19,7 +27,7 @@ import { copySelected, deleteSelected, duplicateSelected, nudgeSelected, paste, 
 import { drawState } from './scene/drag';
 import { cameraState } from './scene/cameraState';
 
-/** 嵌在展示页里（浏览器内演示的门店实况）：只留场景和精简的顶栏 */
+/** 嵌在展示页里（浏览器内演示的数字孪生）：只留场景、精简的顶栏、孪生时间轴和孪生面板 */
 const EMBEDDED = typeof location !== 'undefined' && new URLSearchParams(location.search).get('live') === 'demo';
 import { t } from './i18n';
 
@@ -137,13 +145,13 @@ export function App() {
   useLabelDeclutter(stage);
   const view = useApp((s) => s.view);
   const minimap = useApp((s) => s.minimap);
+  // 数字孪生（决策记录 0016）：连上门店、场景只显示实时数据时，底部换成孪生时间轴（回放 · 实时 · 推演）
+  const twinOn = useApp((s) => s.liveView && s.live.status !== 'off');
   // 订阅界面语言：切换后整个界面（含场景里的标签）重新渲染
   useApp((s) => s.lang);
   const cinematic = useApp((s) => s.cinematic);
   const yourStore = useApp((s) => s.yourStore);
   const project = useApp((s) => s.project);
-  // 「你的商店」在私有模块里；公开仓库的构建没有它
-  const ext = useYourStore();
   const sound = useApp((s) => s.sound);
   // 环境音模块只在第一次打开声音时下载
   const soundLoaded = useRef(false);
@@ -248,8 +256,16 @@ export function App() {
   return (
     <div className={`app mode-${mode}${cinematic ? ' cinematic' : ''}${EMBEDDED ? ' embedded' : ''}`}>
       <TopBar />
-      {project && !EMBEDDED && ext && <ext.ProjectBar />}
-      {yourStore && !EMBEDDED && ext && <ext.Page />}
+      {project && !EMBEDDED && (
+        <Suspense fallback={null}>
+          <ProjectBar />
+        </Suspense>
+      )}
+      {yourStore && !EMBEDDED && (
+        <Suspense fallback={null}>
+          <YourStorePage />
+        </Suspense>
+      )}
       <div ref={workspace} className={`workspace ${split}`} style={{ '--ratio': `${ratio}%` } as CSSProperties}>
         <main ref={stage} className="stage" aria-label={t('门店场景')}>
           <Suspense fallback={<div className="overlay-note loading">{t('正在加载三维场景…')}</div>}>
@@ -257,6 +273,8 @@ export function App() {
           </Suspense>
           <Inspector />
           <Toasts />
+          {twinOn && <TwinStageCard />}
+          {twinOn && EMBEDDED && <TwinDrawer />}
           {!minimap && <Legend />}
           <div className="map-dock">
             <Minimap />
@@ -314,8 +332,31 @@ export function App() {
         <Divider container={workspace} />
         <DataPane />
       </div>
-      <TimelineBar />
+      {twinOn ? <TwinTimeline /> : <TimelineBar />}
       <Tour />
     </div>
+  );
+}
+
+/** 嵌在展示页里的孪生面板：场景右上角的按钮打开，内容和数据面板的「数字孪生」相同（决策记录 0016） */
+function TwinDrawer() {
+  const [open, setOpen] = useState(false);
+  useApp((s) => s.liveVersion);
+  const st = viewState();
+  const n = st ? activeAlerts(st).length : 0;
+  return (
+    <>
+      <button className={`twin-drawer-btn${open ? ' on' : ''}${n ? ' alarm' : ''}`} onClick={() => setOpen(!open)} aria-expanded={open}>
+        {t('孪生面板')}
+        {n > 0 && <em>{n}</em>}
+      </button>
+      {open && (
+        <aside className="twin-drawer" aria-label={t('孪生面板')}>
+          <Suspense fallback={<p className="muted">{t('加载中…')}</p>}>
+            <TwinPanel />
+          </Suspense>
+        </aside>
+      )}
+    </>
   );
 }

@@ -5,7 +5,9 @@ import { backroomLayout } from '@storewright/store-config';
 import { useApp } from '../state/store';
 import { clock } from '../state/clock';
 import { toonGradient } from './toon';
-import { liveClient } from '../live/link';
+import { liveClient, viewState } from '../live/link';
+import { env } from './environment';
+import { lampGlass, lampMetal } from './style/lights';
 
 /**
  * 卸货口（决策记录 0013）：卷帘门、门框、防撞块、调节板和门边的信号灯。
@@ -33,7 +35,7 @@ export function DockDoors() {
   useFrame(() => {
     const t = clock.time;
     const c = liveOnly ? liveClient() : undefined;
-    const liveBusy = c ? Object.values(c.state.receipts).filter((r) => r.arrivedAt !== undefined && r.closedAt === undefined).length : 0;
+    const liveBusy = c ? Object.values((viewState() ?? c.state).receipts).filter((r) => r.arrivedAt !== undefined && r.closedAt === undefined).length : 0;
     docks.forEach((_, i) => {
       if (liveOnly) {
         const p = panels.current[i];
@@ -43,17 +45,18 @@ export function DockDoors() {
           p.scale.y = h;
           p.position.y = DOOR_H + 0.2 - h / 2;
         }
-        lights.current[i]?.color.set(busy ? '#ff3b30' : '#2fd36b');
+        lights.current[i]?.color.set(busy ? '#ff3b30' : '#2fd36b').multiplyScalar(1 + 1.8 * env.night);
         return;
       }
-      // 卷帘门：开始卸货前 1.5 分钟升起，车驶离后落下
+      // 卷帘门：车靠稳、调平板放好后升起（开始卸货前 1.5 分钟），车拉出之前落下；
+      // 门口的灯：有车被派到这个门（正在倒车过来）到车拉出之后都是红灯
       let open = 0;
       let busy = false;
       for (const tr of trucks) {
         if (tr.door !== i) continue;
         const a = tr.unloadStart - 90;
-        const z = tr.leave + 30;
-        if (t >= tr.dockAt && t <= tr.leave + 60) busy = true;
+        const z = tr.leave - OPEN_SEC - 5;
+        if (t >= tr.dockAt && t <= tr.leave + 45) busy = true;
         if (t < a - OPEN_SEC || t > z + OPEN_SEC) continue;
         const up = Math.min(1, Math.max(0, (t - (a - OPEN_SEC)) / OPEN_SEC));
         const down = Math.min(1, Math.max(0, (z + OPEN_SEC - t) / OPEN_SEC));
@@ -65,14 +68,40 @@ export function DockDoors() {
         p.scale.y = h;
         p.position.y = DOOR_H + 0.2 - h / 2;
       }
-      lights.current[i]?.color.set(busy ? '#ff3b30' : '#2fd36b');
+      lights.current[i]?.color.set(busy ? '#ff3b30' : '#2fd36b').multiplyScalar(1 + 1.8 * env.night);
     });
   });
 
   if (!f0) return null;
   const z = f0.maxZ;
+  const xs = docks.map((d) => d.x);
+  const c0 = Math.min(...xs) - DOOR_W / 2 - 1.6;
+  const c1 = Math.max(...xs) + DOOR_W / 2 + 1.6;
   return (
     <group>
+      {/* 卸货雨棚：贯通所有卸货口，斜撑托着 */}
+      {docks.length > 0 && (
+        <group>
+          <mesh position={[(c0 + c1) / 2, 4.85, z + 1.25]} rotation={[0.06, 0, 0]} castShadow receiveShadow>
+            <boxGeometry args={[c1 - c0, 0.14, 2.4]} />
+            <meshToonMaterial color="#e3e6e8" gradientMap={toonGradient()} />
+          </mesh>
+          <mesh position={[(c0 + c1) / 2, 4.95, z + 2.42]} castShadow>
+            <boxGeometry args={[c1 - c0, 0.32, 0.1]} />
+            <meshToonMaterial color="#2f7d55" gradientMap={toonGradient()} />
+          </mesh>
+          {Array.from({ length: Math.max(2, Math.round((c1 - c0) / 6) + 1) }, (_, k) => {
+            const n = Math.max(2, Math.round((c1 - c0) / 6) + 1);
+            const x = c0 + ((c1 - c0) * k) / (n - 1);
+            return (
+              <mesh key={k} position={[x, 4.25, z + 0.9]} rotation={[-0.75, 0, 0]} castShadow>
+                <boxGeometry args={[0.1, 0.1, 2.1]} />
+                <meshToonMaterial color="#59626b" gradientMap={toonGradient()} />
+              </mesh>
+            );
+          })}
+        </group>
+      )}
       {docks.map((d, i) => (
         <group key={i} position={[d.x, 0, z]}>
           {/* 门框 */}
@@ -110,6 +139,31 @@ export function DockDoors() {
           <mesh position={[0, 1.12, 0.55]}>
             <boxGeometry args={[2.2, 0.06, 0.6]} />
             <meshToonMaterial color="#8d949a" gradientMap={toonGradient()} />
+          </mesh>
+          {/* 门封：门洞两侧和上方的黑色海绵垫 */}
+          {[-1, 1].map((s) => (
+            <mesh key={`seal${s}`} position={[s * (DOOR_W / 2 + 0.32), 1.95, 0.42]} castShadow>
+              <boxGeometry args={[0.32, 3.5, 0.42]} />
+              <meshToonMaterial color="#26292c" gradientMap={toonGradient()} />
+            </mesh>
+          ))}
+          <mesh position={[0, DOOR_H + 0.85, 0.42]} castShadow>
+            <boxGeometry args={[DOOR_W + 0.96, 0.42, 0.42]} />
+            <meshToonMaterial color="#26292c" gradientMap={toonGradient()} />
+          </mesh>
+          {/* 地面导向线 */}
+          {[-1.55, 1.55].map((dx) => (
+            <mesh key={`g${dx}`} position={[dx, -0.03, 7.2]} receiveShadow>
+              <boxGeometry args={[0.14, 0.012, 13]} />
+              <meshToonMaterial color="#f0c13a" gradientMap={toonGradient()} />
+            </mesh>
+          ))}
+          {/* 摇臂作业灯 */}
+          <mesh position={[-DOOR_W / 2 - 0.85, 3.3, 0.55]} rotation={[0, 0, 0]} material={lampMetal} castShadow>
+            <boxGeometry args={[0.08, 0.08, 0.9]} />
+          </mesh>
+          <mesh position={[-DOOR_W / 2 - 0.85, 3.25, 1.05]} material={lampGlass}>
+            <boxGeometry args={[0.24, 0.18, 0.24]} />
           </mesh>
           {/* 信号灯：红 = 有车卸货，绿 = 空闲 */}
           <mesh position={[DOOR_W / 2 + 0.55, 2.2, 0.3]}>

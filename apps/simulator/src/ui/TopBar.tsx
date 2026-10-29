@@ -5,8 +5,7 @@ import type { PolicyName } from '../sim/protocol';
 import { POLICY_LABEL, TEMPLATE_LABEL } from './format';
 import { t } from '../i18n';
 import { summary } from '@storewright/ops';
-import { liveClient } from '../live/link';
-import { useYourStore } from '../extensions';
+import { liveClient, viewNow, viewState } from '../live/link';
 
 const VIEWS: Array<[ViewMode, string]> = [
   ['iso', '2.5D'],
@@ -14,13 +13,13 @@ const VIEWS: Array<[ViewMode, string]> = [
   ['top', '俯视'],
 ];
 
-/** 嵌在展示页时顶栏右侧的门店实况：连接状态、今日订单、等待中的顾客 */
+/** 嵌在展示页时顶栏右侧的数字孪生状态：连接状态、今日订单、等待中的顾客（回放时是那一刻的） */
 function EmbeddedLive() {
   const live = useApp((s) => s.live);
   useApp((s) => s.liveVersion);
   const c = liveClient();
   if (live.status === 'off' || !c) return <span className="live-chip off">{live.status === 'off' && live.error ? t('连接失败：{0}', live.error) : t('连接中…')}</span>;
-  const sum = summary(c.state, Date.now() + c.offset);
+  const sum = summary(viewState() ?? c.state, viewNow());
   return (
     <span className={`live-chip ${live.status}`}>
       <i />
@@ -45,7 +44,6 @@ export function TopBar() {
   const buildingView = useApp((s) => s.buildingView);
   const cutPos = useApp((s) => s.cutPos);
   const timeline = useApp((s) => s.timeline);
-  const yourStoreExt = useYourStore();
   const app = useApp.getState;
   // 手机上（窄于 600 像素）第一行只留品牌、「你的商店」和这个开关，其余控件收进下面的面板（样式里的 .tb-more）
   const [more, setMore] = useState(false);
@@ -55,12 +53,10 @@ export function TopBar() {
       <div className="brand">
         <span className="logo" aria-hidden>▦</span>
         <strong>Storewright</strong>
-        <span className="muted">{t('运营模拟器')}</span>
-        {yourStoreExt && (
-          <button className="your-store-btn" onClick={() => app().setYourStore(true)} title={t('从零搭建并运营自己的门店')}>
-            {t('你的商店')}
-          </button>
-        )}
+        <span className="muted">{t('门店数字孪生')}</span>
+        <button className="your-store-btn" onClick={() => app().setYourStore(true)} title={t('从零搭建并运营自己的门店')}>
+          {t('你的商店')}
+        </button>
       </div>
       <button className="chip topbar-toggle" aria-expanded={more} onClick={() => setMore(!more)}>
         <span aria-hidden>{more ? '✕' : '☰'}</span> {t('设置')}
@@ -149,7 +145,7 @@ export function TopBar() {
 
       <label className="field tb-more">
         <span>{t('画质')}</span>
-        <select value={quality} onChange={(e) => app().setQuality(e.target.value as Quality)} title={t('高：实时阴影；中：无阴影；低：标准分辨率，适合性能较弱的设备')}>
+        <select value={quality} onChange={(e) => app().setQuality(e.target.value as Quality)} title={t('高：描边、实时阴影、泛光和草丛；中：描边和天空，无阴影；低：最简画面，适合性能较弱的设备')}>
           <option value="high">{t('高')}</option>
           <option value="medium">{t('中')}</option>
           <option value="low">{t('低')}</option>

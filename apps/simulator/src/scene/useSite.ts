@@ -9,10 +9,35 @@ let cache: { key: string; site: SiteLayout } | undefined;
 /** 按停车场外轮廓和周边设置（风格、种子、地块、施工）缓存周边环境；布局小改动不会让车流重置 */
 export function siteFor(geo: StoreGeometry, settings: SiteSettings): SiteLayout {
   const f0 = geo.floors[0];
-  const key = [geo.lot.minX, geo.lot.maxX, geo.lot.edgeZ, f0?.maxZ ?? 0, settings.style, settings.seed, settings.layout ?? 'auto', settings.roadWorks ? 1 : 0].map((v) => (typeof v === 'number' ? v.toFixed(2) : v)).join('|');
+  const y = geo.yard;
+  const doors = geo.docks.map((d) => d.x);
+  const key = [
+    geo.lot.minX,
+    geo.lot.maxX,
+    geo.lot.edgeZ,
+    f0?.maxZ ?? 0,
+    settings.style,
+    settings.seed,
+    settings.layout ?? 'auto',
+    settings.roadWorks ? 1 : 0,
+    settings.water ?? 'lake',
+    settings.school ? 1 : 0,
+    settings.railway ? 1 : 0,
+    y.side,
+    y.via,
+    y.offsetM,
+    y.slots,
+    y.trailerStalls,
+    doors.map((x) => x.toFixed(1)).join(','),
+  ]
+    .map((v) => (typeof v === 'number' ? v.toFixed(2) : v))
+    .join('|');
   if (cache?.key !== key) {
     const store = { minX: f0?.minX ?? 0, maxX: f0?.maxX ?? 0, minZ: f0?.minZ ?? 0, maxZ: f0?.maxZ ?? 0 };
-    cache = { key, site: generateSite({ lot: geo.lot, store, settings: { ...settings, traffic: 0 } }) };
+    cache = { key, site: generateSite({ lot: geo.lot, store, settings: { ...settings, traffic: 0 }, access: y, doorXs: doors }) };
+    // 调试：地址栏带 ?debug 时可以查看周边环境（出海口、铁路、学校的位置）
+    const g = globalThis as unknown as { __sw?: Record<string, unknown> };
+    if (g.__sw) g.__sw.site = cache.site;
   }
   return cache.site;
 }

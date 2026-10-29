@@ -1,4 +1,4 @@
-import { handoffBoard, roleOf, sellableCases, shelfNow } from '@storewright/ops';
+import { handoffBoard, sellableCases, shelfNow, teamBoard } from '@storewright/ops';
 import type { AiService } from '../ai';
 import type { DemoStore } from '../demo';
 import type { StoreRuntime } from '../runtime';
@@ -53,8 +53,10 @@ export function buildEvalSet(rt: StoreRuntime, demo: DemoStore, ai: AiService, n
   for (const q of ['接下来三个小时预计有多少单？', '未来几个小时会来多少订单？']) add({ q, lang: 'zh', kind: 'forecast', expectTool: 'forecast', ...(fv ? { expect: [`预计 ${fv} 单`] } : {}) });
   for (const q of ['How many orders are expected in the next few hours?', 'What is the forecast for the coming hours?']) add({ q, lang: 'en', kind: 'forecast', expectTool: 'forecast', ...(fv ? { expect: [`about ${fv} orders`] } : {}) });
   // 人员
-  const pickers = st.roster.filter((a) => (roleOf(st, s, a.id) ?? a.role) === 'PICK').map((a) => a.name);
-  const handoff = st.roster.filter((a) => (roleOf(st, s, a.id) ?? a.role) === 'HANDOFF').map((a) => a.name);
+  // 在岗的人（此刻的岗位）；在岗人员页按名字排序
+  const team = teamBoard(st, s, now).members.filter((m) => m.on);
+  const pickers = team.filter((m) => m.role === 'PICK').map((m) => m.name);
+  const handoff = team.filter((m) => m.role === 'HANDOFF').map((m) => m.name);
   add({ q: '谁在拣货？', lang: 'zh', kind: 'staff', expectTool: 'staff_status', expect: pickers.slice(0, 1) });
   add({ q: '现在交付岗有哪些人？', lang: 'zh', kind: 'staff', expectTool: 'staff_status', expect: handoff.slice(0, 1) });
   add({ q: 'Who is picking right now?', lang: 'en', kind: 'staff', expectTool: 'staff_status', expect: pickers.slice(0, 1) });
@@ -86,6 +88,22 @@ export function buildEvalSet(rt: StoreRuntime, demo: DemoStore, ai: AiService, n
   // 交接班
   for (const q of ['帮我做一个交接班摘要', '今天到现在的总结']) add({ q, lang: 'zh', kind: 'summary', expectTool: 'shift_summary' });
   for (const q of ['Give me a handover summary.', 'Recap of today so far, please.']) add({ q, lang: 'en', kind: 'summary', expectTool: 'shift_summary' });
+  // 问数 2.0、复盘、周报（决策记录 0024）
+  for (const [q, lang, tool] of [
+    ['今天为什么迟到了这么多？', 'zh', 'closing_review'],
+    ['做一下打烊复盘', 'zh', 'closing_review'],
+    ['Why were orders late today?', 'en', 'closing_review'],
+    ['给我这周的周报', 'zh', 'weekly_report'],
+    ['How did this week go? Give me the weekly report.', 'en', 'weekly_report'],
+    ['今天每小时的单量和迟到', 'zh', 'metrics_by_hour'],
+    ['Show me today hour by hour.', 'en', 'metrics_by_hour'],
+    ['今天和昨天比怎么样？', 'zh', 'compare_days'],
+    ['Compare today with yesterday.', 'en', 'compare_days'],
+  ] as const)
+    add({ q, lang, kind: 'analysis', expectTool: tool });
+  // 开店简报（决策记录 0022 · F1）
+  for (const q of ['给我今天的开店简报', '今天要注意什么？']) add({ q, lang: 'zh', kind: 'brief', expectTool: 'opening_brief' });
+  for (const q of ['Give me the opening brief.', 'What should we watch out for today?']) add({ q, lang: 'en', kind: 'brief', expectTool: 'opening_brief' });
   return cases;
 }
 

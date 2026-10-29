@@ -137,6 +137,8 @@ describe('AI service: sim pretraining, recommendations, gate and persistence', (
     const rt = e.runtime;
     const lead = await session({ associateId: 'A08' });
     const restocker = await session({ associateId: 'A10' });
+    // 默认自动执行（决策记录 0026）；这里测「需确认」：带班负责人采纳后才生成核对任务
+    await rt.submit({ cmd: { type: 'SetAiMode', module: 'AVAILABILITY', mode: 'CONFIRM' }, actor: 'console', at: Date.now() });
     const [target, other] = [...rt.statics.planogram].sort((a, b) => b.baseVelocity - a.baseVelocity).slice(0, 2);
     const t0 = Date.now();
     // 第一个小时目标商品和其他商品都在卖；之后收银流水一直正常，目标商品 3 小时没有卖出
@@ -169,6 +171,8 @@ describe('AI service: sim pretraining, recommendations, gate and persistence', (
     const e = stores.get('demo')!;
     const rt = e.runtime;
     const lead = await session({ associateId: 'A08' });
+    // 默认自动执行（决策记录 0026）；这里测「需确认」
+    await rt.submit({ cmd: { type: 'SetAiMode', module: 'COUNT', mode: 'CONFIRM' }, actor: 'console', at: Date.now() });
     const champ = e.ai.registry.champion('count-risk');
     expect(champ?.kind).toBe('count-risk');
     // 用一个「认为每条记录都很可能不准」的模型，检查数量上限与动作
@@ -205,10 +209,12 @@ describe('AI service: sim pretraining, recommendations, gate and persistence', (
     const ids = (created.body.orders as Array<{ orderId: string }>).map((o) => o.orderId);
     for (const id of ids.slice(0, 9)) await call('POST', consoleToken, '/commands', { cmd: { type: 'CheckIn', orderId: id } });
     for (const id of ids.slice(9)) await call('POST', consoleToken, '/commands', { cmd: { type: 'UpdateEta', orderId: id, etaAt: Date.now() + 8 * 60_000 } });
-    // 先锁定所有拣货员：不会建议调动
+    // 先锁定所有拣货员和暂存员（可以调去交付的人）：不会建议调动
     const pickers = rt.statics.roster.filter((a) => a.role === 'PICK').map((a) => a.id);
-    for (const id of pickers) await call('POST', lead, '/commands', { cmd: { type: 'LockAssociate', associateId: id, locked: true } });
+    const stagers = rt.statics.roster.filter((a) => a.role === 'STAGE').map((a) => a.id);
+    for (const id of [...pickers, ...stagers]) await call('POST', lead, '/commands', { cmd: { type: 'LockAssociate', associateId: id, locked: true } });
     expect(await e.ai.scanDispatch()).toBe(false);
+    // 只放开拣货员：从拣货调人
     for (const id of pickers) await call('POST', lead, '/commands', { cmd: { type: 'LockAssociate', associateId: id, locked: false } });
     expect(await e.ai.scanDispatch()).toBe(true);
     const rec = Object.values(rt.state.recs).find((r) => r.module === 'STAFFING' && r.status === 'OPEN')!;

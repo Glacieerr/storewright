@@ -20,7 +20,12 @@ export interface Env {
   hemiSky: THREE.Color;
   hemiGround: THREE.Color;
   hemiIntensity: number;
+  /** 地平线颜色（也是雾色） */
   background: THREE.Color;
+  /** 天顶颜色 */
+  skyTop: THREE.Color;
+  /** 轮廓光颜色 */
+  rim: THREE.Color;
   /** 雾的起止距离（0 表示无雾） */
   fogNear: number;
   fogFar: number;
@@ -47,7 +52,9 @@ export const env: Env = {
   hemiSky: new THREE.Color('#ffffff'),
   hemiGround: new THREE.Color('#d8d2c4'),
   hemiIntensity: 0.55,
-  background: new THREE.Color('#e9eef2'),
+  background: new THREE.Color('#cde6f6'),
+  skyTop: new THREE.Color('#3f97e0'),
+  rim: new THREE.Color('#e6eeff'),
   fogNear: 0,
   fogFar: 0,
   weather: 'clear',
@@ -64,25 +71,34 @@ export const env: Env = {
 const DAYLIGHT: Record<string, [number, number]> = { spring: [6.3, 19.4], summer: [5.6, 20.6], autumn: [6.8, 18.6], winter: [7.3, 17.1] };
 const OVERCAST = new THREE.Color('#c9cfd6');
 const RAINY = new THREE.Color('#9aa6b2');
+const OVERCAST_TOP = new THREE.Color('#a3afbb');
+const RAINY_TOP = new THREE.Color('#7c8794');
 
 const smooth = (a: number, b: number, x: number) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
   return t * t * (3 - 2 * t);
 };
 
+// 卡通风格的光照：暖色阳光、偏冷的环境光（暗面带一点蓝紫），天空蓝而通透
 const C = {
-  daySun: new THREE.Color('#fff6e8'),
-  goldSun: new THREE.Color('#ffb06a'),
+  daySun: new THREE.Color('#fff2dc'),
+  goldSun: new THREE.Color('#ffa862'),
   moon: new THREE.Color('#9db4e0'),
-  dayAmb: new THREE.Color('#ffffff'),
-  nightAmb: new THREE.Color('#7f8fb3'),
-  daySky: new THREE.Color('#ffffff'),
-  nightSky: new THREE.Color('#3a4a68'),
-  dayGround: new THREE.Color('#d8d2c4'),
+  dayAmb: new THREE.Color('#dfe6ff'),
+  nightAmb: new THREE.Color('#7385b8'),
+  daySky: new THREE.Color('#d6e4ff'),
+  nightSky: new THREE.Color('#34446a'),
+  dayGround: new THREE.Color('#e0d6bd'),
   nightGround: new THREE.Color('#1f2633'),
-  dayBg: new THREE.Color('#e9eef2'),
-  duskBg: new THREE.Color('#f1d6c2'),
-  nightBg: new THREE.Color('#171e2a'),
+  dayBg: new THREE.Color('#cfe6f5'),
+  duskBg: new THREE.Color('#f7c7a2'),
+  nightBg: new THREE.Color('#1b2948'),
+  dayTop: new THREE.Color('#3d93de'),
+  duskTop: new THREE.Color('#5a6fb6'),
+  nightTop: new THREE.Color('#070e26'),
+  dayRim: new THREE.Color('#eaf1ff'),
+  goldRim: new THREE.Color('#ffd0a3'),
+  nightRim: new THREE.Color('#6f82b8'),
 };
 
 /** 日出日落随季节变化；阴天、雨雪、雾天太阳更弱、天空更灰 */
@@ -106,13 +122,15 @@ export function updateEnv(timeSec: number, out: Env = env, season = 'autumn', we
   if (day > 0.02) out.sunDir.set(-Math.cos(az) * Math.cos(el), Math.sin(el), -Math.sin(az) * Math.cos(el) - 0.25).normalize();
   else out.sunDir.set(0.3, 0.9, -0.3).normalize();
   out.sunColor.copy(C.daySun).lerp(C.goldSun, out.golden).lerp(C.moon, out.night);
-  out.sunIntensity = 1.5 * day * (1 - 0.35 * out.golden) + 0.22 * out.night;
-  out.ambient = 0.95 * day + 0.3 * out.night;
+  out.sunIntensity = 1.5 * day * (1 - 0.35 * out.golden) + 0.32 * out.night;
+  out.ambient = 0.95 * day + 0.42 * out.night;
   out.ambientColor.copy(C.dayAmb).lerp(C.nightAmb, out.night);
   out.hemiSky.copy(C.daySky).lerp(C.nightSky, out.night);
   out.hemiGround.copy(C.dayGround).lerp(C.nightGround, out.night);
-  out.hemiIntensity = 0.55 * day + 0.4 * out.night;
+  out.hemiIntensity = 0.55 * day + 0.5 * out.night;
   out.background.copy(C.dayBg).lerp(C.duskBg, out.golden).lerp(C.nightBg, out.night);
+  out.skyTop.copy(C.dayTop).lerp(C.duskTop, out.golden).lerp(C.nightTop, out.night);
+  out.rim.copy(C.dayRim).lerp(C.goldRim, out.golden).lerp(C.nightRim, out.night);
   // 天气：云越厚阳光越弱、天空越灰；雨雾雪拉近雾的距离（按强度连续变化，多变天气时平滑过渡）
   const w = weather;
   const dim = Math.max(0.3, 1 - 0.5 * w.cloud - 0.18 * w.rain - 0.25 * w.fog);
@@ -122,6 +140,8 @@ export function updateEnv(timeSec: number, out: Env = env, season = 'autumn', we
     out.ambient += (1 - dim) * 0.35 * day;
     out.background.lerp(OVERCAST, 0.7 * day * Math.min(1, w.cloud));
     out.background.lerp(RAINY, 0.7 * day * Math.min(1, w.rain));
+    out.skyTop.lerp(OVERCAST_TOP, 0.85 * day * Math.min(1, w.cloud));
+    out.skyTop.lerp(RAINY_TOP, 0.85 * day * Math.min(1, w.rain));
   }
   const near: number[] = [];
   const far: number[] = [];

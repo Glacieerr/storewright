@@ -1,11 +1,18 @@
 import { useEffect, useState } from 'react';
 import { AI_MODES, AI_MODULES, OVERRIDE_REASONS, type AiMode, type AiModule, type OverrideReason, type Reason } from '@storewright/ai';
-import { adoptionRate, aiModeOf, canManageAi, openRecs, planogramByItem, recentRecs, roleOf, type LiveRec, type OpsState, type StoreStatic } from '@storewright/ops';
+import { adoptionRate, aiModeOf, canManageAi, CONFIRM_ALWAYS, maintenanceStats, nudgeStats, openRecs, planogramByItem, recentRecs, recsByUrgency, recStale, type AssociateRole, type LiveRec, type OpsState, type StoreStatic } from '@storewright/ops';
 import { ai, type AiModelInfo, type AiSummary } from '../api';
 import { clock, t } from '../i18n';
-import { useLive } from '../live';
+import { useIntent } from '../nav';
+import { useLive, useNow } from '../live';
+import { locationText, nearText } from '../format';
 import { toast } from '../ui/Toasts';
+import { AiHealthCard, BriefCard, CapacityCard, OutcomeLine, outcomeText, ReviewCard, SubstitutionLive, WeeklyCard } from './AiBrief';
 import { AskPanel } from './AskPanel';
+import { FieldScreen } from './FieldScreen';
+import { hm, ScheduleView } from './ScheduleScreen';
+import { sensorName } from './TwinCard';
+import { sensorsFor } from '@storewright/twin';
 
 /**
  * AI（决策记录 0010）：带班负责人和控制台查看并处理 AI 建议、设置各模块的运行模式、查看模型版本与回测指标。
@@ -22,6 +29,14 @@ export const MODULE_TEXT: Record<AiModule, string> = {
   COUNT: '按风险盘点',
   MTO: '熟食开始时间',
   RETURNS: '退货去向',
+  FORESIGHT: '运营预警',
+  PICKING: '拣货',
+  EQUIPMENT: '设备健康',
+  INBOUND: '到货与卸货场',
+  FRONT: '前场收银',
+  CAPACITY: '时段产能',
+  STAGING: '暂存与冷冻拣货',
+  EXPIRY: '临期与损耗',
 };
 /** 退货去向的硬性规则（决策 RT-02） */
 export const RETURN_BLOCK_TEXT: Record<string, string> = {
@@ -71,6 +86,12 @@ const KIND_TEXT: Record<string, string> = {
   'prep-model': '菜品系数 + 厨房负载',
   'returns-rule': '固定规则',
   'returns-model': '再售概率（逻辑回归）+ 规则',
+  'pick-standard': '标准工时',
+  'pick-standard-ratio': '标准工时 × 实测比例',
+  'pick-model': '货位 + 商品类型 + 时段 + 熟练度组',
+  'queue-forecast': 'AI 驱动的排队推演',
+  'noshow-rule': '规则（取货前 30 分钟还没报预计到达）',
+  'noshow-logistic': '逻辑回归（提前量、时段、天气、以前爽约、报没报预计到达）',
 };
 const MODEL_STATUS_TEXT: Record<AiModelInfo['status'], string> = { CHAMPION: '当前版本', CANDIDATE: '候选', RETIRED: '已退役', REJECTED: '未通过' };
 const NOTE_TEXT: Record<string, string> = { NOT_BEST: '同一批中不是最好的', ROLLED_BACK: '已回滚', FORCED: '人工上线' };
@@ -105,6 +126,8 @@ const METRIC_TEXT: Record<string, string> = {
   accuracy: '判断正确率',
   falseRestock: '误判回架的比例',
   missedResale: '可售却报废的比例',
+  captureTop10: '风险最高的一成订单抓到的爽约',
+  rate: '爽约率',
 };
 const EVAL_TEXT: Record<string, string> = {
   'orders-hourly': '回测：每次只用当时已有的数据训练，预测之后 7 天，滚动多次后汇总。',
@@ -114,6 +137,8 @@ const EVAL_TEXT: Record<string, string> = {
   substitution: '评估：前 70% 的替代记录训练，之后每条记录比较各方法选出的第一名，用顾客真实的接受概率计算。',
   'mto-prep': '评估：前 70% 的制作记录训练，之后逐条预测实际制作时长（模拟数据中有菜品差异与厨房繁忙的影响）。',
   'returns-disposition': '评估：前 70% 的退货记录训练，之后比较「回架」判断与这件商品实际能否再售。',
+  'pick-time': '评估：按时间先后，前 70% 的拣货批次训练，之后逐批预测用时（模拟数据里每个货位有看不到的难度，高峰更挤、新人更慢，偶尔被打断）。',
+  'no-show': '评估：按时间先后，前 70% 的自取订单训练，之后逐单预测顾客会不会不来（模拟数据里每位顾客有看不到的爽约倾向）。用途：风险高的订单冷冻商品晚点拣，营业结束前提醒联系顾客。',
 };
 /** 模型族：标题、显示的指标、主指标 */
 const FAMILIES: Array<{ id: string; title: string; metrics: string[]; primary: string; minutes: boolean }> = [
@@ -124,8 +149,10 @@ const FAMILIES: Array<{ id: string; title: string; metrics: string[]; primary: s
   { id: 'substitution', title: '替代推荐模型', metrics: ['acceptTop1', 'ndcg3'], primary: 'acceptTop1', minutes: false },
   { id: 'mto-prep', title: '熟食制作时长模型', metrics: ['mae'], primary: 'mae', minutes: true },
   { id: 'returns-disposition', title: '退货去向模型', metrics: ['accuracy', 'falseRestock', 'missedResale'], primary: 'accuracy', minutes: false },
+  { id: 'pick-time', title: '拣货时长模型', metrics: ['wape', 'mae', 'bias', 'coverage80'], primary: 'wape', minutes: false },
+  { id: 'no-show', title: '未取订单风险模型', metrics: ['brier', 'auc', 'ece', 'captureTop10', 'rate'], primary: 'brier', minutes: false },
 ];
-const PERCENT_METRICS = new Set(['wape', 'coverage80', 'ece', 'precision', 'recall', 'hitRate', 'acceptTop1', 'accuracy', 'falseRestock', 'missedResale']);
+const PERCENT_METRICS = new Set(['wape', 'coverage80', 'ece', 'precision', 'recall', 'hitRate', 'acceptTop1', 'accuracy', 'falseRestock', 'missedResale', 'captureTop10', 'rate']);
 
 const kindText = (k: string) => (KIND_TEXT[k] ? t(KIND_TEXT[k]) : k);
 const noteText = (n: string) => (NOTE_TEXT[n] ? t(NOTE_TEXT[n]) : n);
@@ -236,6 +263,128 @@ export function reasonText(r: Reason): string {
       return t('化学品 {0}', effectText(r));
     case 'RULE':
       return t('门店规则：{0}（模型原本建议{1}）', t(RETURN_BLOCK_TEXT[String(r.params?.reason ?? '')] ?? ''), t(DISPOSITION_TEXT[String(r.params?.original ?? '')] ?? ''));
+    // 运营预警（决策记录 0021）
+    case 'PROBLEM_LATE':
+      return t('推演：{0} 起有 {1} 单赶不上取货时段（{2} 单起提醒）', clock(Number(r.params?.at ?? 0)), Math.round(v), Number(r.params?.limit ?? 0));
+    case 'PROBLEM_WAIT':
+      return t('推演：顾客等待会到 {0} 分钟（超过 {1} 分钟提醒）', Math.round(v * 10) / 10, Number(r.params?.limit ?? 0));
+    case 'PROBLEM_COLD_FULL':
+      return t('推演：冷区暂存最高会到 {0}%（超过 {1}% 提醒）', Math.round(v * 100), Math.round(Number(r.params?.limit ?? 0) * 100));
+    case 'PROBLEM_BACKLOG':
+      return t('推演：拣货积压最高会到 {0} 分钟', Math.round(v));
+    case 'DEMAND_VS_FORECAST':
+      return v >= 0 ? t('今天的单量比预测多 {0}%', Math.round(v)) : t('今天的单量比预测少 {0}%', Math.abs(Math.round(v)));
+    case 'PICK_PACE':
+      return v >= 0 ? t('今天拣货比计划慢 {0}%', Math.round(v)) : t('今天拣货比计划快 {0}%', Math.abs(Math.round(v)));
+    case 'STAFF_ON_DUTY':
+      return t('在岗：拣货 {0} · 暂存 {1} · 交付 {2}', Number(r.params?.pick ?? 0), Number(r.params?.stage ?? 0), Number(r.params?.handoff ?? 0));
+    case 'MORE_ORDERS':
+      return t('接下来 {0} 小时还会来约 {1} 单', Number(r.params?.hours ?? 2), Math.round(v));
+    // 补位（决策记录 0022）
+    case 'ABSENCE':
+      return t('{0} {1} {2}–{3} 的{4}班缺勤', String(r.params?.who ?? ''), String(r.params?.date ?? ''), String(r.params?.from ?? ''), String(r.params?.to ?? ''), t(ROLE_TEXT[String(r.params?.role ?? '')] ?? ''));
+    case 'CAN_COVER':
+      return t('{0} 这段时间可以上班、会这个岗位', String(r.params?.who ?? ''));
+    case 'CAN_EXTEND':
+      return t('{0} 当天有班，可以接着延长', String(r.params?.who ?? ''));
+    case 'HOURS_LEFT':
+      return t('这周还能排 {0} 小时', Math.round(v * 10) / 10);
+    case 'NO_OVERTIME':
+      return t('不用加班');
+    case 'OVERTIME':
+      return t('会超过每周 40 小时（加班）');
+    case 'NO_CANDIDATE':
+      return t('没有会这个岗位、这段时间能上班、这周还有工时的人');
+    // 预测性维护（决策记录 0022）
+    case 'TEMP_TREND':
+      return t('底线温度每小时 +{0} °C（去掉开门和除霜的短暂升温）', Math.round(v * 100) / 100);
+    case 'TEMP_LEVEL':
+      return t('现在的底线温度 {0} °C（平时 {1} °C，告警线 {2} °C）', Math.round(v * 10) / 10, Number(r.params?.nominal ?? 0), Number(r.params?.limit ?? 0));
+    case 'ETA_LIMIT':
+      return t('照这样约 {0} 分钟后越过告警线（{1}–{2} 分钟）', Math.round(v), Number(r.params?.low ?? 0), Number(r.params?.high ?? 0));
+    case 'DOOR_RECOVERY':
+      return t('开门后回温是之前的 {0} 倍：可能门封漏气', Math.round(v * 10) / 10);
+    case 'STUCK':
+      return t('读数 {0} 分钟一点没变（正常时有小幅波动）', Math.round(v));
+    // 多源货架真相、顺路核对（决策记录 0022）
+    case 'PICKER_REPORTS':
+      return t('拣货员报告找不到 {0} 次（最近一次 {1} 分钟前：{2}）', Math.round(v), Number(r.params?.ago ?? 0), t(SIGNAL_TEXT[String(r.params?.kind ?? '')] ?? ''));
+    case 'MISPLACED_LIKELY':
+      return t('多半是放错了地方（{0}%），不像是卖完或损坏', Math.round(v));
+    case 'REPORT_RELIABILITY':
+      return t('这类报告的可靠度 {0}%（从之前的核对结果学）', Math.round(v));
+    case 'SHELF_UNCERTAIN':
+      return t('说不准还在不在架上（找得到的概率 {0}%）', Math.round(v));
+    case 'ON_THE_WAY':
+      return t('拣完第 {0} 站就路过附近', Math.round(v));
+    // 冷链拆批、未取订单、时段产能（决策记录 0023）
+    case 'COLD_EXPOSURE':
+      return t('AI 估计从第一件到送回暂存要 {0} 分钟（冷链时限 {1} 分钟）', Math.round(v), Number(r.params?.limit ?? 0));
+    case 'SPLIT_INTO':
+      return t('拆成 {0} 个批次，最长的约 {1} 分钟', Math.round(v), Number(r.params?.worst ?? 0));
+    case 'NO_SHOW_RISK':
+      return t('顾客不来的可能 {0}%', Math.round(v));
+    case 'NO_ETA':
+      return t('还没报预计到达');
+    case 'PAST_NO_SHOWS':
+      return t('以前 {0} 单里有 {1} 单没来取', Number(r.params?.orders ?? 0) + Math.round(v), Math.round(v));
+    case 'ORDERED_AHEAD':
+      return t('提前 {0} 小时下的单', Math.round(v));
+    case 'EVENING_SLOT':
+      return t('晚上最后几个时段');
+    case 'RAIN':
+      return t('预报下雨');
+    case 'WEEKEND':
+      return t('周末');
+    case 'SAME_DAY':
+      return t('当天临时下的单');
+    case 'LOYAL':
+      return t('老顾客');
+    case 'NOT_PICKED_UP':
+      return t('{0} 单备好了、过了取货时段 30 分钟还没来（{1} 关门）', Math.round(v), clock(Number(r.params?.close ?? 0)));
+    case 'SLOT_BOOKED':
+      return t('已经接了 {0} 单，估计能做 {1} 单', Math.round(v), Number(r.params?.capacity ?? 0));
+    case 'PICK_CAPACITY':
+      return t('拣货能做约 {0} 单（每单约 {1} 分钟）', Math.round(v), Number(r.params?.perOrder ?? 0));
+    case 'HANDOFF_CAPACITY':
+      return t('交付能做约 {0} 单', Math.round(v));
+    // 提前下班（决策记录 0022 · D2）
+    case 'NO_WORSE':
+      return t('推演：少一名{0}，迟到 {1} 单、平均等待 {2} 分钟，都不变差', t(ROLE_TEXT[String(r.params?.role ?? '')] ?? ''), Math.round(v), Number(r.params?.wait ?? 0));
+    case 'HOURS_THIS_WEEK':
+      return t('这周已排 {0} 小时', v);
+    // 到货、开门前补货、收银通道（决策记录 0022 · A3）
+    case 'TRUCKS_WAITING':
+      return t('{0} 辆车在排队，接下来两小时还会到 {1} 辆', Math.round(v), Number(r.params?.upcoming ?? 0));
+    case 'LONGEST_WAIT':
+      return t('最长要等 {0} 分钟（{1}）', Math.round(v), String(r.params?.receiptId ?? ''));
+    case 'RECEIVERS':
+      return t('在岗收货员 {0} 人，卸货门 {1} 个', Math.round(v), Number(r.params?.docks ?? 0));
+    case 'COLD_FIRST':
+      return t('{0} 车有冷藏冷冻商品：先卸', Math.round(v));
+    case 'SUPPLIER_ETA':
+      return t('供应商通知晚 {0} 分钟（{1} → {2}）', Math.round(v), clock(Number(r.params?.from ?? 0)), clock(Number(r.params?.to ?? 0)));
+    case 'TRUCKS_AROUND':
+      return t('前后 30 分钟还有 {0} 车（同时能卸 {1} 车）', Math.round(v), Number(r.params?.docks ?? 0));
+    case 'CASES_TONIGHT':
+      return t('开门前要上架 {0} 箱', Math.round(v));
+    case 'NIGHT_CREW':
+      return t('排了 {0} 人（需要 {1} 人）', Math.round(v), Number(r.params?.need ?? 0));
+    case 'FINISH_AT':
+      return Number(r.params?.finish ?? -1) < 0 ? t('没有排人补货') : t('照现在的人数 {0} 补完，比开门晚 {1} 分钟', hm(Number(r.params?.finish ?? 0)), Math.round(v));
+    case 'ENTRANCE_RATE':
+      return t('入口客流每小时约 {0} 人', Math.round(v));
+    case 'FLOW_TREND':
+      return v >= 0 ? t('最近 10 分钟比之前多 {0}%', Math.round(v)) : t('最近 10 分钟比之前少 {0}%', Math.abs(Math.round(v)));
+    case 'SERVICE_MIN':
+      return t('人工通道每位顾客约 {0} 分钟', v);
+    case 'TARGET_WAIT':
+      return t('目标：平均排队不超过 {0} 分钟', v);
+    // 临期与损耗（决策记录 0024 · C4）
+    case 'EXPIRES_IN':
+      return v <= 0 ? t('{0} 到期，已经过期', String(r.params?.expiry ?? '')) : t('{0} 到期（还有 {1}）', String(r.params?.expiry ?? ''), hoursText(v));
+    case 'LEFT_AT_EXPIRY':
+      return t('照现在的卖法，到期时还会剩约 {0} 件（这一批 {1} 件）', Math.round(v), Number(r.params?.units ?? 0));
     default:
       return r.factor;
   }
@@ -262,32 +411,205 @@ function recTitle(r: LiveRec, s?: OpsState, st?: StoreStatic): string {
     const o = s?.orders[r.target];
     return t('{0} 的到店时间', o ? `${o.firstName} ${o.lastName.slice(0, 1)}.` : r.target);
   }
+  if (r.module === 'AVAILABILITY' && r.action.kind === 'SEARCH_NEARBY') return t('{0} 可能放错了地方', st ? (planogramByItem(st).get(r.target)?.name ?? r.target) : r.target);
   if (r.module === 'AVAILABILITY') return t('{0} 可能不在货架上', st ? (planogramByItem(st).get(r.target)?.name ?? r.target) : r.target);
+  if (r.module === 'PICKING' && r.action.kind === 'ADD_WALK_CHECK') return t('批次 {0} 顺路数一下 {1}', String(r.action.params?.walkId ?? ''), String(r.action.params?.name ?? ''));
   if (r.module === 'COUNT') return t('建议盘点库位 {0}', r.target);
   if (r.module === 'STAFFING' && r.action.kind === 'MOVE_ASSOCIATE') {
     const name = st?.roster.find((a) => a.id === r.target)?.name ?? r.target;
     return t('建议把 {0} 从{1}调到{2}', name, t(ROLE_TEXT[String(r.action.params?.from ?? '')] ?? ''), t(ROLE_TEXT[String(r.action.params?.to ?? '')] ?? ''));
   }
   if (r.module === 'STAFFING' && r.action.params?.plan) return t('今天的排班建议');
+  if (r.module === 'STAFFING' && r.target.startsWith('absence:')) {
+    const p = r.action.params ?? {};
+    const who = st?.roster.find((a) => a.id === p.replaces)?.name ?? String(p.replaces ?? '');
+    return r.action.kind === 'OFFER_SHIFT' ? t('{0} 缺勤：找人补 {1} 的班', who, String(p.date ?? '')) : t('{0} 缺勤：{1} 的班找不到人补', who, String(p.date ?? ''));
+  }
+  if (r.module === 'STAFFING' && r.action.kind === 'OFFER_EARLY_LEAVE') return t('单量比预测少：可以请人自愿提前下班');
   if (r.module === 'MTO') return t('{0} 的开始时间', s?.mto[r.target]?.name ?? r.target);
+  if (r.module === 'INBOUND') {
+    const p = r.action.params ?? {};
+    if (r.target === 'DOCK') return t('卸货门排队：最长要等 {0} 分钟', Math.round(r.prediction?.baseline ?? 0));
+    if (r.target === 'NIGHT') return t('明早开门前补不完：要上架 {0} 箱', Number(p.cases ?? r.reasons.find((x) => x.factor === 'CASES_TONIGHT')?.value ?? 0));
+    if (r.target.startsWith('ETA:')) return t('{0} 的到货晚 {1} 分钟', String(p.supplier ?? ''), Number(p.delayMin ?? 0));
+  }
+  if (r.module === 'FRONT' && r.target === 'LANES') return t('收银通道：现在开 {0} 条', Number(r.action.params?.lanes ?? 0));
+  if (r.module === 'PICKING' && r.action.kind === 'SPLIT_WALK') return t('冷链批次 {0} 拆成两个', String(r.action.params?.walkId ?? ''));
+  if (r.module === 'STAGING' && r.target.startsWith('noshow:')) {
+    const o = s?.orders[r.target.slice(7)];
+    return t('{0} 可能不来取：冷冻商品晚点拣', o ? `${o.firstName} ${o.lastName.slice(0, 1)}. · ${o.shortCode}` : r.target.slice(7));
+  }
+  if (r.module === 'STAGING' && r.target === 'CONTACT') return t('快关门了：{0} 单还没来取', Number(r.action.params?.count ?? 0));
+  if (r.module === 'CAPACITY' && r.action.kind === 'CLOSE_SLOT') return t('{0} 的取货时段快接满了', clock(Number(r.action.params?.slotStart ?? 0)));
+  if (r.module === 'EXPIRY') {
+    const p = r.action.params ?? {};
+    const name = st ? (planogramByItem(st).get(String(p.itemId ?? ''))?.name ?? String(p.itemId ?? '')) : String(p.itemId ?? '');
+    const lot = String(p.lot ?? '');
+    if (p.expired) return t('{0}（批号 {1}）已经过期', name, lot);
+    if (r.action.kind === 'MARKDOWN') return t('{0}（批号 {1}）快到期：建议降价 {2}%', name, lot, Math.round(Number(p.pct ?? 0) * 100));
+    if (r.action.kind === 'DONATE') return t('{0}（批号 {1}）到期前卖不完：建议捐赠', name, lot);
+    return t('{0}（批号 {1}）快到期：建议放到显眼位置', name, lot);
+  }
+  if (r.module === 'EQUIPMENT') {
+    const name = st ? sensorName(sensorsFor(st).find((d) => d.id === r.target), r.target) : r.target;
+    return r.action.params?.reason === 'STUCK' ? t('{0} 读数卡住：建议报修传感器', name) : t('{0} 在慢慢变坏：建议报修', name);
+  }
+  if (r.module === 'FORESIGHT') {
+    const at = Number(r.action.params?.at ?? r.prediction?.from ?? 0);
+    const b = r.prediction?.baseline ?? 0;
+    if (r.target === 'LATE') return t('预计 {0} 起有 {1} 单赶不上取货时段', clock(at), Math.round(b));
+    if (r.target === 'WAIT') return t('预计 {0} 前后顾客平均要等 {1} 分钟', clock(at), Math.round(b * 10) / 10);
+    if (r.target === 'COLD_FULL') return t('冷区暂存会到 {0}%', Math.round(b * 100));
+    if (r.target === 'BACKLOG') return t('拣货积压会到 {0} 分钟', Math.round(b));
+  }
   return t(MODULE_TEXT[r.module]);
 }
 
-function unitText(unit: string): string {
-  return unit === 'ORDERS' ? t('单') : unit === 'MINUTES' ? t('分钟') : '';
+/** 建议要做的事（运营预警的各种办法，决策记录 0021） */
+export function actionText(a: { kind: string; params?: Record<string, string | number | boolean> | undefined }, st?: StoreStatic): string {
+  const p = a.params ?? {};
+  const n = Number(p.count ?? String(p.orderIds ?? '').split(',').filter(Boolean).length);
+  switch (a.kind) {
+    case 'MOVE_ASSOCIATE':
+      return (
+        t('现在把 {0} 从{1}调到{2}（约 {3} 小时）', st?.roster.find((x) => x.id === p.associateId)?.name ?? String(p.associateId ?? ''), t(ROLE_TEXT[String(p.from ?? '')] ?? ''), t(ROLE_TEXT[String(p.to ?? '')] ?? ''), Number(p.hours ?? 1)) +
+        (p.order ? t('；收货顺序 {0}', String(p.order).split(',').join(' → ')) : '')
+      );
+    case 'EXPEDITE_ORDERS':
+      return t('提前开始 {0} 单（不等锁单时间，批次排在最前）', n);
+    case 'DEFER_FROZEN':
+      return p.noShow ? t('这单的冷冻商品 {0}（取货前 20 分钟）再拣，顾客来了再拣也来得及', clock(Number(p.until ?? 0))) : t('{0} 单的冷冻商品 {1} 之后再拣', n, clock(Number(p.until ?? 0)));
+    case 'NOTIFY_DELAY':
+      return t('通知 {0} 位顾客会晚 {1} 分钟', n, Number(p.minutes ?? 0));
+    case 'REQUEST_REPAIR': {
+      const n = String(p.slots ?? '').split(',').filter(Boolean).length;
+      return n ? t('开报修单，这台设备的 {0} 个暂存格位暂停放新框（已经在里面的框照常取出）', n) : t('开报修单');
+    }
+    case 'OFFER_SHIFT':
+      return t('请 {0} {1} {2}–{3} 上{4}（发邀请，本人接受后生效）', st?.roster.find((x) => x.id === p.associateId)?.name ?? String(p.associateId ?? ''), String(p.date ?? ''), hm(Number(p.from ?? 0)), hm(Number(p.to ?? 0)), t(ROLE_TEXT[String(p.role ?? '')] ?? ''));
+    case 'OFFER_EARLY_LEAVE':
+      return t('问 {0} 愿不愿意 {1} 下班（自愿）', st?.roster.find((x) => x.id === p.associateId)?.name ?? String(p.associateId ?? ''), hm(Number(p.from ?? 0)));
+    case 'SEARCH_NEARBY': {
+      const near = String(p.near ?? '').split(',').filter(Boolean);
+      return near.length ? t('请一位同事先看原货位 {0}，再看同一通道的 {1}', locationText(String(p.locationId ?? '')), nearText(near)) : t('请一位同事到货位 {0} 附近找一找', locationText(String(p.locationId ?? '')));
+    }
+    case 'SPLIT_WALK':
+      return t('拆成两个批次（按订单在路线上的先后），各自不超过冷链时限');
+    case 'HAND_OVER':
+      return t('剩下没拣的行转给别人（补新框），先把已经拣好的框送回暂存');
+    case 'CLOSE_SLOT':
+      return t('{0}–{1} 的时段停止接新单（已经接的单照常做）{2}', clock(Number(p.slotStart ?? 0)), clock(Number(p.slotEnd ?? 0)), p.later ? t('；{0} 的时段还能接约 {1} 单', clock(Number(p.later)), Number(p.laterLeft ?? 0)) : '');
+    case 'ADD_WALK_CHECK':
+      return t('拣货员拣完第 {0} 站后顺手数一下货位 {1}', Number(p.afterStop ?? 0) + 1, locationText(String(p.locationId ?? '')));
+    // 临期与损耗（决策记录 0024 · C4）
+    case 'MARKDOWN':
+      return t('这一批 {0} 件（{1} 到期）降价 {2}%，贴上临期价签', Number(p.units ?? 0), String(p.expiry ?? ''), Math.round(Number(p.pct ?? 0) * 100));
+    case 'DONATE':
+      return t('到期前把这一批 {0} 件（{1} 到期）下架，交给合作的捐赠机构', Number(p.units ?? 0), String(p.expiry ?? ''));
+    case 'INFO':
+      if (p.callIn) return t('请一名{0}提前来或延长到 {1}（需要店长安排）', t(ROLE_TEXT[String(p.role ?? '')] ?? ''), clock(Number(p.until ?? 0)));
+      // 到货、开门前补货、收银通道（决策记录 0022 · A3）
+      if (p.receiptId && p.delayMin !== undefined) return t('{0} → {1}；前后 30 分钟还有 {2} 车，同时能卸 {3} 车', clock(Number(p.from ?? 0)), clock(Number(p.to ?? 0)), Number(p.overlap ?? 0), Number(p.docks ?? 0));
+      if (p.order) return t('按这个顺序收货（冷藏冷冻优先）：{0}', String(p.order).split(',').join(' → '));
+      if (p.need !== undefined) return t('需要 {0} 人（现在排了 {1} 人{2}）：请店长安排', Number(p.need), Number(p.crew ?? 0), p.finish !== undefined ? t('，预计 {0} 补完，开门 {1}', hm(Number(p.finish)), hm(Number(p.open ?? 0))) : '');
+      if (p.orderIds && p.close) return t('打电话或发消息问问这 {0} 位顾客还来不来；确认不来的由门店管理员取消（记为未取）', String(p.orderIds).split(',').filter(Boolean).length);
+      if (p.lanes !== undefined)
+        return Number(p.next) > Number(p.lanes)
+          ? t('{0} 起需要 {1} 条人工收银通道（每小时约 {2} 位顾客）：{3} 前叫人', clock(Number(p.at ?? 0)), Number(p.next), Number(p.nextPerHour ?? 0), clock(Number(p.callAt ?? p.at ?? 0)))
+          : t('每小时约 {0} 位顾客结账：开 {1} 条人工通道，平均排队约 {2} 分钟（一共 {3} 条）', Number(p.perHour ?? 0), Number(p.lanes), Number(p.wait ?? 0), Number(p.manual ?? 0));
+      if (p.nobody) return t('{0}–{1} 的{2}班找不到能补的人：考虑调整其他人的班或少接单', hm(Number(p.from ?? 0)), hm(Number(p.to ?? 0)), t(ROLE_TEXT[String(p.role ?? '')] ?? ''));
+      if (p.expired) return t('这一批 {0} 件已经过了保质期（{1}）：马上下架，不能再卖', Number(p.units ?? 0), String(p.expiry ?? ''));
+      if (p.visible) return t('把这一批 {0} 件（{1} 到期）挪到货架最前面，先卖它', Number(p.units ?? 0), String(p.expiry ?? ''));
+      return '';
+    default:
+      return a.kind;
+  }
 }
 
-/** 预测值的显示：概率显示为百分比 */
+/** 运营预警的预计效果：采纳前后推演里的迟到订单、平均等待、冷区占用 */
+function ForesightEffect({ rec }: { rec: LiveRec }) {
+  const p = rec.action.params ?? {};
+  const rows: Array<[string, number, number, (v: number) => string]> = [
+    ['赶不上取货时段', Number(p.lateBefore ?? 0), Number(p.lateAfter ?? 0), (v) => t('{0} 单', Math.round(v))],
+    ['顾客平均等待', Number(p.waitBefore ?? 0), Number(p.waitAfter ?? 0), (v) => t('{0} 分钟', Math.round(v * 10) / 10)],
+    ['冷区暂存峰值', Number(p.coldBefore ?? 0), Number(p.coldAfter ?? 0), (v) => `${Math.round(v * 100)}%`],
+  ];
+  return (
+    <table className="ai-effect">
+      <thead>
+        <tr>
+          <th>{t('预计效果（推演）')}</th>
+          <th>{t('不处理')}</th>
+          <th>{t('采纳后')}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map(([label, a, b, fmt]) => (
+          <tr key={label}>
+            <td>{t(label)}</td>
+            <td className="mono">{fmt(a)}</td>
+            <td className={`mono ${b < a - 1e-9 ? 'good-text' : b > a + 1e-9 ? 'warn-text' : ''}`}>{fmt(b)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+/** 订单量展望（决策记录 0021 · A1）：接下来几个小时的预计单数（已按今天的实际修正） */
+function OutlookCard() {
+  const { client } = useLive();
+  const now = useNow(60_000);
+  const ol = client.state.outlook;
+  if (!ol) return null;
+  const hours = ol.hours.filter((h) => h.t + 3_600_000 > now).slice(0, 4);
+  if (!hours.length) return null;
+  const max = Math.max(1, ...hours.map((h) => h.high));
+  return (
+    <section className="card outlook">
+      <div className="card-head">
+        <span className="tag">{t('订单量展望')}</span>
+        <span className="strong">{t('接下来 {0} 小时约 {1} 单', hours.length, Math.round(hours.reduce((a, h) => a + h.mean, 0)))}</span>
+        <span className="due">{clock(ol.at)}</span>
+      </div>
+      <div className="outlook-bars">
+        {hours.map((h) => (
+          <div key={h.t} title={t('80% 区间 {0}–{1}', Math.round(h.low), Math.round(h.high))}>
+            <i style={{ height: `${(h.mean / max) * 100}%` }} />
+            <b className="mono">{Math.round(h.mean)}</b>
+            <small>{new Date(h.t).getHours()}:00</small>
+          </div>
+        ))}
+      </div>
+      <p className="note">{Math.abs(ol.correction - 1) >= 0.02 ? t('按今天的实际修正 ×{0}（最近观察到 {1} 单，原来预测 {2} 单）。推演、补货优先级都用这条线。', ol.correction, ol.observed, Math.round(ol.expected)) : t('今天的实际和预测差不多。推演、补货优先级都用这条线。')}</p>
+    </section>
+  );
+}
+
+function unitText(unit: string): string {
+  return unit === 'ORDERS' ? t('单') : unit === 'MINUTES' || unit === 'SECONDS' ? t('分钟') : unit === 'LANES' ? t('条通道') : '';
+}
+
+/** 预测值的显示：概率显示为百分比，秒换成分钟 */
 function valueText(unit: string, v: number): string {
+  if (unit === 'SECONDS') return String(Math.round(v / 60));
   return unit === 'PROBABILITY' ? pct(v) : String(Math.round(v));
 }
 
 export function AiScreen() {
-  const [tab, setTab] = useState<'recs' | 'ask' | 'modes' | 'models'>('recs');
+  const [tab, setTab] = useState<'recs' | 'schedule' | 'field' | 'ask' | 'modes' | 'models'>('recs');
+  // 提醒直接打开某个子页、滚到那条建议（决策记录 0026）
+  useIntent('aiTab', setTab);
+  useIntent('recId', (id) => {
+    setTab('recs');
+    window.setTimeout(() => document.getElementById(`rec-${id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 50);
+  });
   const { client } = useLive();
   const open = openRecs(client.state).length;
   const tabs: [typeof tab, string][] = [
     ['recs', '建议'],
+    ['schedule', '排班'],
+    ['field', '现场'],
     ['ask', '问答'],
     ['modes', '模式与统计'],
     ['models', '模型'],
@@ -302,17 +624,27 @@ export function AiScreen() {
           </button>
         ))}
       </div>
-      {tab === 'recs' ? <RecsView /> : tab === 'ask' ? <AskPanel /> : tab === 'modes' ? <ModesView /> : <ModelsView />}
+      {tab === 'recs' ? <RecsView /> : tab === 'schedule' ? <ScheduleView /> : tab === 'field' ? <FieldScreen /> : tab === 'ask' ? <AskPanel /> : tab === 'modes' ? <ModesView /> : <ModelsView />}
     </div>
   );
 }
 
 function RecsView() {
-  const { client } = useLive();
-  const open = openRecs(client.state);
+  const { client, auth } = useLive();
+  // 按紧急程度排（决策记录 0026）：标了紧急的、要执行的、设备和运营预警在前
+  const open = recsByUrgency(client.state);
   const recent = recentRecs(client.state, 10);
+  const lead = canManageAi(client.statics as StoreStatic, auth.actor);
   return (
     <div className="list">
+      {canManageAi(client.statics as StoreStatic, auth.actor) && (
+        <>
+          <BriefCard />
+          <ReviewCard />
+          <WeeklyCard />
+        </>
+      )}
+      <OutlookCard />
       {open.length === 0 ? (
         <div className="empty">
           <p className="empty-title">{t('暂时没有待处理的建议')}</p>
@@ -321,6 +653,8 @@ function RecsView() {
       ) : (
         open.map((r) => <RecCard key={r.id} rec={r} />)
       )}
+      {/* 停止接单不用再去「模型」页找（决策记录 0026） */}
+      {lead && <CapacityCard compact />}
       {recent.length > 0 && (
         <>
           <h2 className="section-title">{t('最近处理')}</h2>
@@ -337,6 +671,7 @@ function RecsView() {
                   )}
                   <span className={`tag ${r.status === 'ACCEPTED' || r.status === 'AUTO_APPLIED' ? 'ok' : ''}`}>{t(STATUS_TEXT[r.status])}</span>
                   {r.reason && <span className="muted">{t(REASON_TEXT[r.reason])}</span>}
+                  {r.outcome && <span className={`tag ${r.outcome.hit ? 'ok' : 'warn-tag'}`} title={t('效果追踪：事后从事件记录算出的实际值')}>{outcomeText(r)}</span>}
                 </li>
               ))}
             </ul>
@@ -347,38 +682,144 @@ function RecsView() {
   );
 }
 
+/** 这些模块的建议在卡片上写出要做的事（运营预警、设备、排班另有专门的显示） */
+const GENERIC_ACTION = new Set<string>(['INBOUND', 'FRONT', 'PICKING', 'STAGING', 'CAPACITY', 'EXPIRY']);
+
+/** 快关门了还没来取的订单（决策记录 0023 · B5）：门店管理员确认顾客不来时取消，记为未取（之后的风险会算上） */
+function ContactList({ rec }: { rec: LiveRec }) {
+  const { client, auth, run } = useLive();
+  const ids = String(rec.action.params?.orderIds ?? '').split(',').filter(Boolean);
+  return (
+    <ul className="plain contact-list">
+      {ids.map((id) => {
+        const o = client.state.orders[id];
+        if (!o) return null;
+        return (
+          <li key={id}>
+            <span className="grow">
+              {o.firstName} {o.lastName.slice(0, 1)}. · <span className="mono">{o.shortCode}</span> · {t('取货时段 {0}', clock(o.slotStart))}
+            </span>
+            {o.status === 'CANCELLED' ? (
+              <span className="tag">{t('已取消')}</span>
+            ) : o.status === 'COMPLETED' ? (
+              <span className="tag ok">{t('已取走')}</span>
+            ) : auth.role === 'console' ? (
+              <button className="link danger" onClick={() => void run({ type: 'CancelOrder', orderId: id, reason: 'NO_SHOW' })}>
+                {t('顾客不来了：取消（记为未取）')}
+              </button>
+            ) : null}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 function RecCard({ rec }: { rec: LiveRec }) {
   const { client, auth, run } = useLive();
-  const can = canManageAi(client.statics as StoreStatic, auth.actor);
+  const st = client.statics as StoreStatic;
+  const can = canManageAi(st, auth.actor);
+  const now = useNow(30_000);
   const [overriding, setOverriding] = useState(false);
   const [reason, setReason] = useState<OverrideReason | undefined>();
   const [note, setNote] = useState('');
+  // 决策记录 0026：涉及人、钱、顾客的动作点两下（先看清要做什么）；补班邀请默认被拒后自动问下一个人
+  const [confirming, setConfirming] = useState(false);
+  const [autoNext, setAutoNext] = useState(true);
   const p = rec.prediction;
   const info = rec.action.kind === 'INFO';
+  // 只显示的建议：「有用」不执行动作
+  const show = rec.mode === 'SHOW';
+  // 情况已经变了、动作做不了的建议：只留「收起」（节拍也会自动收起）
+  const stale = !show && !!st && recStale(client.state, rec, st, now);
+  const careful = !show && CONFIRM_ALWAYS.has(rec.action.kind);
+  const offer = rec.action.kind === 'OFFER_SHIFT';
+  const accept = () => void run({ type: 'AcceptRecommendation', recId: rec.id, ...(offer && autoNext ? { autoNext: true } : {}) });
   const vsUsual = p?.baseline ? (p.value - p.baseline) / p.baseline : undefined;
   return (
-    <article className="card ai-rec">
+    <article className="card ai-rec" id={`rec-${rec.id}`}>
       <div className="card-head">
         <span className="tag">{t(MODULE_TEXT[rec.module])}</span>
         <span className="strong">{recTitle(rec, client.state, client.statics)}</span>
         <span className="due">{p?.from !== undefined && p.to !== undefined ? `${clock(p.from)}–${clock(p.to)}` : ''}</span>
       </div>
-      {p && (
+      {p && rec.module !== 'FORESIGHT' && (
         <div className="ai-big">
           <b>{valueText(p.unit, p.value)}</b>
           <span>
-            {p.unit === 'PROBABILITY' ? (rec.module === 'COUNT' ? t('记录不准的概率') : t('货架上找得到的概率')) : unitText(p.unit)}
+            {p.unit === 'PROBABILITY' ? (rec.module === 'COUNT' ? t('记录不准的概率') : rec.module === 'STAGING' ? t('顾客不来的概率') : rec.action.kind === 'SEARCH_NEARBY' ? t('放错了地方的概率') : t('货架上找得到的概率')) : unitText(p.unit)}
+            {rec.module === 'EQUIPMENT' && <small>{t('后预计越过告警线')}</small>}
             {rec.module === 'STAFFING' && p.unit === 'MINUTES' && <small>{t('调动后预计的平均等待')}</small>}
             {p.low !== undefined && p.high !== undefined && <small>{t('80% 区间 {0}–{1}', Math.round(p.low), Math.round(p.high))}</small>}
           </span>
-          {vsUsual !== undefined && p.unit === 'ORDERS' && (
+          {vsUsual !== undefined && p.unit === 'ORDERS' && rec.module === 'FORECAST' && (
             <em className={vsUsual >= 0 ? 'up' : 'down'}>{t('比近 4 周同时段 {0}', `${vsUsual >= 0 ? '+' : '−'}${Math.abs(Math.round(vsUsual * 100))}%`)}</em>
           )}
           {p.unit === 'MINUTES' && p.baseline !== undefined && rec.module === 'ETA' && <em className={p.value >= p.baseline ? 'up' : 'down'}>{t('顾客报 {0} 分钟', Math.round(p.baseline))}</em>}
           {p.unit === 'MINUTES' && p.baseline !== undefined && rec.module === 'STAFFING' && <em className="down">{t('调动前 {0} 分钟', Math.round(p.baseline * 10) / 10)}</em>}
         </div>
       )}
+      {rec.module === 'FORESIGHT' && (
+        <>
+          <p className="ai-action">
+            <b>{t('建议：')}</b>
+            {actionText(rec.action, client.statics)}
+          </p>
+          <ForesightEffect rec={rec} />
+        </>
+      )}
+      {rec.module === 'EQUIPMENT' && (
+        <p className="ai-action">
+          <b>{t('建议：')}</b>
+          {actionText(rec.action, client.statics)}
+        </p>
+      )}
+      {rec.module === 'STAFFING' && (rec.action.kind === 'OFFER_SHIFT' || rec.action.kind === 'OFFER_EARLY_LEAVE' || rec.action.params?.nobody) && (
+        <p className="ai-action">
+          <b>{t('建议：')}</b>
+          {actionText(rec.action, client.statics)}
+          {rec.alternatives.length > 0 && !(can && offer) && <small className="block-note">{t('其他人选：{0}', rec.alternatives.map((a) => client.statics?.roster.find((x) => x.id === a.action.params?.associateId)?.name ?? '').filter(Boolean).join('、'))}</small>}
+        </p>
+      )}
+      {can && offer && !stale && (
+        <div className="offer-options">
+          <label className="toggle">
+            <input type="checkbox" checked={autoNext} onChange={(e) => setAutoNext(e.target.checked)} />
+            <span>{t('被拒后自动问下一个人（不用每次再采纳）')}</span>
+          </label>
+          {rec.alternatives.length > 0 && (
+            <div className="chips">
+              {rec.alternatives.map((a) => {
+                const ap = a.action.params ?? {};
+                const id = String(ap.associateId ?? '');
+                return (
+                  <button
+                    key={id}
+                    className="chip"
+                    onClick={() =>
+                      void run({ type: 'SendShiftOffer', associateId: id, date: String(ap.date ?? ''), from: Number(ap.from), to: Number(ap.to), ...(ap.role ? { role: String(ap.role) as AssociateRole } : {}), ...(ap.replaces ? { replaces: String(ap.replaces) } : {}), recId: rec.id, ...(autoNext ? { autoNext: true } : {}) })
+                    }
+                  >
+                    {t('改发给 {0}', client.statics?.roster.find((x) => x.id === id)?.name ?? id)}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
       {rec.module === 'STAFFING' && rec.action.params?.plan && <StaffPlanTable rec={rec} />}
+      {(GENERIC_ACTION.has(rec.module) || rec.action.kind === 'SEARCH_NEARBY') &&
+        (() => {
+          const a = actionText(rec.action, client.statics);
+          return a && a !== rec.action.kind ? (
+            <p className="ai-action">
+              <b>{t('建议：')}</b>
+              {a}
+            </p>
+          ) : null;
+        })()}
+      {rec.module === 'STAGING' && rec.target === 'CONTACT' && <ContactList rec={rec} />}
       {p?.breakdown && p.breakdown.unit === 'LINES' && (
         <p className="note">
           {t(
@@ -402,7 +843,15 @@ function RecCard({ rec }: { rec: LiveRec }) {
           </li>
         ))}
       </ul>
-      {rec.alternatives.length > 0 && (
+      {rec.module === 'FORESIGHT' && rec.alternatives.length > 0 && (
+        <p className="note">
+          {t(
+            '其他办法：{0}',
+            rec.alternatives.map((a) => `${actionText(a.action, client.statics)}（${rec.target === 'COLD_FULL' ? `${Math.round(Number(a.action.params?.after ?? 0) * 100)}%` : Math.round(Number(a.action.params?.after ?? 0) * 10) / 10}）`).join(' · '),
+          )}
+        </p>
+      )}
+      {rec.module !== 'FORESIGHT' && rec.alternatives.length > 0 && (
         <p className="note">
           {t(
             '其他模型：{0}',
@@ -413,10 +862,30 @@ function RecCard({ rec }: { rec: LiveRec }) {
       <p className="note">
         {t('模型 {0} v{1} · {2} · {3}', rec.model.id, rec.model.version, kindText(rec.model.kind), t(MODE_TEXT[rec.mode]))}
       </p>
+      {can && show && !info && <p className="note">{t('只显示：点「有用」不会执行；要执行，请到「模式与统计」把这个模块改成需确认')}</p>}
       {can &&
-        (overriding ? (
+        (stale ? (
+          <div className="actions">
+            <span className="tag warn-tag">{t('已过时')}</span>
+            <span className="muted">{t('情况已经变了，这条建议做不了')}</span>
+            <button className="link" onClick={() => void run({ type: 'DismissRecommendation', recId: rec.id }, { quiet: true })}>
+              {t('收起')}
+            </button>
+          </div>
+        ) : confirming ? (
+          <div className="ai-confirm" role="alertdialog" aria-label={t('确认执行')}>
+            <p className="strong">{t('确认执行：{0}', actionText(rec.action, client.statics))}</p>
+            <p className="note">{t('涉及人、钱或顾客的动作，执行后撤不回')}</p>
+            <div className="actions">
+              <button onClick={() => setConfirming(false)}>{t('取消')}</button>
+              <button className="primary" onClick={accept}>
+                {t('确认执行')}
+              </button>
+            </div>
+          </div>
+        ) : overriding ? (
           <div className="ai-override">
-            <p className="strong">{info ? t('哪里不准？') : t('为什么不采纳？')}</p>
+            <p className="strong">{info || show ? t('哪里不准？') : t('为什么不采纳？')}</p>
             <div className="chips">
               {OVERRIDE_REASONS.map((r) => (
                 <button key={r} className={`chip${reason === r ? ' on' : ''}`} onClick={() => setReason(r)}>
@@ -438,10 +907,10 @@ function RecCard({ rec }: { rec: LiveRec }) {
           </div>
         ) : (
           <div className="actions">
-            <button className="primary" onClick={() => void run({ type: 'AcceptRecommendation', recId: rec.id })}>
-              {info ? t('有用') : t('采纳')}
+            <button className="primary" onClick={careful ? () => setConfirming(true) : accept}>
+              {info || show ? t('有用') : t('采纳')}
             </button>
-            <button onClick={() => setOverriding(true)}>{info ? t('不准') : t('否决')}</button>
+            <button onClick={() => setOverriding(true)}>{info || show ? t('不准') : t('否决')}</button>
             <button className="link" onClick={() => void run({ type: 'DismissRecommendation', recId: rec.id }, { quiet: true })}>
               {t('忽略')}
             </button>
@@ -458,9 +927,12 @@ function ModesView() {
   const can = canManageAi(client.statics as StoreStatic, auth.actor);
   return (
     <div className="list">
-      <StaffView />
+      <NudgeStatsView />
+      <p className="note">{t('调配人员、把人放进固定名单（AI 不建议调动）：点顶栏的「在岗」按钮（👥）。')}</p>
       <h2 className="section-title">{t('运行模式')}</h2>
       <p className="note">{t('只显示：AI 给出信息；需确认：员工采纳后才执行；自动执行：AI 直接执行并记录。锁定的模块只有门店管理员可以修改。')}</p>
+      <p className="note">{t('涉及人、钱、顾客的动作（调人、补班和提前下班的邀请、通知顾客晚到、降价、捐赠、停止接单）即使设成自动执行，也要人确认。')}</p>
+      <p className="note">{t('效果追踪：建议的时间段过去、或者对应的任务做完后，AI 从事件记录算出同一个指标的实际值。连续不准时自动降成只显示。这是观察数据：带班负责人更愿意采纳有把握的建议，采纳的和没采纳的不能直接比较。')}</p>
       {AI_MODULES.map((m) => {
         const cur = aiModeOf(s, m);
         const st = s.aiModes[m];
@@ -486,6 +958,8 @@ function ModesView() {
                 {locked ? t('解锁') : t('锁定')}
               </button>
             )}
+            {st?.auto && cur === 'SHOW' && <p className="banner warn">{t('效果追踪：最近 {0} 次只有 {1} 达到预计效果，已自动改为只显示。确认原因后可以改回来。', st.auto.n, pct(st.auto.hitRate))}</p>}
+            <OutcomeLine stats={stats} />
             {stats && stats.OVERRIDDEN > 0 && (
               <p className="note">
                 {t(
@@ -504,56 +978,54 @@ function ModesView() {
   );
 }
 
-/** 人员：当前岗位、临时调动、固定名单（锁定后 AI 不会建议调动这个人） */
-function StaffView() {
-  const { client, auth, run } = useLive();
-  const st = client.statics as StoreStatic;
-  const s = client.state;
-  const can = canManageAi(st, auth.actor);
-  const people = st.roster.filter((a) => a.role !== 'LEAD');
+/** 建议中枢的统计（决策记录 0021 · G1）：最近一小时发了多少提醒、平均每人几条、多久处理、过期没处理的比例 */
+function NudgeStatsView() {
+  const { client, auth } = useLive();
+  const now = useNow(30_000);
+  const [deferred, setDeferred] = useState<Record<string, number> | undefined>();
+  useEffect(() => {
+    void ai
+      .nudges(auth)
+      .then((r) => setDeferred(r.deferred))
+      .catch(() => undefined);
+  }, [now]);
+  const st = nudgeStats(client.state, now);
+  const nameOf = (id: string) => (id === 'console' ? t('门店管理员') : (client.statics?.roster.find((a) => a.id === id)?.name ?? id));
   return (
     <>
-      <h2 className="section-title">{t('人员')}</h2>
-      <p className="note">{t('可以把员工临时调到别的作业岗位；锁定的员工属于固定名单，AI 不会建议调动。')}</p>
+      <h2 className="section-title">{t('提醒')}</h2>
       <section className="card">
-        <ul className="plain staff-list">
-          {people.map((a) => {
-            const role = roleOf(st, s, a.id) ?? a.role;
-            const locked = !!s.staffLocks[a.id];
-            return (
-              <li key={a.id}>
-                <span className="strong">{a.name}</span>
-                <span className="tag">{t(ROLE_TEXT[role] ?? role)}</span>
-                {s.roles[a.id] && <span className="tag">{t('临时')}</span>}
-                {locked && <span className="tag">{t('固定')}</span>}
-                {can && (
-                  <span className="staff-actions">
-                    {(['PICK', 'STAGE', 'HANDOFF'] as const)
-                      .filter((r) => r !== role)
-                      .map((r) => (
-                        <button key={r} className="chip" onClick={() => void run({ type: 'ChangeRole', associateId: a.id, role: r }, { quiet: true })}>
-                          {t('调到{0}', t(ROLE_TEXT[r] ?? r))}
-                        </button>
-                      ))}
-                    {s.roles[a.id] && (
-                      <button className="chip" onClick={() => void run({ type: 'ChangeRole', associateId: a.id, role: a.role }, { quiet: true })}>
-                        {t('回到{0}', t(ROLE_TEXT[a.role] ?? a.role))}
-                      </button>
-                    )}
-                    <button className="link" onClick={() => void run({ type: 'LockAssociate', associateId: a.id, locked: !locked }, { quiet: true })}>
-                      {locked ? t('取消固定') : t('固定')}
-                    </button>
-                  </span>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+        <div className="facts">
+          <span>
+            {t('最近一小时')} <b>{st.lastHour}</b>
+          </span>
+          <span>
+            {t('紧急')} <b>{st.urgentLastHour}</b>
+          </span>
+          <span>
+            {t('平均每人')} <b>{st.perPerson}</b>
+          </span>
+          <span>
+            {t('读的中位数')} <b>{st.medianReadSec !== undefined ? t('{0} 秒', st.medianReadSec) : '—'}</b>
+          </span>
+          <span>
+            {t('处理完的中位数')} <b>{st.medianCloseSec !== undefined ? t('{0} 秒', st.medianCloseSec) : '—'}</b>
+          </span>
+          <span>
+            {t('过期没处理')} <b>{st.expiredShare !== undefined ? pct(st.expiredShare) : '—'}</b>
+          </span>
+        </div>
+        {st.byPerson.length > 0 && <p className="note">{st.byPerson.map((x) => `${nameOf(x.to)} ${x.count}`).join(' · ')}</p>}
+        {deferred && (
+          <p className="note">{t('先不发的（累计）：正在交付 {0} · 超出每小时预算 {1} · 营业时间外 {2}', deferred.BUSY ?? 0, deferred.BUDGET ?? 0, deferred.NIGHT ?? 0)}</p>
+        )}
+        <p className="note">{t('紧急的马上发；正在交付、核验取货码、冷链计时快到的人先不打扰；每人每小时最多 3 条非紧急提醒；同一通道、同一台设备、同一个模块的合成一条。')}</p>
       </section>
     </>
   );
 }
 
+/** 人员：当前岗位、临时调动、固定名单（锁定后 AI 不会建议调动这个人） */
 function ModelsView() {
   const { client, auth } = useLive();
   const can = canManageAi(client.statics as StoreStatic, auth.actor);
@@ -583,9 +1055,14 @@ function ModelsView() {
   const trained = (r: { promoted: boolean; best: number }) => (r.promoted ? t('v{0} 已上线', r.best) : t('v{0} 没有通过上线检查，保留当前版本', r.best));
   return (
     <div className="list">
+      <AiHealthCard />
       {FAMILIES.map((f) => (
         <FamilySection key={f.id} family={f} models={data.models.filter((m) => m.id === f.id)} />
       ))}
+      <MaintenanceStats />
+      {data.shelfTruth && <ShelfTruthStats data={data.shelfTruth} />}
+      {data.substitution && <SubstitutionLive data={data.substitution} />}
+      <CapacityCard />
       {can && (
         <div className="actions ai-actions">
           <button className="primary" disabled={busy} onClick={() => void act(() => ai.forecast(auth), () => t('已发出预测'))}>
@@ -593,6 +1070,9 @@ function ModelsView() {
           </button>
           <button disabled={busy} onClick={() => void act(() => ai.scan(auth), (r: { shelves: number; counts: number }) => t('发出 {0} 条核对货架、{1} 条盘点建议', r.shelves, r.counts))}>
             {t('立即检查货架与盘点风险')}
+          </button>
+          <button disabled={busy} onClick={() => void act(() => ai.foresight(auth), (r: { problems: unknown[] }) => (r.problems.length ? t('推演发现 {0} 个问题，已发出运营预警', r.problems.length) : t('推演：接下来两小时没有问题')))}>
+            {t('立即用推演看一次')}
           </button>
           <button disabled={busy} onClick={() => void act(() => ai.retrain(auth), trained)}>
             {t('重新训练')}
@@ -606,6 +1086,66 @@ function ModelsView() {
         </div>
       )}
     </div>
+  );
+}
+
+/** 预测性维护的命中情况（决策记录 0022）：AI 发起的报修里，修好时确认有故障的比例 */
+function MaintenanceStats() {
+  const { client } = useLive();
+  const m = maintenanceStats(client.state);
+  return (
+    <>
+      <h2 className="section-title">{t('设备健康（预测性维护）')}</h2>
+      <section className="card">
+        <p>{m.predicted ? t('AI 发起的报修关单 {0} 次，修好时确认有故障 {1} 次（命中率 {2}）；未关单 {3} 张。', m.predicted, m.confirmed, pct(m.confirmed / m.predicted), m.open) : t('还没有关单的 AI 报修；未关单 {0} 张。', m.open)}</p>
+        <p className="note">{t('做法：每台设备和自己的平时比，看底线温度的趋势（稳健回归）、开门后的回温、读数是否卡住，估计多久越过告警线。关单时选的实际故障就是评估和改进的标签。')}</p>
+      </section>
+    </>
+  );
+}
+
+/** 拣货员报告的种类（决策记录 0022 · C1） */
+const SIGNAL_TEXT: Record<string, string> = {
+  NOT_FOUND_EMPTY: '找不到 · 空架',
+  NOT_FOUND_ELSEWHERE: '找不到 · 不在原位',
+  NOT_FOUND_DAMAGED: '找不到 · 损坏',
+  NOT_FOUND_TAG: '找不到 · 价签不对',
+  NOT_FOUND_OTHER: '找不到 · 其他',
+  PICKED_OK: '拣到了',
+};
+
+/** 多源货架真相：各种拣货员报告的可靠度（从「报告之后员工去数的结果」学） */
+function ShelfTruthStats({ data }: { data: NonNullable<AiSummary['shelfTruth']> }) {
+  return (
+    <>
+      <h2 className="section-title">{t('货架真相（拣货员报告）')}</h2>
+      <section className="card">
+        <p>{t('正在跟踪 {0} 件商品的最近报告。可靠度：报告之后员工去数，结果和报告一致的比例（起点相当于看过 10 次）。', data.tracked)}</p>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>{t('报告')}</th>
+                <th>{t('对 / 错')}</th>
+                <th>{t('可靠度')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.reliability.map((r) => (
+                <tr key={r.kind}>
+                  <td>{t(SIGNAL_TEXT[r.kind] ?? r.kind)}</td>
+                  <td className="mono">
+                    {r.hit} / {r.miss}
+                  </td>
+                  <td className="mono">{pct(r.r)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="note">{t('做法：收银沉默给出起点，每条「找不到」按它的可靠度降低「货架上有」的把握，「拣到了」提高；越旧的报告分量越轻。多半放错了地方时发「附近找一找」，说不准时请路过的拣货员顺手数一下。')}</p>
+      </section>
+    </>
   );
 }
 
@@ -636,6 +1176,8 @@ function FamilySection({ family, models }: { family: (typeof FAMILIES)[number]; 
           <p className="note">
             {family.id === 'substitution'
               ? t('仿真预训练：合成替代记录（顾客有忠于品牌、对价格敏感、坚持有机等模型看不到的偏好）')
+              : family.id === 'no-show'
+              ? t('仿真预训练：{0} 天的合成自取订单（顾客有模型看不到的爽约倾向）', champ.data.days)
               : family.id === 'shelf-availability'
               ? t('仿真预训练：{0} 天的合成货架真实存量（含模型看不到的整批丢失、放错位置和零星损耗）', champ.data.days)
               : family.id === 'count-risk'
@@ -654,6 +1196,11 @@ function FamilySection({ family, models }: { family: (typeof FAMILIES)[number]; 
             ))}
           </div>
           <p className="note">{t(EVAL_TEXT[family.id] ?? '')}</p>
+          {family.id === 'substitution' && champ.metrics.personalLift !== undefined && (
+            <p className="note">
+              {t('个性化（按顾客自己以前的反应调整，决策记录 0023）：第一名的期望接受率变化 {0} 个百分点（下限 {1}，知道真实偏好时的上限 {2}）。{3}', (Math.round((champ.metrics.personalLift as number) * 1000) / 10).toFixed(1), (Math.round((champ.metrics.personalLiftLow ?? 0) * 1000) / 10).toFixed(1), pct(champ.metrics.personalOracle ?? 0), (champ.metrics.personalLift as number) >= 0.01 && (champ.metrics.personalLiftLow ?? 0) > 0 ? t('值得做。') : t('提升不到 1 个百分点，暂时不做；先攒真实标签再看。'))}
+            </p>
+          )}
         </section>
       )}
       {lastGate?.gate && (

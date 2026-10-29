@@ -1,16 +1,16 @@
 import { useEffect, useState } from 'react';
-import { signIn, storeInfo } from '../api';
+import { signIn, storeInfo, type RosterEntry } from '../api';
 import { getLang, setLang, t, useLang } from '../i18n';
 import type { Auth } from '../live';
 import { DEMO } from '../demo/transport';
 
-const ROLE_TEXT: Record<string, string> = { PICK: '拣货', STAGE: '暂存', HANDOFF: '交付', LEAD: '班组长', BACKROOM: '后仓收货', RESTOCK: '补货', DELI: '熟食' };
+const ROLE_TEXT: Record<string, string> = { PICK: '拣货', STAGE: '暂存', HANDOFF: '交付', LEAD: '带班负责人', BACKROOM: '后仓收货', RESTOCK: '补货', DELI: '熟食' };
 
 /** 登录：演示阶段从员工名单中选择身份（不使用密码）；控制台代替订单平台、顾客和司机 */
 export function SignIn({ onSignedIn }: { onSignedIn: (a: Auth) => void }) {
   useLang();
   const [storeId, setStoreId] = useState(() => new URLSearchParams(location.search).get('store') || 'demo');
-  const [roster, setRoster] = useState<Array<{ id: string; name: string; role: string }> | null>(null);
+  const [roster, setRoster] = useState<RosterEntry[] | null>(null);
   const [error, setError] = useState('');
   // 大型店有几百名员工（决策记录 0014）：名单多时先搜索（名字或员工编号）、按岗位筛选，只显示前 60 个
   const [query, setQuery] = useState('');
@@ -87,6 +87,7 @@ export function SignIn({ onSignedIn }: { onSignedIn: (a: Auth) => void }) {
             </span>
             <b>{a.name}</b>
             <small>{t(ROLE_TEXT[a.role] ?? a.role)}</small>
+            {a.employment === 'STUDENT' && a.shift && <small className="student-tag">{t('学生兼职 {0}–{1}', hm(a.shift.from), hm(a.shift.to))}</small>}
           </button>
         ))}
         {roster === null && !error && <p className="muted">{t('加载中…')}</p>}
@@ -99,6 +100,8 @@ export function SignIn({ onSignedIn }: { onSignedIn: (a: Auth) => void }) {
     </div>
   );
 }
+
+const hm = (min: number) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
 
 export function Logo() {
   return (

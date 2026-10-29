@@ -89,6 +89,30 @@ function moduleIn(q: string): string | undefined {
   return undefined;
 }
 
+/** 问题里的订单号（「订单 K7QD」「order K7QD」） */
+function orderCodeIn(q: string): string | undefined {
+  return /(?:订单|单号|order)\s*#?\s*([A-Za-z0-9]{4,8})\b/i.exec(q)?.[1]?.toUpperCase();
+}
+
+/** 问题里说的是哪天：昨天 / 今天 / 具体日期 */
+function dayIn(q: string): string | undefined {
+  const m = /(\d{4}-\d{2}-\d{2})/.exec(q);
+  if (m) return m[1];
+  return /(昨天|yesterday)/i.test(q) ? 'yesterday' : undefined;
+}
+
+/** 问数 2.0、复盘、周报（决策记录 0024 · F2、F3、F5）：返回要用的工具，不是这几类时返回 undefined */
+function analysisCall(q: string, planogram: readonly PlanogramEntry[]): ToolCall | undefined {
+  if (/(复盘|打烊|为什么(会)?迟到|迟到.{0,6}(原因|为什么)|closing review|end[- ]of[- ]day review|why (were|was|did).{0,30}late|what went wrong today)/i.test(q)) return { name: 'closing_review', args: dayIn(q) ? { date: dayIn(q) } : {} };
+  if (/(周报|这一?周|本周|weekly|this week|week in review)/i.test(q)) return { name: 'weekly_report', args: {} };
+  const code = orderCodeIn(q);
+  if (code && /(经过|时间线|怎么回事|到哪|进度|状态|timeline|what happened|history|status|where is)/i.test(q)) return { name: 'order_timeline', args: { order: code } };
+  if (/(每小时|按小时|各个?时段|几点.{0,4}(最忙|最多|单最多)|by hour|hourly|busiest hour|hour by hour)/i.test(q)) return { name: 'metrics_by_hour', args: dayIn(q) ? { date: dayIn(q) } : {} };
+  if (/(比较|对比|和昨天比|跟昨天比|比昨天|compare|vs\.? yesterday|versus yesterday|than yesterday)/i.test(q)) return { name: 'compare_days', args: {} };
+  if (/(今天卖了|卖了多少|卖出多少|库存轨迹|进出记录|sold today|how many .{0,30} sold|inventory history|history of)/i.test(q) && matchItem(q, planogram)) return { name: 'item_history', args: { query: q } };
+  return undefined;
+}
+
 export function route(question: string, planogram: readonly PlanogramEntry[]): ToolCall[] {
   const q = question.trim();
   // 1. 推演
@@ -106,7 +130,15 @@ export function route(question: string, planogram: readonly PlanogramEntry[]): T
   }
   // 3. 等待原因
   if (/(为什么|为何|怎么|why).*(等|慢|久|排队|wait|slow|long|queue)/i.test(q) || /(等待|等候|排队|wait|queue).*(长|久|多|long|slow)/i.test(q)) return [{ name: 'wait_analysis', args: {} }];
-  // 4. 交接班摘要
+  // 3.5 问数 2.0、复盘、周报
+  const analysis = analysisCall(q, planogram);
+  if (analysis) return [analysis];
+  // 4. 开店简报（决策记录 0022 · F1）
+  if (/(简报|班前会|早会|开门前|开店前|今天(要|需要|该)?注意|需要我决定|brief(ing)?\b|huddle|watch out for today|need to decide|before (we )?open)/i.test(q)) {
+    const part = /(中午|午间|midday|noon)/i.test(q) ? 'MIDDAY' : /(傍晚|晚上|明天|evening|tomorrow)/i.test(q) ? 'EVENING' : /(早上|早会|开门前|开店前|morning|before (we )?open)/i.test(q) ? 'MORNING' : undefined;
+    return [{ name: 'opening_brief', args: part ? { part } : {} }];
+  }
+  // 5. 交接班摘要
   if (/(交接|摘要|总结|日报|汇总|小结|handover|hand-over|summary|summarize|recap|wrap.?up)/i.test(q)) {
     const since = /(\d{1,2})\s*点(?:以来|开始|之后|后)|since\s*(\d{1,2})/i.exec(q);
     return [{ name: 'shift_summary', args: since ? { sinceHour: Number(since[1] ?? since[2]) } : {} }];
@@ -137,7 +169,7 @@ export function routeHybrid(question: string, planogram: readonly PlanogramEntry
   const q = question.trim();
   const rules = route(q, planogram);
   const first = rules[0];
-  if (first && (first.name === 'whatif' || (first.name === 'explain_recommendation' && first.args.recId) || (first.name === 'knowledge' && first.args.explicit))) return rules;
+  if (first && (first.name === 'whatif' || (first.name === 'explain_recommendation' && first.args.recId) || (first.name === 'knowledge' && first.args.explicit) || ['closing_review', 'weekly_report', 'metrics_by_hour', 'compare_days', 'order_timeline', 'item_history'].includes(first.name))) return rules;
   const { intent, p } = classifyIntent(model, q, planogram);
   if (p < 0.4) return rules;
   switch (intent) {

@@ -1,4 +1,4 @@
-import type { CompareRequest, DayDigest, MultiDayRequest, PolicyDigest, SimRequest, SimResponse, Timeline } from './protocol';
+import type { AdviceResult, AdviseRequest, CompareRequest, DayDigest, MultiDayRequest, PolicyDigest, SimRequest, SimResponse, Timeline, WhatIfDigest, WhatIfRequest } from './protocol';
 
 type Pending = { resolve: (v: never) => void; reject: (e: Error) => void; progress?: (done: number, total: number) => void };
 
@@ -13,6 +13,8 @@ export class SimClient {
   private compareSeq = 0;
   /** 多日模拟用负数序号，不干扰策略对比的“最新请求”判断 */
   private multiSeq = 0;
+  private adviseSeq = 0;
+  private whatifSeq = 0;
   private pending = new Map<number, Pending>();
 
   constructor() {
@@ -28,6 +30,8 @@ export class SimClient {
       if (msg.type === 'result') p.resolve(msg.timeline as never);
       else if (msg.type === 'compare') p.resolve(msg.results as never);
       else if (msg.type === 'multiDay') p.resolve(msg.days as never);
+      else if (msg.type === 'advice') p.resolve(msg.result as never);
+      else if (msg.type === 'whatif') p.resolve(msg.digests as never);
       else p.reject(new Error(msg.message));
     };
     this.main.onmessage = onMessage;
@@ -57,6 +61,32 @@ export class SimClient {
       this.pending.set(reqId, { resolve: resolve as (v: never) => void, reject, progress });
       this.side.postMessage({ type: 'multiDay', reqId, base, days } satisfies MultiDayRequest);
     });
+  }
+
+  /** AI 建议（在对比用的 Worker 中运行；序号从 1e9 往下，不和别的请求混在一起） */
+  advise(base: AdviseRequest['base'], front?: AdviseRequest['front']): Promise<AdviceResult> {
+    const reqId = -1e9 - ++this.adviseSeq;
+    return new Promise((resolve, reject) => {
+      this.pending.set(reqId, { resolve: resolve as (v: never) => void, reject });
+      this.side.postMessage({ type: 'advise', reqId, base, ...(front ? { front } : {}) } satisfies AdviseRequest);
+    });
+  }
+
+  get latestAdvise(): number {
+    return this.adviseSeq;
+  }
+
+  /** 同一天按几组设置各跑一遍（采纳与不采纳对比） */
+  whatif(runs: WhatIfRequest['runs']): Promise<WhatIfDigest[]> {
+    const reqId = -2e9 - ++this.whatifSeq;
+    return new Promise((resolve, reject) => {
+      this.pending.set(reqId, { resolve: resolve as (v: never) => void, reject });
+      this.side.postMessage({ type: 'whatif', reqId, runs } satisfies WhatIfRequest);
+    });
+  }
+
+  get latestWhatIf(): number {
+    return this.whatifSeq;
   }
 
   /** 最近一次主仿真请求的序号 */

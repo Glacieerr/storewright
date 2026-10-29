@@ -83,13 +83,20 @@ describe('business modules over HTTP (Phase 6)', () => {
     // 包裹
     const asn = await call('POST', c, '/demo/parcels', { count: 4, trips: 2 });
     const [p1, p2, p3] = asn.body.parcels as string[];
+    // 到货通知里没有的编码不会直接变成「多出」（决策记录 0026）
+    const unknown = await call('POST', lead, '/commands', { cmd: { type: 'InductParcel', code: 'NOPE-1' } });
+    expect(unknown.status).toBe(409);
+    expect(unknown.body.reject.code).toBe('PARCEL_NOT_FOUND');
+    expect((await call('POST', lead, '/commands', { cmd: { type: 'InductParcel', code: 'NOPE-1', extra: true } })).status).toBe(200);
+    expect((await call('POST', lead, '/commands', { cmd: { type: 'ResolveParcel', parcelId: 'NOPE-1', action: 'RETURN' } })).status).toBe(200);
     expect((await call('POST', lead, '/commands', { cmd: { type: 'InductParcel', code: p1 } })).status).toBe(200);
     expect((await call('POST', lead, '/commands', { cmd: { type: 'InductParcel', code: p3 } })).status).toBe(200);
     expect((await call('POST', lead, '/commands', { cmd: { type: 'StageParcel', parcelId: p1, slotCode: 'P01' } })).status).toBe(200);
     expect((await call('POST', lead, '/commands', { cmd: { type: 'StageParcel', parcelId: p3, slotCode: 'P02' } })).status).toBe(200);
     s = await state(c);
     expect(s.parcels[p1!]!.tripRef).toBe(s.parcels[p3!]!.tripRef);
-    expect((await call('POST', c, '/commands', { cmd: { type: 'HandOffParcels', tripRef: s.parcels[p1!]!.tripRef } })).status).toBe(200);
+    // 员工手机也能按行程交给司机（以前只有控制台）
+    expect((await call('POST', lead, '/commands', { cmd: { type: 'HandOffParcels', tripRef: s.parcels[p1!]!.tripRef } })).status).toBe(200);
     expect((await state(c)).parcels[p2!]!.status).toBe('EXPECTED');
   });
 });

@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { env } from './environment';
@@ -9,6 +9,8 @@ import { useApp } from '../state/store';
 import { SCENE, ZONE_COLOR } from './palette';
 import { toonGradient } from './toon';
 import { getLang, t } from '../i18n';
+import { makeWorldTexMaterial } from './terrain/terrainMaterial';
+import { floorTileTexture } from './terrain/textures';
 
 const WALL_H = 0.8;
 
@@ -67,8 +69,16 @@ export function Ground() {
   const points = model.config.layout.points;
   const backroomY = geo.floorY.get(points.backroom.floorId) ?? 0;
 
+  // 楼板：塑胶地砖（世界坐标平铺）；同时显示多层时，上层楼板半透明，能看到下层
+  const floorGround = useMemo(() => makeWorldTexMaterial(floorTileTexture(), 2.4, SCENE.floor), []);
+  const floorUpper = useMemo(() => makeWorldTexMaterial(floorTileTexture(), 2.4, SCENE.floorUpper), []);
+  useEffect(() => {
+    floorUpper.transparent = showAll;
+    floorUpper.opacity = showAll ? 0.55 : 1;
+    floorUpper.needsUpdate = true;
+  }, [floorUpper, showAll]);
   // 夜间店内灯光：楼板自发光，营造灯火通明的效果（不增加实时光源）
-  const floorMats = useRef(new Set<THREE.MeshToonMaterial>());
+  const floorMats = useRef(new Set<THREE.MeshToonMaterial>([floorGround, floorUpper]));
   useFrame(() => {
     for (const m of floorMats.current) m.emissive.setRGB(0.42 * env.night, 0.39 * env.night, 0.3 * env.night);
   });
@@ -107,18 +117,8 @@ export function Ground() {
         return (
           <group key={f.floorId}>
             {(f.level > 0 ? slabPieces(f, holesFor(f.y)) : [[cx, cz, w, d]]).map(([px, pz, pw, pd], k) => (
-            <mesh key={k} position={[px as number, f.y - 0.06, pz as number]} receiveShadow>
+            <mesh key={k} position={[px as number, f.y - 0.06, pz as number]} receiveShadow material={f.level === 0 ? floorGround : floorUpper}>
               <boxGeometry args={[pw as number, 0.12, pd as number]} />
-              {/* 同时显示多层时，上层楼板半透明，能看到下层 */}
-              <meshToonMaterial
-                ref={(m: THREE.MeshToonMaterial | null) => {
-                  if (m) floorMats.current.add(m);
-                }}
-                color={f.level === 0 ? SCENE.floor : SCENE.floorUpper}
-                gradientMap={toonGradient()}
-                transparent={showAll && f.level > 0}
-                opacity={showAll && f.level > 0 ? 0.55 : 1}
-              />
             </mesh>
             ))}
             {/* 矮墙：只勾勒轮廓，不遮挡视线 */}

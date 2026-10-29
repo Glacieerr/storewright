@@ -16,6 +16,8 @@ export { framePositions } from './framePositions';
 import { framePositions } from './framePositions';
 
 const PANTS = new THREE.Color('#353c48');
+/** 学生兼职工：同样的岗位色上衣，配牛仔裤（决策记录 0020） */
+const JEANS = new THREE.Color('#4f74a8');
 
 /** 员工：按岗位着色的工作服，拣货员推着拣货车；四肢随走动摆动 */
 export function Associates() {
@@ -54,7 +56,7 @@ export function Associates() {
       p.heading = pose.heading;
       p.moving = pose.moving;
       p.shirt.copy(shirts[i] as THREE.Color);
-      p.pants.copy(PANTS);
+      p.pants.copy(a.student ? JEANS : PANTS);
       p.cart = pose.withCart ? 'picking' : 'none';
       // 人物按约 1.4 倍显示，远景也能看清（模拟经营游戏的常见做法）
       p.scale = 1.4;
@@ -80,7 +82,23 @@ export function Associates() {
 const NIGHT_SHIRT = new THREE.Color('#2f5d8a');
 const RECV_SHIRT = new THREE.Color('#c98b2c');
 /** 开叉车时人在叉车上（叉车模型里有司机），不单独画 */
-const ON_FORKLIFT = new Set(['叉车进车厢', '叉车卸货', '叉车去叉托盘', '叉车放进货架', '叉车举升放货', '叉车去高层货位', '叉车把高层托盘放到地面']);
+const ON_FORKLIFT = new Set([
+  '叉车进车厢',
+  '叉车卸货',
+  '叉车去叉托盘',
+  '叉车放进货架',
+  '叉车举升放货',
+  '叉车去高层货位',
+  '叉车把高层托盘放到地面',
+  '叉车驶出通道',
+  '叉车停回充电位',
+  '等待通道空出',
+  '叉车送上二楼',
+  '叉车等货梯',
+  '叉车回货梯',
+  '叉车经连通通道送往溢流位',
+  '叉车经连通通道返回',
+]);
 
 /** 后仓人员：早班收货员（叉车、搬运车卸货、点数贴标）与夜班补货组（推货上架） */
 export function BackroomCrew() {

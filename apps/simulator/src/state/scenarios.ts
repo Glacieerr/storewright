@@ -1,5 +1,5 @@
 import type { StoreConfig, TemplateName } from '@storewright/store-config';
-import { DEFAULT_COSTS, type CostParams, type DayMetrics, type Disruption, type InboundMetrics, type Staffing } from '@storewright/sim-engine';
+import { DEFAULT_COSTS, type CostParams, type DayMetrics, type Disruption, type InboundMetrics, type Role, type Staffing } from '@storewright/sim-engine';
 import type { PolicyName, Timeline } from '../sim/protocol';
 import type { SiteSettings } from '../scene/site';
 
@@ -18,6 +18,8 @@ export interface ScenarioSettings {
   sizing?: { ordersPerDay: number; staffScale: number };
   incidents: { small: boolean; randomLarge: boolean; manual: Disruption[] };
   nightCrew: { enabled: boolean; crew?: number };
+  /** 学生兼职工（决策记录 0020；旧方案没有这一项） */
+  students?: { enabled: boolean; count?: number; roles: Role[] };
   config: StoreConfig;
 }
 

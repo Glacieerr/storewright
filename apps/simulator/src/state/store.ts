@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 import { createTemplate, generateStoreConfig, StoreModel, validateStoreConfig, type ConfigIssue, type GeneratorParams, type StoreConfig, type TemplateName } from '@storewright/store-config';
-import { defaultNightCrew, defaultScenario, DISRUPTION_MINUTES, scaledStaffing, shiftStaffing, storeSizing, type Disruption, type DisruptionKind, type Role, type Staffing } from '@storewright/sim-engine';
+import { defaultNightCrew, defaultScenario, DISRUPTION_MINUTES, scaledStaffing, shiftStaffing, storeSizing, type Advice, type AdviceAction, type AdviceArea, type Disruption, type DisruptionKind, type FrontInput, type InboundAdjust, type Role, type Staffing } from '@storewright/sim-engine';
 import { SimClient } from '../sim/client';
-import type { DayDigest, PolicyDigest, PolicyName, Timeline } from '../sim/protocol';
+import type { AdviceResult, DayDigest, PolicyDigest, PolicyName, SimRequest, Timeline, WhatIfDigest } from '../sim/protocol';
 import { applyLang, ensureLang, getLang, t, type Lang } from '../i18n';
 import { digestOf, loadCosts, loadSavedScenarios, persistCosts, persistScenarios, type SavedScenario } from './scenarios';
 import type { CostParams } from '@storewright/sim-engine';
@@ -13,10 +13,12 @@ import { clock, setRange, setTime } from './clock';
 
 export type ViewMode = 'iso' | '3d' | 'top';
 export type CameraCmd = 'in' | 'out' | 'reset' | 'rotateLeft' | 'rotateRight' | 'front' | 'side' | 'bird' | 'street';
-export type DataTab = 'live' | 'compare' | 'report' | 'events' | 'edit' | 'ops';
+export type DataTab = 'live' | 'ai' | 'compare' | 'report' | 'events' | 'edit' | 'ops';
 export type SplitOrder = 'scene-left' | 'scene-right';
 export type Overlay = 'temp' | 'heat' | 'stock' | 'areas' | 'none';
 export type AppMode = 'sim' | 'edit';
+/** 孪生时间轴：回放（过去）、实时（现在）、推演（未来） */
+export type TwinMode = 'live' | 'replay' | 'forecast';
 /** 画质：高 = 阴影 + 高分辨率，中 = 无阴影，低 = 无阴影 + 标准分辨率 */
 export type Quality = 'high' | 'medium' | 'low';
 /** 建筑查看方式：内部（无外壳）、半剖（一半外观一半内部）、外观 */
@@ -80,6 +82,14 @@ interface AppState {
   /** 实时状态每次变化加一 */
   liveVersion: number;
   setLiveView(on: boolean): void;
+  /** 数字孪生（决策记录 0016）：孪生时间轴在看过去（回放）、现在（实时）还是未来（推演） */
+  twin: { mode: TwinMode; t?: number };
+  setTwin(mode: TwinMode, t?: number): void;
+  /** 孪生数据（设备读数、回放）每次变化加一 */
+  twinVersion: number;
+  /** 推演方案：各岗位在岗人数的调整 */
+  forecastDelta: Record<'PICK' | 'STAGE' | 'HANDOFF', number>;
+  setForecastDelta(d: Partial<Record<'PICK' | 'STAGE' | 'HANDOFF', number>>): void;
   /** 巡游当前镜头的字幕与进度 */
   cinematicCaption?: { text: string; i: number; n: number };
   /** 导览：当前步骤（未开始时为空） */
@@ -136,6 +146,9 @@ interface AppState {
   /** 周边环境：道路风格、随机种子、拥堵强度 */
   site: SiteSettings;
   setSite(patch: Partial<SiteSettings>): void;
+  /** 星期几（0 = 周一，默认周四）：到货车辆按星期排班（决策记录 0019） */
+  weekday: number;
+  setWeekday(w: number): void;
   /** 修改营业时间（写入草稿并实时应用），排班随之平移 */
   setHours(openMin: number, closeMin: number): void;
   /** 当前门店规模和营业时间下的默认排班 */
@@ -161,6 +174,33 @@ interface AppState {
   nightCrew: { enabled: boolean; crew?: number };
   setNightCrew(patch: { enabled?: boolean; crew?: number }): void;
   nightCrewSize(): number;
+  /** 学生兼职工（决策记录 0020）：启用、名单人数（undefined 表示按门店规模自动）、可以做的岗位 */
+  students: { enabled: boolean; count?: number; roles: Role[] };
+  setStudents(patch: Partial<{ enabled: boolean; count: number; roles: Role[] }>): void;
+  studentCount(): number;
+  /** 发给仿真的学生设置（没有启用时为 undefined） */
+  studentsReq(): { count: number; roles: Role[] } | undefined;
+  /** AI 建议（决策记录 0020）：当前方案的分析结果；方案变了就过时，打开「AI 建议」标签时重新分析 */
+  aiAdvice: { status: 'idle' | 'running' | 'ready' | 'error'; result?: AdviceResult; stale: boolean };
+  runAdvise(front?: FrontInput): Promise<void>;
+  /** 采纳的建议对到货、后仓的改动（随仿真请求发出） */
+  aiAdjust: InboundAdjust;
+  inboundReq(): InboundAdjust | undefined;
+  /** 这次打开以来采纳的建议（可以撤销）与忽略的建议 */
+  aiLog: AiLogEntry[];
+  /** 每个时段的收银通道计划、停车场引导（采纳前场建议后写进当天计划） */
+  checkoutPlan?: Array<{ floorId: string; byHour: number[] }>;
+  parkingGuide?: { fromHour: number; toHour: number };
+  adoptAdvice(a: Advice): void;
+  dismissAdvice(a: Advice, reason: string): void;
+  undoAdvice(id: string): void;
+  /** 本机累计的反馈：采纳、忽略的次数与忽略原因（决策记录 0010 原则 2：否决原因是下一轮改进的数据） */
+  aiFeedback: AiFeedback;
+  /** 当前设置的仿真请求（不含类型和序号） */
+  simBase(): Omit<SimRequest, 'type' | 'reqId'>;
+  /** 采纳与不采纳对比：同一天按现在的设置、撤掉全部采纳的设置各跑一遍 */
+  aiCompare: { status: 'idle' | 'running' | 'ready' | 'error'; adopted?: WhatIfDigest; baseline?: WhatIfDigest; count?: number };
+  runAiCompare(): Promise<void>;
   buildingView: BuildingView;
   /** 半剖时剖切面的位置（0–1，沿门店宽度方向） */
   cutPos: number;
@@ -201,6 +241,57 @@ interface AppState {
 }
 
 const client = new SimClient();
+
+/** 一条建议的处理记录（决策记录 0020） */
+export interface AiLogEntry {
+  id: string;
+  area: AdviceArea;
+  code: string;
+  params: Record<string, string | number>;
+  action?: AdviceAction;
+  status: 'adopted' | 'dismissed';
+  reason?: string;
+  at: number;
+  /** 采纳前的值（撤销时恢复） */
+  prev?: unknown;
+}
+
+/** 本机累计的反馈：每类建议采纳、忽略几次，忽略的原因 */
+export interface AiFeedback {
+  adopted: number;
+  dismissed: number;
+  byCode: Record<string, { adopted: number; dismissed: number }>;
+  reasons: Record<string, number>;
+}
+
+const FEEDBACK_KEY = 'storewright.ai.feedback';
+
+function loadFeedback(): AiFeedback {
+  try {
+    const raw = window.localStorage.getItem(FEEDBACK_KEY);
+    const v = raw ? (JSON.parse(raw) as AiFeedback) : undefined;
+    if (v && typeof v.adopted === 'number' && v.byCode && v.reasons) return v;
+  } catch {
+    // 读不到本机存储时从零开始
+  }
+  return { adopted: 0, dismissed: 0, byCode: {}, reasons: {} };
+}
+
+function bumpFeedback(f: AiFeedback, a: Advice, status: 'adopted' | 'dismissed', reason?: string): AiFeedback {
+  const c = f.byCode[a.code] ?? { adopted: 0, dismissed: 0 };
+  const next: AiFeedback = {
+    adopted: f.adopted + (status === 'adopted' ? 1 : 0),
+    dismissed: f.dismissed + (status === 'dismissed' ? 1 : 0),
+    byCode: { ...f.byCode, [a.code]: { adopted: c.adopted + (status === 'adopted' ? 1 : 0), dismissed: c.dismissed + (status === 'dismissed' ? 1 : 0) } },
+    reasons: reason ? { ...f.reasons, [reason]: (f.reasons[reason] ?? 0) + 1 } : f.reasons,
+  };
+  try {
+    window.localStorage.setItem(FEEDBACK_KEY, JSON.stringify(next));
+  } catch {
+    // 存不下时只在这次打开里记着
+  }
+  return next;
+}
 let liveTimer: number | undefined;
 let compareTimer: number | undefined;
 
@@ -280,6 +371,7 @@ export const useApp = create<AppState>((set, get) => ({
         sizing: st.sizing ? { ...st.sizing } : undefined,
         incidents: structuredClone(st.incidents),
         nightCrew: { ...st.nightCrew },
+        students: { ...st.students, roles: [...st.students.roles] },
         config: cloneConfig(st.config),
       },
       digest: digestOf(st.timeline, st.config),
@@ -316,6 +408,7 @@ export const useApp = create<AppState>((set, get) => ({
       sizing: st.sizing ? { ...st.sizing } : undefined,
       incidents: structuredClone(st.incidents),
       nightCrew: { ...st.nightCrew },
+      students: st.students ? { ...st.students, roles: [...st.students.roles] } : get().students,
       config,
       ...derive(config),
       floor: 'F1',
@@ -337,7 +430,7 @@ export const useApp = create<AppState>((set, get) => ({
     const req = client.latestMultiDay + 1;
     try {
       const result = await client.multiDay(
-        { config, demandTemplate: template, ordersPerDay: sizing?.ordersPerDay, policy, seed, demandFactor, staffing, traffic: site.traffic, weather: site.weather, season: site.season, weatherSeed: site.seed, lang: get().lang, nightCrew, incidents: get().incidents, shelfStock: get().shelfStock, restockRequests: get().restockRequests, ai: get().ai },
+        { config, demandTemplate: template, ordersPerDay: sizing?.ordersPerDay, policy, seed, demandFactor, staffing, traffic: site.traffic, weather: site.weather, season: site.season, weatherSeed: site.seed, school: site.school, railway: site.railway, weekday: get().weekday, lang: get().lang, nightCrew, incidents: get().incidents, shelfStock: get().shelfStock, restockRequests: get().restockRequests, ai: get().ai, students: get().studentsReq(), inbound: get().inboundReq() },
         days,
         (done, total) => {
           if (client.latestMultiDay === req) set({ multiDay: { ...get().multiDay, done, total } });
@@ -350,6 +443,12 @@ export const useApp = create<AppState>((set, get) => ({
     }
   },
   site: { style: 'suburban', seed: 1, traffic: 1, weather: 'clear', season: 'autumn' },
+  weekday: 3,
+  setWeekday(w) {
+    if (w === get().weekday) return;
+    set({ weekday: w });
+    void get().simulate();
+  },
   // 手机等触屏设备默认关闭实时阴影
   quality: typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches ? 'medium' : 'high',
   setQuality(q) {
@@ -396,6 +495,178 @@ export const useApp = create<AppState>((set, get) => ({
     const k = sizing?.staffScale ?? (template === 'small' ? 0.3 : template === 'large' ? 2.5 : 1);
     return nightCrew.crew ?? defaultNightCrew(k);
   },
+  students: { enabled: false, roles: ['pick', 'handoff'] },
+  setStudents(patch) {
+    set({ students: { ...get().students, ...patch } });
+    void get().simulate();
+  },
+  studentCount() {
+    const { students, sizing, template } = get();
+    const k = sizing?.staffScale ?? (template === 'small' ? 0.3 : template === 'large' ? 2.5 : 1);
+    // 中型店名单上 6 个学生（每天来 3–4 个），按规模伸缩
+    return students.count ?? Math.max(2, Math.round(6 * k));
+  },
+  studentsReq() {
+    const { students } = get();
+    return students.enabled && students.roles.length ? { count: get().studentCount(), roles: [...students.roles] } : undefined;
+  },
+  aiAdvice: { status: 'idle', stale: true },
+  async runAdvise(front) {
+    const { config, template, policy, seed, demandFactor, staffing, site, sizing } = get();
+    set({ aiAdvice: { ...get().aiAdvice, status: 'running' } });
+    const req = client.latestAdvise + 1;
+    try {
+      const nightCrew = { enabled: get().nightCrew.enabled, crew: get().nightCrewSize() };
+      const result = await client.advise(
+        { config, demandTemplate: template, ordersPerDay: sizing?.ordersPerDay, policy, seed, demandFactor, staffing, traffic: site.traffic, weather: site.weather, season: site.season, weatherSeed: site.seed, school: site.school, railway: site.railway, weekday: get().weekday, lang: get().lang, nightCrew, incidents: get().incidents, shelfStock: get().shelfStock, restockRequests: get().restockRequests, ai: get().ai, students: get().studentsReq(), inbound: get().inboundReq() },
+        front,
+      );
+      if (client.latestAdvise !== req) return;
+      set({ aiAdvice: { status: 'ready', result, stale: false } });
+    } catch {
+      if (client.latestAdvise === req) set({ aiAdvice: { status: 'error', stale: true } });
+    }
+  },
+  simBase() {
+    const { config, template, policy, seed, demandFactor, staffing, site, sizing } = get();
+    const nightCrew = { enabled: get().nightCrew.enabled, crew: get().nightCrewSize() };
+    return { config, demandTemplate: template, ordersPerDay: sizing?.ordersPerDay, policy, seed, demandFactor, staffing, traffic: site.traffic, weather: site.weather, season: site.season, weatherSeed: site.seed, school: site.school, railway: site.railway, weekday: get().weekday, lang: get().lang, nightCrew, incidents: get().incidents, shelfStock: get().shelfStock, restockRequests: get().restockRequests, ai: get().ai, students: get().studentsReq(), inbound: get().inboundReq() };
+  },
+  aiCompare: { status: 'idle' },
+  async runAiCompare() {
+    const st = get();
+    const adopted = st.aiLog.filter((e) => e.status === 'adopted' && e.action);
+    const current = st.simBase();
+    // 撤掉全部采纳：到货、后仓的改动不发；排班减去加的人；夜班恢复采纳前的人数
+    const staffing = structuredClone(current.staffing ?? st.staffing);
+    let night = { ...st.nightCrew };
+    for (const e of [...adopted].reverse()) {
+      const act = e.action as AdviceAction;
+      if (act.kind === 'STAFF') for (let h = act.fromHour; h < act.toHour; h++) staffing[act.role][h] = Math.max(0, (staffing[act.role][h] ?? 0) - act.delta);
+      if (act.kind === 'NIGHT_CREW') night = e.prev as AppState['nightCrew'];
+      // 用 AI 排班：恢复采纳前每小时的人数
+      if (act.kind === 'STAFF_PLAN') Object.assign(staffing, structuredClone(e.prev as { pick: number[]; stage: number[]; handoff: number[] }));
+    }
+    const k = st.sizing?.staffScale ?? (st.template === 'small' ? 0.3 : st.template === 'large' ? 2.5 : 1);
+    const baseline = { ...current, staffing, nightCrew: { enabled: night.enabled, crew: night.crew ?? defaultNightCrew(k) }, inbound: undefined };
+    set({ aiCompare: { status: 'running', count: adopted.length } });
+    const req = client.latestWhatIf + 1;
+    try {
+      const [a, b] = await client.whatif([current, baseline]);
+      if (client.latestWhatIf !== req) return;
+      set({ aiCompare: { status: 'ready', adopted: a, baseline: b, count: adopted.length } });
+    } catch {
+      if (client.latestWhatIf === req) set({ aiCompare: { status: 'error' } });
+    }
+  },
+  aiAdjust: {},
+  inboundReq() {
+    const a = get().aiAdjust;
+    return a.receivers !== undefined || a.slotting || a.liftOrder || (a.appt && Object.keys(a.appt).length) ? structuredClone(a) : undefined;
+  },
+  aiLog: [],
+  aiFeedback: loadFeedback(),
+  adoptAdvice(a) {
+    const act = a.action;
+    if (!act || get().aiLog.some((e) => e.id === a.id && e.status === 'adopted')) return;
+    const st = get();
+    let prev: unknown;
+    const adj = structuredClone(st.aiAdjust);
+    switch (act.kind) {
+      case 'MOVE_APPOINTMENT':
+        adj.appt = { ...(adj.appt ?? {}), [act.deliveryId]: act.to };
+        set({ aiAdjust: adj });
+        break;
+      case 'RECEIVERS':
+        prev = adj.receivers;
+        set({ aiAdjust: { ...adj, receivers: act.to } });
+        break;
+      case 'SLOTTING':
+        set({ aiAdjust: { ...adj, slotting: act.policy } });
+        break;
+      case 'LIFT_ORDER':
+        set({ aiAdjust: { ...adj, liftOrder: act.policy } });
+        break;
+      case 'NIGHT_CREW':
+        prev = { ...st.nightCrew };
+        set({ nightCrew: { enabled: true, crew: act.to } });
+        break;
+      case 'STAFF': {
+        const arr = [...st.staffing[act.role]];
+        for (let h = act.fromHour; h < act.toHour; h++) arr[h] = Math.max(0, (arr[h] ?? 0) + act.delta);
+        set({ staffing: { ...st.staffing, [act.role]: arr } });
+        break;
+      }
+      case 'CHECKOUT_PLAN':
+        prev = st.checkoutPlan;
+        set({ checkoutPlan: act.lanes });
+        break;
+      case 'PARKING_GUIDE':
+        prev = st.parkingGuide;
+        set({ parkingGuide: { fromHour: act.fromHour, toHour: act.toHour } });
+        break;
+      case 'STAFF_PLAN':
+        prev = { pick: [...st.staffing.pick], stage: [...st.staffing.stage], handoff: [...st.staffing.handoff] };
+        set({ staffing: { ...st.staffing, pick: [...act.staffing.pick], stage: [...act.staffing.stage], handoff: [...act.staffing.handoff] } });
+        break;
+    }
+    const entry: AiLogEntry = { id: a.id, area: a.area, code: a.code, params: a.params, action: act, status: 'adopted', at: Date.now(), ...(prev !== undefined ? { prev } : {}) };
+    set({ aiLog: [...get().aiLog, entry], aiFeedback: bumpFeedback(get().aiFeedback, a, 'adopted'), aiAdvice: { ...get().aiAdvice, stale: true } });
+    void get().simulate();
+  },
+  dismissAdvice(a, reason) {
+    set({ aiLog: [...get().aiLog, { id: a.id, area: a.area, code: a.code, params: a.params, status: 'dismissed', reason, at: Date.now() }], aiFeedback: bumpFeedback(get().aiFeedback, a, 'dismissed', reason) });
+  },
+  undoAdvice(id) {
+    const st = get();
+    const e = [...st.aiLog].reverse().find((x) => x.id === id);
+    if (!e) return;
+    set({ aiLog: st.aiLog.filter((x) => x !== e) });
+    if (e.status !== 'adopted' || !e.action) return;
+    const act = e.action;
+    const adj = structuredClone(st.aiAdjust);
+    switch (act.kind) {
+      case 'MOVE_APPOINTMENT':
+        if (adj.appt) delete adj.appt[act.deliveryId];
+        set({ aiAdjust: adj });
+        break;
+      case 'RECEIVERS':
+        if (e.prev === undefined) delete adj.receivers;
+        else adj.receivers = e.prev as number;
+        set({ aiAdjust: adj });
+        break;
+      case 'SLOTTING':
+        delete adj.slotting;
+        set({ aiAdjust: adj });
+        break;
+      case 'LIFT_ORDER':
+        delete adj.liftOrder;
+        set({ aiAdjust: adj });
+        break;
+      case 'NIGHT_CREW':
+        set({ nightCrew: e.prev as AppState['nightCrew'] });
+        break;
+      case 'STAFF': {
+        const arr = [...st.staffing[act.role]];
+        for (let h = act.fromHour; h < act.toHour; h++) arr[h] = Math.max(0, (arr[h] ?? 0) - act.delta);
+        set({ staffing: { ...st.staffing, [act.role]: arr } });
+        break;
+      }
+      case 'CHECKOUT_PLAN':
+        set({ checkoutPlan: e.prev as AppState['checkoutPlan'] });
+        break;
+      case 'PARKING_GUIDE':
+        set({ parkingGuide: e.prev as AppState['parkingGuide'] });
+        break;
+      case 'STAFF_PLAN': {
+        const p = e.prev as { pick: number[]; stage: number[]; handoff: number[] };
+        set({ staffing: { ...st.staffing, pick: [...p.pick], stage: [...p.stage], handoff: [...p.handoff] } });
+        break;
+      }
+    }
+    set({ aiAdvice: { ...get().aiAdvice, stale: true } });
+    void get().simulate();
+  },
   buildingView: 'interior',
   cutPos: 0.5,
   setBuildingView(v) {
@@ -407,7 +678,7 @@ export const useApp = create<AppState>((set, get) => ({
 
   setTemplate(t) {
     const config = createTemplate(t);
-    set({ template: t, config, ...derive(config), staffing: defaultScenario(t).staffing, sizing: undefined, demandFactor: 1, floor: 'F1', selection: undefined, nightCrew: { enabled: get().nightCrew.enabled } });
+    set({ template: t, config, ...derive(config), staffing: defaultScenario(t).staffing, sizing: undefined, demandFactor: 1, floor: 'F1', selection: undefined, nightCrew: { enabled: get().nightCrew.enabled }, aiAdjust: {}, aiLog: [], checkoutPlan: undefined, parkingGuide: undefined });
     void get().simulate();
   },
   setPolicy(p) {
@@ -469,6 +740,15 @@ export const useApp = create<AppState>((set, get) => ({
   live: { status: 'off', url: 'http://localhost:8787', storeId: 'demo' },
   liveView: false,
   liveVersion: 0,
+  twin: { mode: 'live' },
+  setTwin(mode, t) {
+    set({ twin: t === undefined ? { mode } : { mode, t } });
+  },
+  twinVersion: 0,
+  forecastDelta: { PICK: 0, STAGE: 0, HANDOFF: 0 },
+  setForecastDelta(d) {
+    set({ forecastDelta: { ...get().forecastDelta, ...d } });
+  },
   setLiveView(on) {
     set({ liveView: on });
   },
@@ -538,7 +818,8 @@ export const useApp = create<AppState>((set, get) => ({
     if (get().mode !== 'edit') get().enterEdit();
     const config = generateStoreConfig(params);
     // 日订单量和排班按门店规模连续插值；需求的时段分布取最接近的模板，排班再平移到营业时间
-    const aisles = params.ambientAisles + params.frozenAisles + params.gmAislesF1 + (params.secondFloor?.gmAisles ?? 0);
+    // 通道数按生成结果数（二楼通道 0 = 按货梯位置自动铺满）
+    const aisles = config.layout.runs.filter((r) => r.kind === 'AISLE').length;
     const size: TemplateName = aisles <= 11 ? 'small' : aisles <= 23 ? 'medium' : 'large';
     const s = storeSizing(aisles);
     const sizing = { ordersPerDay: s.ordersPerDay, staffScale: Math.round(s.staffScale * (params.staffScale ?? 1) * 100) / 100 };
@@ -554,7 +835,9 @@ export const useApp = create<AppState>((set, get) => ({
     // （「多变」天气由季节和种子生成，这两项改了也要重新仿真）
     const next = get().site;
     const dynChanged = next.weather === 'dynamic' && ((patch.season !== undefined && patch.season !== prev.season) || (patch.seed !== undefined && patch.seed !== prev.seed));
-    if ((patch.traffic !== undefined && patch.traffic !== prev.traffic) || (patch.weather !== undefined && patch.weather !== prev.weather) || dynChanged) void get().simulate();
+    // 季节决定供应商直送的频次（夏天冰品多……）、学校和铁路道口影响到店时间，也要重新仿真（决策记录 0019）
+    const changed = (k: keyof SiteSettings) => patch[k] !== undefined && patch[k] !== prev[k];
+    if (changed('traffic') || changed('weather') || changed('season') || changed('school') || changed('railway') || dynChanged) void get().simulate();
   },
   async simulate() {
     const { config, template, policy, seed, demandFactor, staffing, site, sizing } = get();
@@ -562,7 +845,7 @@ export const useApp = create<AppState>((set, get) => ({
     const req = client.latest + 1;
     try {
       const nightCrew = { enabled: get().nightCrew.enabled, crew: get().nightCrewSize() };
-      const timeline = await client.simulate({ config, demandTemplate: template, ordersPerDay: sizing?.ordersPerDay, policy, seed, demandFactor, staffing, traffic: site.traffic, weather: site.weather, season: site.season, weatherSeed: site.seed, lang: get().lang, nightCrew, incidents: get().incidents, shelfStock: get().shelfStock, restockRequests: get().restockRequests, ai: get().ai });
+      const timeline = await client.simulate({ config, demandTemplate: template, ordersPerDay: sizing?.ordersPerDay, policy, seed, demandFactor, staffing, traffic: site.traffic, weather: site.weather, season: site.season, weatherSeed: site.seed, school: site.school, railway: site.railway, weekday: get().weekday, lang: get().lang, nightCrew, incidents: get().incidents, shelfStock: get().shelfStock, restockRequests: get().restockRequests, ai: get().ai, students: get().studentsReq(), inbound: get().inboundReq() });
       if (client.latest !== req) return; // 有更新的请求，丢弃旧结果
       const cur = get();
       const sim = cur.model.config === config ? { model: cur.model, geo: cur.geo } : derive(config);
@@ -570,7 +853,7 @@ export const useApp = create<AppState>((set, get) => ({
       const keep = clock.time > timeline.start ? clock.time : 10 * 3600;
       setRange(timeline.start, timeline.end);
       setTime(keep);
-      set({ timeline, status: 'ready', simModel: sim.model, simGeo: sim.geo });
+      set({ timeline, status: 'ready', simModel: sim.model, simGeo: sim.geo, aiAdvice: { ...get().aiAdvice, stale: true } });
       // 策略对比在另一个 Worker 中稍后计算，不影响播放
       window.clearTimeout(compareTimer);
       compareTimer = window.setTimeout(() => void get().runCompare(), 400);
@@ -670,7 +953,7 @@ export const useApp = create<AppState>((set, get) => ({
     set({ compare: { ...get().compare, status: 'running' } });
     const req = client.latestCompare + 1;
     try {
-      const results = await client.compare({ config, demandTemplate: template, ordersPerDay: sizing?.ordersPerDay, seed, demandFactor, staffing, traffic: site.traffic, weather: site.weather, season: site.season, weatherSeed: site.seed, lang: get().lang, incidents: get().incidents, shelfStock: get().shelfStock, restockRequests: get().restockRequests, ai: get().ai });
+      const results = await client.compare({ config, demandTemplate: template, ordersPerDay: sizing?.ordersPerDay, seed, demandFactor, staffing, traffic: site.traffic, weather: site.weather, season: site.season, weatherSeed: site.seed, school: site.school, railway: site.railway, weekday: get().weekday, lang: get().lang, incidents: get().incidents, shelfStock: get().shelfStock, restockRequests: get().restockRequests, ai: get().ai, students: get().studentsReq(), inbound: get().inboundReq() });
       if (client.latestCompare !== req) return;
       set({ compare: { status: 'ready', results } });
     } catch {

@@ -1,7 +1,9 @@
 import { createTemplate, type TemplateName } from '@storewright/store-config';
-import { handoffBoard, recentNotes, roleOf, sellableCases, shelfNow, stagingOccupancy, type LiveRec, type OpsState, type PlanogramEntry, type StoreStatic } from '@storewright/ops';
+import { handoffBoard, recentNotes, sellableCases, shelfNow, stagingOccupancy, teamBoard, type LiveRec, type OpsState, type PlanogramEntry, type StoreStatic } from '@storewright/ops';
 import type { Policy, SimScenario } from '@storewright/sim-engine';
 import type { AiService } from '../ai';
+import { dayStats, openingBrief, type BriefItem } from '../brief';
+import { closingReview, weeklyReport } from '../review';
 import type { DemoStore } from '../demo';
 import type { StoreRuntime } from '../runtime';
 import { searchKnowledge } from './knowledge';
@@ -51,6 +53,7 @@ const ROLE: Record<string, [string, string]> = {
   LEAD: ['带班负责人', 'team lead'],
   BACKROOM: ['后仓', 'backroom'],
   RESTOCK: ['补货', 'restocking'],
+  DELI: ['熟食', 'deli'],
 };
 const roleText = (lang: Lang, r: string) => (ROLE[r] ? ROLE[r][lang === 'zh' ? 0 : 1] : r);
 
@@ -183,22 +186,25 @@ const forecast: ToolDef = {
 
 const staff_status: ToolDef = {
   name: 'staff_status',
-  description: 'Who is in which role right now (including temporary moves), who is busy with a task, and who is pinned to the fixed roster.',
+  description: 'Who is on duty in which role right now (including temporary moves and when they end), who is busy with a task, and who is pinned to the fixed roster.',
   parameters: { type: 'object', properties: { role: { type: 'string', description: 'Optional role filter: PICK, STAGE, HANDOFF, BACKROOM, RESTOCK, LEAD' } } },
   run(ctx, args) {
-    const st = ctx.rt.statics;
-    const s = ctx.rt.state;
     const filter = typeof args.role === 'string' ? args.role.toUpperCase() : undefined;
+    // 在岗人员（决策记录 0025）：此刻的岗位（临时调动 > 当天排班 > 名单），临时调动写明几点回原岗位
+    const board = teamBoard(ctx.rt.statics, ctx.rt.state, ctx.now);
     const byRole: Record<string, string[]> = {};
-    for (const a of st.roster) {
-      const r = roleOf(st, s, a.id) ?? a.role;
-      if (filter && r !== filter) continue;
-      const tags = [s.roles[a.id] ? L(ctx.lang, '临时', 'temporary') : '', s.staffLocks[a.id] ? L(ctx.lang, '固定', 'pinned') : ''].filter(Boolean);
-      (byRole[r] ??= []).push(tags.length ? L(ctx.lang, `${a.name}（${tags.join('、')}）`, `${a.name} (${tags.join(', ')})`) : a.name);
+    for (const m of board.members) {
+      if (!m.on || (filter && m.role !== filter)) continue;
+      const until = m.moved?.until;
+      const moved = !m.moved ? '' : until !== undefined ? L(ctx.lang, `临时，${clockOf(until)} 回${roleText('zh', m.base)}`, `temporary, back to ${roleText('en', m.base)} at ${clockOf(until)}`) : L(ctx.lang, '临时', 'temporary');
+      const tags = [moved, m.locked ? L(ctx.lang, '固定', 'pinned') : ''].filter(Boolean);
+      (byRole[m.role] ??= []).push(tags.length ? L(ctx.lang, `${m.name}（${tags.join('、')}）`, `${m.name} (${tags.join(', ')})`) : m.name);
     }
+    const off = board.members.filter((m) => !m.on).length;
     const parts = Object.entries(byRole).map(([r, names]) => L(ctx.lang, `${roleText(ctx.lang, r)}：${names.join('、')}`, `${roleText(ctx.lang, r)}: ${names.join(', ')}`));
-    const text = parts.length ? L(ctx.lang, `现在的岗位安排——${parts.join('；')}。`, `Current roles — ${parts.join('; ')}.`) : L(ctx.lang, '没有符合条件的员工。', 'No matching staff.');
-    return { tool: 'staff_status', args, data: { byRole }, text, cite: L(ctx.lang, '员工名单与岗位', 'roster and roles') };
+    const rest = off && !filter ? L(ctx.lang, `另有 ${off} 人不在岗。`, ` ${off} more are off duty.`) : '';
+    const text = parts.length ? L(ctx.lang, `现在在岗的岗位安排——${parts.join('；')}。${rest}`, `On duty now — ${parts.join('; ')}.${rest}`) : L(ctx.lang, '没有符合条件的在岗员工。', 'No matching staff on duty.');
+    return { tool: 'staff_status', args, data: { byRole, offDuty: off }, text, cite: L(ctx.lang, '员工名单、排班与岗位', 'roster, schedule and roles') };
   },
 };
 
@@ -265,7 +271,7 @@ const wait_analysis: ToolDef = {
     const waiting = rows.filter((r) => r.arrivedAt !== undefined && !r.session);
     const notReady = waiting.filter((r) => !r.ready).length;
     const arrivedLastHour = Object.values(s.orders).filter((o) => o.arrivedAt !== undefined && now - o.arrivedAt <= 3_600_000).length;
-    const handoffStaff = st.roster.filter((a) => (roleOf(st, s, a.id) ?? a.role) === 'HANDOFF').length;
+    const handoffStaff = teamBoard(st, s, now).members.filter((m) => m.on && m.role === 'HANDOFF').length;
     const sessions = Object.values(s.sessions).filter((x) => x.status !== 'COMPLETED').length;
     const longest = waiting.reduce((m, r) => Math.max(m, r.waitSec), 0);
     const move = Object.values(s.recs).find((r) => r.status === 'OPEN' && r.module === 'STAFFING' && r.action.kind === 'MOVE_ASSOCIATE');
@@ -442,7 +448,270 @@ const shift_summary: ToolDef = {
   },
 };
 
-export const TOOLS: ToolDef[] = [store_status, find_item, forecast, staff_status, explain_recommendation, wait_analysis, whatif, knowledge, shift_summary];
+const PROBLEM: Record<string, [string, string]> = { LATE: ['订单赶不上取货时段', 'orders missing their pickup slot'], WAIT: ['顾客等待变长', 'longer customer waits'], COLD_FULL: ['冷区暂存快满', 'cold staging filling up'], BACKLOG: ['拣货积压', 'a picking backlog'] };
+const hm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+/** 某个时刻的本地时间 HH:MM */
+const clockOf = (ms: number) => {
+  const d = new Date(ms);
+  return hm(d.getHours() * 60 + d.getMinutes());
+};
+
+/** 开店简报里「要注意的事」「要店长决定的事」的一句话 */
+function briefItemText(lang: Lang, x: BriefItem): string {
+  const p = x.params ?? {};
+  switch (x.code) {
+    case 'FORESIGHT': {
+      const k = PROBLEM[String(p.problem)] ?? ['运营问题', 'an operations problem'];
+      return L(lang, `推演预计 ${hhmm(Number(p.at))} 前后${k[0]}`, `the forecast expects ${k[1]} around ${hhmm(Number(p.at))}`);
+    }
+    case 'EQUIPMENT':
+      return L(lang, `设备 ${p.sensor} 在慢慢变坏，建议报修`, `equipment ${p.sensor} is degrading; a repair is suggested`);
+    case 'TICKET':
+      return L(lang, `设备 ${p.sensor} 在报修，${p.slots} 个暂存格位暂停放新框`, `equipment ${p.sensor} is under repair; ${p.slots} staging slots are paused`);
+    case 'GAP': {
+      const role = ROLE[String(p.role)] ?? [String(p.role), String(p.role)];
+      return L(lang, `${hm(Number(p.from))}–${hm(Number(p.to))} ${role[0]}缺 ${p.short} 人`, `${role[1]} is ${p.short} short ${hm(Number(p.from))}–${hm(Number(p.to))}`);
+    }
+    case 'DEMAND':
+      return Number(p.pct) >= 0 ? L(lang, `单量比平时多 ${p.pct}%`, `orders ${p.pct}% above a usual day`) : L(lang, `单量比平时少 ${Math.abs(Number(p.pct))}%`, `orders ${Math.abs(Number(p.pct))}% below a usual day`);
+    case 'PEAK':
+      return L(lang, `高峰在 ${p.hour} 点（约 ${p.orders} 单）`, `peak at ${p.hour}:00 (about ${p.orders} orders)`);
+    case 'AI_HEALTH':
+      return p.status === 'PAUSED' ? L(lang, `AI 模型 ${p.model} 因为数据中断暂停`, `AI model ${p.model} is paused because its data stopped`) : L(lang, `AI 模型 ${p.model} 最近误差明显变大，考虑重新训练`, `AI model ${p.model} has drifted; consider retraining`);
+    case 'INBOUND':
+      return L(lang, `还有 ${p.trucks} 车到货没到（共 ${p.cases} 箱）`, `${p.trucks} deliveries still to arrive (${p.cases} cases)`);
+    case 'RECS':
+      return L(lang, `${p.count} 条 ${p.module} 建议等你处理`, `${p.count} ${p.module} suggestions waiting for you`);
+    case 'OFFERS':
+      return L(lang, `${p.count} 个补班邀请还没人答复`, `${p.count} shift offers not answered yet`);
+    case 'MODE_DOWNGRADED':
+      return L(lang, `${p.module} 最近说到做到率只有 ${Math.round(Number(p.hitRate) * 100)}%，已自动改为只显示`, `${p.module} was switched to show-only after a ${Math.round(Number(p.hitRate) * 100)}% hit rate`);
+    case 'PUBLISH_SCHEDULE':
+      return L(lang, `下周（${p.from} 起）的排班还没发布`, `next week's schedule (from ${p.from}) is not published yet`);
+    case 'SKILL_GAP': {
+      const sk: Record<string, [string, string]> = { AGE_CHECK: ['年龄核验', 'ID checks'], FORKLIFT: ['开叉车', 'forklift'], DELI: ['熟食', 'deli'] };
+      const name = sk[String(p.skill)] ?? [String(p.skill), String(p.skill)];
+      return L(lang, `${hm(Number(p.from))}–${hm(Number(p.to))} 没有在岗的人会${name[0]}${p.train ? `；可以请 ${p.train} 学` : ''}`, `no one on duty for ${name[1]} ${hm(Number(p.from))}–${hm(Number(p.to))}${p.train ? `; ${p.train} could be trained` : ''}`);
+    }
+    default:
+      return x.code;
+  }
+}
+
+const opening_brief: ToolDef = {
+  name: 'opening_brief',
+  description: "The store's brief for the start of a shift (morning, midday or evening): today's (or tomorrow's) order forecast with its range and main drivers, deliveries, staffing gaps, yesterday's or today's numbers, the three things to watch and the decisions waiting for the manager.",
+  parameters: { type: 'object', properties: { part: { type: 'string', enum: ['MORNING', 'MIDDAY', 'EVENING'] } } },
+  run(ctx, args) {
+    const part = args.part === 'MORNING' || args.part === 'MIDDAY' || args.part === 'EVENING' ? args.part : undefined;
+    const b = openingBrief(ctx.rt, ctx.ai, ctx.now, part);
+    const parts: string[] = [];
+    const f = b.forecast;
+    if (f) parts.push(L(ctx.lang, `${b.part === 'EVENING' ? '明天' : '今天'}预计 ${f.orders} 单（${f.low}–${f.high}，平时约 ${f.usual} 单）${f.peakHour !== undefined ? `，高峰 ${f.peakHour} 点` : ''}`, `${b.part === 'EVENING' ? 'Tomorrow' : 'Today'} about ${f.orders} orders (${f.low}–${f.high}; a usual day ${f.usual})${f.peakHour !== undefined ? `, peak at ${f.peakHour}:00` : ''}`));
+    if (b.soFar) parts.push(L(ctx.lang, `到现在 ${b.soFar.orders} 单，预测是 ${b.soFar.expected} 单`, `${b.soFar.orders} orders so far against ${b.soFar.expected} forecast`));
+    if (b.inbound.trucks) parts.push(L(ctx.lang, `到货 ${b.inbound.trucks} 车（${b.inbound.cases} 箱，已到 ${b.inbound.arrived} 车）`, `${b.inbound.trucks} deliveries (${b.inbound.cases} cases, ${b.inbound.arrived} arrived)`));
+    parts.push(L(ctx.lang, `排班 ${b.staffing.scheduled} 人${b.staffing.gaps.length ? `，缺口 ${b.staffing.gaps.length} 段` : '，没有缺口'}`, `${b.staffing.scheduled} people scheduled${b.staffing.gaps.length ? `, ${b.staffing.gaps.length} staffing gaps` : ', no gaps'}`));
+    if (b.stats) parts.push(L(ctx.lang, `${b.part === 'MORNING' ? '昨天' : '今天到现在'} ${b.stats.orders} 单、迟到 ${b.stats.late} 单、平均等待 ${b.stats.avgWaitMin} 分钟`, `${b.part === 'MORNING' ? 'Yesterday' : 'Today so far'}: ${b.stats.orders} orders, ${b.stats.late} late, average wait ${b.stats.avgWaitMin} min`));
+    const watch = b.watch.map((x) => briefItemText(ctx.lang, x));
+    const decide = b.decisions.map((x) => briefItemText(ctx.lang, x));
+    const text = L(
+      ctx.lang,
+      `${b.part === 'MORNING' ? '开店简报' : b.part === 'MIDDAY' ? '午间简报' : '傍晚简报'}：${parts.join('；')}。${watch.length ? `要注意：${watch.join('；')}。` : '暂时没有要特别注意的事。'}${decide.length ? `需要你决定：${decide.join('；')}。` : ''}`,
+      `${b.part === 'MORNING' ? 'Opening brief' : b.part === 'MIDDAY' ? 'Midday brief' : 'Evening brief'}: ${parts.join('; ')}. ${watch.length ? `Watch: ${watch.join('; ')}.` : 'Nothing special to watch.'}${decide.length ? ` For you to decide: ${decide.join('; ')}.` : ''}`,
+    );
+    return { tool: 'opening_brief', args, data: b as unknown as Record<string, unknown>, text, cite: L(ctx.lang, '订单量模型、排班和今天的事件记录', "the order model, the schedule and today's event log") };
+  },
+};
+
+/** 每个原因让迟到变多 / 变少时的说法（中文、英文）；Shapley 值为负是帮了忙，例如单量比预测少 */
+const FACTOR: Record<string, { up: [string, string]; down: [string, string] }> = {
+  DEMAND: { up: ['单量比预测多', 'more orders than forecast'], down: ['单量比预测少', 'fewer orders than forecast'] },
+  STAFF: { up: ['拣货的人比排班少', 'fewer pickers than scheduled'], down: ['拣货的人比排班多', 'more pickers than scheduled'] },
+  PACE: { up: ['拣货比标准慢', 'slower picking than standard'], down: ['拣货比标准快', 'faster picking than standard'] },
+};
+
+const dateArg = (v: unknown, now: number): string => {
+  if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+  const d = new Date(now - (v === 'yesterday' ? 86_400_000 : 0));
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+/** 打烊复盘与反事实归因（决策记录 0024 · F3） */
+const closing_review: ToolDef = {
+  name: 'closing_review',
+  description: "End-of-day review: today's late orders split by cause (more orders than forecast, fewer pickers than scheduled, slower picking, other) using a replay of the day, shortages caused by late trucks, AI suggestions adopted and how many delivered, and what to watch tomorrow.",
+  parameters: { type: 'object', properties: { date: { type: 'string' } } },
+  run(ctx, args) {
+    const r = closingReview(ctx.rt, ctx.ai, ctx.now, dateArg(args.date, ctx.now));
+    const parts = (['DEMAND', 'STAFF', 'PACE'] as const)
+      .filter((f) => Math.abs(r.factors[f]) >= 0.5)
+      .map((f) => {
+        const v = Math.round(r.factors[f]);
+        const x = FACTOR[f] as { up: [string, string]; down: [string, string] };
+        return v > 0 ? L(ctx.lang, `${x.up[0]}：多迟到约 ${v} 单`, `${x.up[1]}: about ${v} more late`) : L(ctx.lang, `${x.down[0]}：少迟到约 ${-v} 单`, `${x.down[1]}: about ${-v} fewer late`);
+      });
+    // 复刻比实际少的部分算「其他原因」；复刻比实际多是复刻的误差，括号里已经写了
+    const other = Math.max(0, Math.round(r.other));
+    const notes = r.notes.map((x) => briefItemText(ctx.lang, x));
+    const text = L(
+      ctx.lang,
+      `${r.date} 迟到 ${r.actualLate} 单${parts.length || other ? `：${[...parts, ...(other ? [`其他原因约 ${other} 单`] : [])].join('，')}` : ''}（复刻出来 ${r.replay} 单，三个原因都没有时 ${r.baseline} 单）。缺货 ${r.shortages.lines} 行${r.shortages.lateTruckLines ? `，其中 ${r.shortages.lateTruckLines} 行的商品在晚到的车上` : ''}。AI 建议 ${r.recs.issued} 条、采纳 ${r.recs.adopted} 条${r.recs.measured ? `，测到效果的 ${r.recs.measured} 条里 ${r.recs.hits} 条达到预计` : ''}。${notes.length ? `明天要注意：${notes.join('；')}。` : ''}`,
+      `${r.date}: ${r.actualLate} late orders${parts.length || other ? ` — ${[...parts, ...(other ? [`other causes about ${other}`] : [])].join(', ')}` : ''} (replay ${r.replay}, ${r.baseline} with none of the causes). ${r.shortages.lines} short lines${r.shortages.lateTruckLines ? `, ${r.shortages.lateTruckLines} of them on late trucks` : ''}. ${r.recs.issued} AI suggestions, ${r.recs.adopted} adopted${r.recs.measured ? `; ${r.recs.hits} of ${r.recs.measured} measured delivered` : ''}.${notes.length ? ` Tomorrow: ${notes.join('; ')}.` : ''}`,
+    );
+    return { tool: 'closing_review', args, data: r as unknown as Record<string, unknown>, text, cite: L(ctx.lang, '今天的事件记录和复刻', "today's event log and replay") };
+  },
+};
+
+/** 周报（决策记录 0024 · F5） */
+const weekly_report: ToolDef = {
+  name: 'weekly_report',
+  description: 'Weekly report: the last 7 days of orders, late orders, waits, shortages and substitutions, how often each AI module delivered, and next week’s order forecast and staffing gaps.',
+  parameters: { type: 'object', properties: {} },
+  run(ctx, args) {
+    const w = weeklyReport(ctx.rt, ctx.ai, ctx.now);
+    const t = w.totals;
+    const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : '—');
+    const best = [...w.outcomes].sort((a, b) => b.n - a.n).slice(0, 3);
+    const text = L(
+      ctx.lang,
+      `本周（${w.from} 到 ${w.to}）${t.orders} 单，迟到 ${t.late}（${pct(t.late, t.orders)}），平均等待 ${t.avgWaitMin} 分钟，缺货 ${t.shortLines} 行、替代 ${t.substitutions} 行，冷链提醒 ${t.coldAlerts} 次；AI 建议 ${t.recs} 条、采纳 ${t.adopted} 条。${best.length ? `说到做到率：${best.map((x) => `${x.module} ${x.hitRate !== undefined ? pct(x.hitRate, 1) : '—'}（${x.n} 次）`).join('、')}。` : ''}下周（${w.nextWeek.from} 起）预计 ${w.nextWeek.orders} 单（${w.nextWeek.low}–${w.nextWeek.high}），排班缺口 ${w.nextWeek.gaps} 段。`,
+      `This week (${w.from} to ${w.to}): ${t.orders} orders, ${t.late} late (${pct(t.late, t.orders)}), average wait ${t.avgWaitMin} min, ${t.shortLines} short lines, ${t.substitutions} substitutions, ${t.coldAlerts} cold-chain alerts; ${t.recs} AI suggestions, ${t.adopted} adopted.${best.length ? ` Delivered: ${best.map((x) => `${x.module} ${x.hitRate !== undefined ? pct(x.hitRate, 1) : '—'} (${x.n})`).join(', ')}.` : ''} Next week (from ${w.nextWeek.from}): about ${w.nextWeek.orders} orders (${w.nextWeek.low}–${w.nextWeek.high}), ${w.nextWeek.gaps} staffing gaps.`,
+    );
+    return { tool: 'weekly_report', args, data: w as unknown as Record<string, unknown>, text, cite: L(ctx.lang, '最近 7 天的事件记录和订单量模型', 'the last 7 days of events and the order model') };
+  },
+};
+
+/** 按小时查指标（决策记录 0024 · F2） */
+const metrics_by_hour: ToolDef = {
+  name: 'metrics_by_hour',
+  description: 'Metrics by hour for a day (default today): orders by pickup hour, late orders, average customer wait, short lines and substitutions, with the busiest hour.',
+  parameters: { type: 'object', properties: { date: { type: 'string', description: 'YYYY-MM-DD, or "yesterday"' } } },
+  run(ctx, args) {
+    const date = dateArg(args.date, ctx.now);
+    const from = new Date(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10))).getTime();
+    const hours = Array.from({ length: 24 }, (_, h) => ({ h, orders: 0, late: 0, waits: [] as number[], short: 0, subs: 0 }));
+    for (const o of Object.values(ctx.rt.state.orders)) {
+      if (o.status === 'CANCELLED' || o.slotStart < from || o.slotStart >= from + 86_400_000) continue;
+      const x = hours[new Date(o.slotStart).getHours()] as (typeof hours)[number];
+      x.orders++;
+      const staged = o.stagedAt ?? (o.status === 'COMPLETED' ? o.completedAt : undefined);
+      if (staged === undefined ? o.slotStart <= ctx.now : staged > o.slotStart) x.late++;
+      if (o.completedAt !== undefined && o.arrivedAt !== undefined) x.waits.push((o.completedAt - o.arrivedAt) / 60_000);
+      for (const r of Object.values(o.lineResults)) {
+        if (r.short > 0) x.short++;
+        if (r.substituted > 0) x.subs++;
+      }
+    }
+    const rows = hours.filter((x) => x.orders > 0).map((x) => ({ hour: x.h, orders: x.orders, late: x.late, avgWaitMin: x.waits.length ? r1(x.waits.reduce((a, b) => a + b, 0) / x.waits.length) : 0, short: x.short, subs: x.subs }));
+    if (!rows.length) return { tool: 'metrics_by_hour', args, data: { date, rows }, text: L(ctx.lang, `${date} 没有订单记录。`, `No orders on ${date}.`), cite: L(ctx.lang, '事件记录', 'event log') };
+    const peak = rows.reduce((m, x) => (x.orders > m.orders ? x : m));
+    const lateH = rows.filter((x) => x.late > 0);
+    const text = L(
+      ctx.lang,
+      `${date} 按取货时段：${rows.map((x) => `${x.hour} 点 ${x.orders} 单${x.late ? `（迟到 ${x.late}）` : ''}`).join('，')}。最忙 ${peak.hour} 点（${peak.orders} 单）${lateH.length ? `；迟到集中在 ${lateH.map((x) => `${x.hour} 点`).join('、')}` : '，没有迟到'}。`,
+      `${date} by pickup hour: ${rows.map((x) => `${x.hour}:00 ${x.orders}${x.late ? ` (${x.late} late)` : ''}`).join(', ')}. Busiest ${peak.hour}:00 (${peak.orders})${lateH.length ? `; late orders around ${lateH.map((x) => `${x.hour}:00`).join(', ')}` : ', no late orders'}.`,
+    );
+    return { tool: 'metrics_by_hour', args, data: { date, rows, spark: rows.map((x) => x.orders) }, text, cite: L(ctx.lang, '事件记录', 'event log') };
+  },
+};
+
+/** 两天比较（决策记录 0024 · F2） */
+const compare_days: ToolDef = {
+  name: 'compare_days',
+  description: 'Compare two days (default today vs yesterday): orders, late orders, average wait, short lines, substitutions, cold-chain alerts.',
+  parameters: { type: 'object', properties: { a: { type: 'string' }, b: { type: 'string' } } },
+  run(ctx, args) {
+    const a = dateArg(args.a, ctx.now);
+    const b = dateArg(args.b ?? 'yesterday', ctx.now);
+    const x = dayStats(ctx.rt.state, a, ctx.now);
+    const y = dayStats(ctx.rt.state, b, ctx.now);
+    const fmt = (v: number | undefined) => (v === undefined ? '—' : String(v));
+    const text = L(
+      ctx.lang,
+      `${a} 对比 ${b}：订单 ${fmt(x?.orders)} / ${fmt(y?.orders)}，迟到 ${fmt(x?.late)} / ${fmt(y?.late)}，平均等待 ${fmt(x?.avgWaitMin)} / ${fmt(y?.avgWaitMin)} 分钟，缺货 ${fmt(x?.shortLines)} / ${fmt(y?.shortLines)} 行，替代 ${fmt(x?.substitutions)} / ${fmt(y?.substitutions)} 行，冷链提醒 ${fmt(x?.coldAlerts)} / ${fmt(y?.coldAlerts)} 次。`,
+      `${a} vs ${b}: orders ${fmt(x?.orders)} / ${fmt(y?.orders)}, late ${fmt(x?.late)} / ${fmt(y?.late)}, average wait ${fmt(x?.avgWaitMin)} / ${fmt(y?.avgWaitMin)} min, short lines ${fmt(x?.shortLines)} / ${fmt(y?.shortLines)}, substitutions ${fmt(x?.substitutions)} / ${fmt(y?.substitutions)}, cold-chain alerts ${fmt(x?.coldAlerts)} / ${fmt(y?.coldAlerts)}.`,
+    );
+    return { tool: 'compare_days', args, data: { a, b, x: x ?? null, y: y ?? null }, text, cite: L(ctx.lang, '事件记录', 'event log') };
+  },
+};
+
+const ORDER_STEP: Record<string, [string, string]> = {
+  OrderCreated: ['下单', 'ordered'],
+  OrderLocked: ['锁单', 'locked'],
+  PickWalkClaimed: ['开始拣货', 'picking started'],
+  PickWalkCompleted: ['拣完', 'picked'],
+  ItemNotFound: ['有商品找不到', 'an item was not found'],
+  SubstitutionPicked: ['换了替代品', 'a substitute was picked'],
+  OrderStaged: ['暂存好了', 'staged'],
+  EtaUpdated: ['顾客报了预计到达', 'customer shared an arrival time'],
+  CustomerArrived: ['顾客到店', 'customer arrived'],
+  PrepStarted: ['开始交付', 'handoff started'],
+  CodeVerified: ['取货码核验通过', 'pickup code verified'],
+  OrderHandedOff: ['交付完成', 'handed off'],
+  OrderCancelled: ['取消', 'cancelled'],
+};
+
+/** 某张订单的完整时间线（决策记录 0024 · F2）：只说流程，不评价人（不出现员工的名字） */
+const order_timeline: ToolDef = {
+  name: 'order_timeline',
+  description: "The full timeline of one order by its short code: ordered, locked, picked, staged, customer arrival and handoff. Process only — it never names or rates associates.",
+  parameters: { type: 'object', properties: { order: { type: 'string' } }, required: ['order'] },
+  run(ctx, args) {
+    const q = String(args.order ?? '').trim().toUpperCase();
+    const o = Object.values(ctx.rt.state.orders).find((x) => x.shortCode.toUpperCase() === q || x.id.toUpperCase() === q);
+    if (!o) return { tool: 'order_timeline', args, data: { found: false }, text: L(ctx.lang, `没有找到订单 ${q}。`, `No order ${q}.`), cite: L(ctx.lang, '订单记录', 'order records') };
+    const walkIds = new Set(o.toteIds.map((id) => ctx.rt.state.totes[id]?.walkId).filter(Boolean));
+    const touches = (e: { type: string; payload: Record<string, unknown> }) =>
+      e.payload.orderId === o.id || (Array.isArray(e.payload.orderIds) && (e.payload.orderIds as string[]).includes(o.id)) || (typeof e.payload.walkId === 'string' && walkIds.has(e.payload.walkId) && (e.type === 'PickWalkClaimed' || e.type === 'PickWalkCompleted')) || (typeof e.payload.toteId === 'string' && o.toteIds.includes(e.payload.toteId as string) && (e.type === 'ItemNotFound' || e.type === 'SubstitutionPicked')) || (e.type === 'OrderCreated' && (e.payload.order as { id?: string } | undefined)?.id === o.id);
+    const steps: Array<{ at: number; type: string }> = [];
+    for (const e of ctx.rt.recentEvents()) if (ORDER_STEP[e.type] && touches(e as unknown as { type: string; payload: Record<string, unknown> })) if (!steps.some((x) => x.type === e.type && (e.type === 'PickWalkClaimed' || e.type === 'OrderCreated'))) steps.push({ at: e.at, type: e.type });
+    const text = L(
+      ctx.lang,
+      `订单 ${o.shortCode}（取货时段 ${hhmm(o.slotStart)}）：${steps.map((x) => `${hhmm(x.at)} ${(ORDER_STEP[x.type] as [string, string])[0]}`).join(' → ') || '内存里没有这张订单的事件'}。`,
+      `Order ${o.shortCode} (pickup ${hhmm(o.slotStart)}): ${steps.map((x) => `${hhmm(x.at)} ${(ORDER_STEP[x.type] as [string, string])[1]}`).join(' → ') || 'no events in memory'}.`,
+    );
+    return { tool: 'order_timeline', args, data: { order: o.shortCode, steps }, text, cite: L(ctx.lang, '事件记录', 'event log') };
+  },
+};
+
+/** 某件商品今天的库存轨迹（决策记录 0024 · F2） */
+const item_history: ToolDef = {
+  name: 'item_history',
+  description: "One item's inventory history today: units sold at the register, picked for online orders, restocked, counted, reported missing, and the current shelf estimate.",
+  parameters: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] },
+  run(ctx, args) {
+    const p = matchItem(String(args.query ?? ''), ctx.rt.statics.planogram);
+    if (!p) return { tool: 'item_history', args, data: { found: false }, text: L(ctx.lang, '没有找到这个商品。', 'I could not find that item.'), cite: L(ctx.lang, '陈列表', 'planogram') };
+    const d = new Date(ctx.now);
+    const from = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    let sold = 0;
+    let picked = 0;
+    let restocked = 0;
+    let missing = 0;
+    const counts: number[] = [];
+    const lineItem = (toteId: string, lineId: string) => {
+      const t = ctx.rt.state.totes[toteId];
+      return t ? ctx.rt.state.orders[t.orderId]?.lines.find((l) => l.lineId === lineId)?.itemId : undefined;
+    };
+    for (const e of ctx.rt.recentEvents()) {
+      if (e.at < from) continue;
+      if (e.type === 'SalesRecorded') for (const l of e.payload.lines) if (l.itemId === p.itemId) sold += l.qty;
+      if (e.type === 'ItemPicked' && lineItem(e.payload.toteId, e.payload.lineId) === p.itemId) picked += e.payload.qty;
+      if (e.type === 'ItemNotFound' && lineItem(e.payload.toteId, e.payload.lineId) === p.itemId) missing++;
+      if (e.type === 'ReplenishmentCompleted' && e.payload.itemId === p.itemId) restocked += e.payload.units;
+      if (e.type === 'ShelfCounted' && e.payload.itemId === p.itemId) counts.push(e.payload.units);
+    }
+    const est = Math.round(shelfNow(ctx.rt.state, p).est);
+    const text = L(
+      ctx.lang,
+      `${p.name} 今天：收银卖出 ${sold} 件，线上拣走 ${picked} 件，补货上架 ${restocked} 件${counts.length ? `，员工数过 ${counts.length} 次（最近 ${counts.at(-1)} 件）` : ''}${missing ? `，拣货员报告找不到 ${missing} 次` : ''}；货架现在估计 ${est} 件。`,
+      `${p.name} today: ${sold} sold at the register, ${picked} picked online, ${restocked} restocked${counts.length ? `, counted ${counts.length} time(s) (last ${counts.at(-1)})` : ''}${missing ? `, reported missing ${missing} time(s)` : ''}; about ${est} on the shelf now.`,
+    );
+    return { tool: 'item_history', args, data: { itemId: p.itemId, sold, picked, restocked, counts, missing, est }, text, cite: L(ctx.lang, '今天的事件记录', "today's event log") };
+  },
+};
+
+export const TOOLS: ToolDef[] = [store_status, find_item, forecast, staff_status, explain_recommendation, wait_analysis, whatif, knowledge, shift_summary, opening_brief, closing_review, weekly_report, metrics_by_hour, compare_days, order_timeline, item_history];
 export const TOOL_BY_NAME = new Map(TOOLS.map((t) => [t.name, t]));
 
 // —— 理由与状态的文字（与员工端一致的简短版本）——

@@ -19,6 +19,8 @@ export interface TrafficCar {
   color: string;
   len: number;
   braking: boolean;
+  /** 当前加速度（m/s²，车身俯仰用） */
+  a: number;
   /** 计划在下一个路口转弯（site.turns 的下标） */
   turn?: number;
   /** 变道中：相对当前车道中线的横向偏移（米，沿车道右侧方向），逐渐回到 0 */
@@ -62,6 +64,8 @@ export class TrafficSim {
   readonly peds: PedestrianSim;
   /** 人流强度（0…1），由画面层按昼夜设置 */
   pedBusy = 1;
+  /** 铁路道口（栏杆放下）、学校护导员（拦车）：由场景按仿真时刻每帧设置 */
+  gates: { rail: boolean; school: boolean } = { rail: false, school: false };
   time = 0;
   /** 本次运行中的变道次数（统计用） */
   laneChanges = 0;
@@ -129,16 +133,17 @@ export class TrafficSim {
       const rate = lane.rate * (0.12 + c);
       if (this.rng.next() < 1 - Math.exp(-rate * dt)) {
         const last = list[list.length - 1];
-        const type = trafficType(this.rng.next(), lane.kind === 'main' ? 0.06 : 0.02);
+        const type = trafficType(this.rng.next(), lane.kind === 'main' ? 0.06 : 0.02, lane.kind === 'main');
         const len = VEHICLE_LENGTH[type];
         if (!last || last.d - last.len / 2 > len + S0 + 2) {
           // 是否在某个路口转弯（按每个转弯的比例抽取）；转弯车道可以是同方向的另一条车道，路上再变道过去
           let turn: number | undefined;
           const group = (this.adj[li] as { group: string }).group;
           this.site.turns.forEach((t, ti) => {
-            if (turn === undefined && (this.adj[t.from] as { group: string } | undefined)?.group === group && t.atD > len + 40 && this.rng.chance(t.share)) turn = ti;
+            // 长途半挂车是过境车流，不在这里转弯
+            if (turn === undefined && type !== 'semi' && (this.adj[t.from] as { group: string } | undefined)?.group === group && t.atD > len + 40 && this.rng.chance(t.share)) turn = ti;
           });
-          list.push({ id: ++this.seq, d: len / 2, v: last ? Math.min(vMax, last.v) : vMax * 0.85, type, color: carColor(this.rng.next()), len, braking: false, turn, shift: 0, lcCool: 2 });
+          list.push({ id: ++this.seq, d: len / 2, v: last ? Math.min(vMax, last.v) : vMax * 0.85, type, color: carColor(this.rng.next()), len, braking: false, a: 0, turn, shift: 0, lcCool: 2 });
         }
       }
     });
@@ -170,12 +175,15 @@ export class TrafficSim {
         ([...this.pedObstacles, ...this.obstacles].some((o) => o.lane === turn.to && o.d + o.len / 2 > turn.toD - 3 && o.d - o.len / 2 < turn.toD + 6) ||
           (this.lanes[turn.to] ?? []).some((c) => c.d - c.len / 2 < turn.toD + tc.car.len + S0 && c.d + c.len / 2 > turn.toD - 1));
       if (blocked) {
+        tc.car.a = tc.car.v > 0 ? -3 : 0;
         tc.car.v = 0;
         tc.car.braking = true;
         continue;
       }
       tc.car.braking = false;
+      const v0 = tc.car.v;
       tc.car.v = Math.max(2, Math.min(5.5, tc.car.v - 3 * dt));
+      tc.car.a = (tc.car.v - v0) / Math.max(1e-3, dt);
       tc.s += tc.car.v * dt;
       if (tc.s >= turn.len) {
         this.turning.splice(k--, 1);
@@ -235,6 +243,15 @@ export class TrafficSim {
     for (const st of lane.stops) {
       const dist = st.d - front;
       if (dist < -0.5) continue;
+      // 铁路道口、学校护导员：关闭时当作红灯，开着就看下一条停止线（决策记录 0019）
+      if (st.gate) {
+        if (this.gates[st.gate] && dist > (car.v * car.v) / (2 * 6) - 1 && dist < gap) {
+          gap = Math.max(0.05, dist);
+          vLead = 0;
+          break;
+        }
+        continue;
+      }
       const signal = this.site.signals[st.signal];
       if (!signal) break;
       const turn = car.turn !== undefined ? this.site.turns[car.turn] : undefined;
@@ -255,6 +272,7 @@ export class TrafficSim {
     const interaction = Number.isFinite(gap) ? (sStar / s) ** 2 : 0;
     const a = Math.max(-9, A_MAX * (1 - (car.v / vMax) ** 4 - interaction));
     car.braking = a < -0.6 || car.v < 0.3;
+    car.a = car.v <= 0 && a < 0 ? 0 : a;
     car.v = Math.max(0, car.v + a * dt);
     car.d += car.v * dt;
   }

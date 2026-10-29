@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { roleOf } from '@storewright/ops';
+import { currentRole } from '@storewright/ops';
 import { t } from '../../i18n';
 import { useLive } from '../../live';
+import { rememberedSub, rememberSub } from '../../nav';
 import { MtoView } from './MtoView';
 import { OversizedView } from './OversizedView';
 import { ParcelView } from './ParcelView';
@@ -18,9 +19,15 @@ export function ExtScreen() {
   const s = client.state;
   const mods = client.statics?.modules;
   const sections = (['mto', 'returns', 'oversized', 'parcel'] as const).filter((k) => mods?.[k]);
-  const role = roleOf(client.statics, client.state, auth.actor) ?? '';
+  const role = currentRole(client.statics, client.state, auth.actor, client.now()) ?? '';
   const preferred = DEFAULT[role];
-  const [section, setSection] = useState<Section | undefined>(preferred && sections.includes(preferred) ? preferred : sections[0]);
+  // 记住上次的子页（决策记录 0026）：交付员去熟食现做取东西再回来，不会跳回退货
+  const remembered = rememberedSub('ext') as Section | undefined;
+  const [section, setSectionState] = useState<Section | undefined>(remembered && sections.includes(remembered) ? remembered : preferred && sections.includes(preferred) ? preferred : sections[0]);
+  const setSection = (k: Section) => {
+    rememberSub('ext', k);
+    setSectionState(k);
+  };
   if (!sections.length || !section) {
     return (
       <div className="empty">
@@ -33,7 +40,7 @@ export function ExtScreen() {
     mto: Object.values(s.mto).filter((x) => x.status === 'QUEUED' || x.status === 'COOKING' || x.status === 'HELD').length,
     returns: Object.values(s.returns).filter((x) => x.status === 'OPEN').length,
     oversized: Object.values(s.oversized).filter((x) => x.status !== 'STAGED').length,
-    parcel: Object.values(s.parcels).filter((x) => x.status === 'INDUCTED' || x.status === 'OVER').length,
+    parcel: Object.values(s.parcels).filter((x) => x.status === 'INDUCTED' || x.status === 'OVER' || x.status === 'DAMAGED').length,
   };
   return (
     <div className="inventory">
@@ -58,6 +65,6 @@ export function extBadge(s: ReturnType<typeof useLive>['client']['state']): numb
   return (
     Object.values(s.mto).filter((x) => x.status === 'QUEUED' || x.status === 'HELD').length +
     Object.values(s.oversized).filter((x) => x.status === 'OPEN').length +
-    Object.values(s.parcels).filter((x) => x.status === 'INDUCTED').length
+    Object.values(s.parcels).filter((x) => x.status === 'INDUCTED' || x.status === 'OVER' || x.status === 'DAMAGED').length
   );
 }

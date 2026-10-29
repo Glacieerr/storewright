@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import type { TempZone } from '@storewright/domain';
-import { backroomLayout, stagingRacks, type StoreConfig } from '@storewright/store-config';
+import { backroomLayout, stagingRacks, yardSettings, type StoreConfig } from '@storewright/store-config';
 import { useApp } from '../state/store';
 import { copySelected, deleteSelected, distributeSelected, duplicateSelected, editFloor, hasClipboard, paste, patchSelected, rotateSelected, selectAllOnFloor } from '../state/editOps';
 import { ZONE_LABEL } from '../scene/palette';
-import { ROAD_STYLE_LABEL, SITE_LAYOUT_LABEL, type RoadStyle, type SiteLayoutKind } from '../scene/site';
+import { BOATS_LABEL, ROAD_STYLE_LABEL, SITE_LAYOUT_LABEL, WATER_LABEL, type RoadStyle, type SiteLayoutKind, type WaterKind } from '../scene/site';
+import type { BoatTraffic } from '../scene/terrain/harbor';
+import { YardFields } from './YardFields';
 import { GeneratorPanel } from './GeneratorPanel';
 import { AreaEditor } from './AreaEditor';
 import { ParkingEditor } from './ParkingEditor';
@@ -363,7 +365,7 @@ export function EditorPanel() {
         {!draft.docks && (
           <label>
             <span>{t('卸货门')}</span>
-            <input type="number" min={1} max={4} value={draft.backroom.docks} onChange={(e) => update((d) => (d.backroom.docks = Math.min(4, Math.max(1, Number(e.target.value) || 1))))} />
+            <input type="number" min={1} max={10} value={draft.backroom.docks} onChange={(e) => update((d) => (d.backroom.docks = Math.min(10, Math.max(1, Number(e.target.value) || 1))))} />
           </label>
         )}
         <label>
@@ -395,6 +397,11 @@ export function EditorPanel() {
         <p className="hint">
           {t('库存仓库：{0} 个托盘位（{1} 排 × {2} 层）。货架排数 0 表示按后仓深度放满。没有叉车时货只能用搬运车卸下、堆在收货区，进不了高层货架。线上订单暂存仓的规模决定暂存格位数。', backroomLayout(draft).capacity, backroomLayout(draft).rows.length, draft.backroom.rackLevels)}
         </p>
+      </div>
+
+      <div className="form">
+        <h3>{t('卸货场')}</h3>
+        <YardFields value={yardSettings(draft)} onChange={(v) => update((d) => (d.outdoor.yard = { ...yardSettings(d), ...v }))} />
       </div>
 
       <AreaEditor draft={draft} update={update} />
@@ -451,9 +458,39 @@ export function EditorPanel() {
             ))}
           </select>
         </label>
+        <label>
+          <span>{t('水系')}</span>
+          <select value={site.water ?? 'lake'} onChange={(e) => app().setSite({ water: e.target.value as WaterKind })}>
+            {(Object.keys(WATER_LABEL) as WaterKind[]).map((k) => (
+              <option key={k} value={k}>
+                {WATER_LABEL[k]}
+              </option>
+            ))}
+          </select>
+        </label>
+        {(site.water ?? 'lake') !== 'none' && (
+          <label>
+            <span>{t('船只')}</span>
+            <select value={site.boats ?? 'normal'} onChange={(e) => app().setSite({ boats: e.target.value as BoatTraffic })} aria-label={t('船只多少')}>
+              {(Object.keys(BOATS_LABEL) as BoatTraffic[]).map((k) => (
+                <option key={k} value={k}>
+                  {BOATS_LABEL[k]}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="check">
           <input type="checkbox" checked={!!site.roadWorks} onChange={(e) => app().setSite({ roadWorks: e.target.checked })} />
           {t('主路有一段施工（限速、锥桶）')}
+        </label>
+        <label className="check">
+          <input type="checkbox" checked={!!site.school} onChange={(e) => app().setSite({ school: e.target.checked })} />
+          {t('附近有学校（上学、放学时车多人多）')}
+        </label>
+        <label className="check">
+          <input type="checkbox" checked={!!site.railway} onChange={(e) => app().setSite({ railway: e.target.checked })} />
+          {t('主路上有铁路道口（火车经过时道口关闭）')}
         </label>
         <label>
           <span>{t('随机种子')}</span>
@@ -482,13 +519,17 @@ export function EditorPanel() {
                 layout: pick(['standard', 'corner', 'strip'] as SiteLayoutKind[]),
                 roadWorks: Math.random() < 0.35,
                 traffic: pick([0, 1, 1, 2]),
+                water: pick(['lake', 'lake', 'none'] as WaterKind[]),
+                boats: pick(['few', 'normal', 'normal', 'many'] as BoatTraffic[]),
+                school: Math.random() < 0.4,
+                railway: Math.random() < 0.35,
               });
             }}
           >
             {t('🎲 周边全部随机')}
           </button>
         </div>
-        <p className="hint">{t('道路风格、地块、施工和种子只改变画面（施工会让背景车流在那一段慢下来）；拥堵强度会推迟顾客和司机的到店时间，并重新仿真。')}</p>
+        <p className="hint">{t('道路风格、地块、水系、施工和种子只改变画面（施工会让背景车流在那一段慢下来）；拥堵强度、学校和铁路道口会推迟顾客、司机和货车的到店时间，并重新仿真。')}</p>
       </div>
 
       <div className={`validation ${issues.length ? 'bad' : 'ok'}`}>

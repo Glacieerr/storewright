@@ -169,15 +169,24 @@ export function slotFree(s: OpsState, st: StoreStatic, code: string): number {
 
 /**
  * 暂存格位建议（决策 S-02：员工自选为主，系统建议作为参考）：同订单同温区已占用且未满的格位优先，其次最空的同温区格位。
+ * 按到店时间（决策记录 0023 · B5）：半小时内就到的顾客，框放离交付点近的格位；一个半小时以后才到的放远一点，把近的留给快到的。
  */
-export function suggestSlots(s: OpsState, st: StoreStatic, toteId: string, limit = 3): string[] {
+export function suggestSlots(s: OpsState, st: StoreStatic, toteId: string, limit = 3, now = s.at): string[] {
   const t = s.totes[toteId];
   const o = t ? s.orders[t.orderId] : undefined;
   if (!t || !o) return [];
   const sameOrder = new Set(o.toteIds.map((id) => s.totes[id]?.slotCode).filter((c): c is string => !!c));
-  return st.slots
-    .filter((slot) => slot.tempZone === t.tempZone && (slot.area === 'ANY' || slot.area === o.type) && slotFree(s, st, slot.code) > 0)
-    .map((slot) => ({ code: slot.code, score: (sameOrder.has(slot.code) ? 0 : 1000) + (s.slots[slot.code]?.length ?? 0) }))
+  const trip = o.tripId ? s.trips[o.tripId] : undefined;
+  const arriveAt = trip ? (trip.arrivedAt ?? trip.etaAt ?? o.slotStart) : (o.arrivedAt ?? o.aiEtaAt ?? o.etaAt ?? o.slotStart);
+  const mins = (arriveAt - now) / 60_000;
+  const candidates = st.slots
+    // 报修中的设备管着的格位不再推荐（预测性维护，决策记录 0022）
+    // 换格位时不推荐它现在所在的格位
+    .filter((slot) => slot.tempZone === t.tempZone && (slot.area === 'ANY' || slot.area === o.type) && slotFree(s, st, slot.code) > 0 && !s.pausedSlots?.[slot.code] && !(t.status === 'STAGED' && slot.code === t.slotCode));
+  const far = Math.max(1, ...candidates.map((x) => x.distM ?? 0));
+  const dist = (slot: (typeof candidates)[number]) => (slot.distM === undefined ? 0 : mins <= 30 ? slot.distM : mins >= 90 ? far - slot.distM : 0);
+  return candidates
+    .map((slot) => ({ code: slot.code, score: (sameOrder.has(slot.code) ? 0 : 1000) + (s.slots[slot.code]?.length ?? 0) + dist(slot) * 2 }))
     .sort((a, b) => a.score - b.score || a.code.localeCompare(b.code))
     .slice(0, limit)
     .map((x) => x.code);
@@ -269,26 +278,36 @@ export function sessionTotes(s: OpsState, orderIds: readonly string[]): LiveTote
 export function needsAgeCheck(s: OpsState, orderIds: readonly string[]): boolean {
   return orderIds.some((id) => {
     const o = s.orders[id];
-    return !!o && o.lines.some((l) => l.ageRestricted && (o.lineResults[l.lineId]?.picked ?? 0) > 0);
+    // 换成替代品的也要核验（替代品通常是同类商品；流程梳理发现，决策记录 0025）
+    return !!o && o.lines.some((l) => l.ageRestricted && (o.lineResults[l.lineId]?.picked ?? 0) + (o.lineResults[l.lineId]?.substituted ?? 0) > 0);
   });
 }
 
 /** 交付时要告知顾客的缺货与替代 */
-export function orderShortages(o: LiveOrder): Array<{ lineId: string; name: string; short: number; substituteName?: string; substituted: number }> {
-  const out: Array<{ lineId: string; name: string; short: number; substituteName?: string; substituted: number }> = [];
+export function orderShortages(o: LiveOrder): Array<{ lineId: string; name: string; short: number; substituteName?: string; substituted: number; subAccepted?: boolean }> {
+  const out: Array<{ lineId: string; name: string; short: number; substituteName?: string; substituted: number; subAccepted?: boolean }> = [];
   for (const l of o.lines) {
     const r = o.lineResults[l.lineId];
     if (!r || (r.short === 0 && r.substituted === 0)) continue;
-    const row: { lineId: string; name: string; short: number; substituteName?: string; substituted: number } = { lineId: l.lineId, name: l.name, short: r.short, substituted: r.substituted };
+    const row: { lineId: string; name: string; short: number; substituteName?: string; substituted: number; subAccepted?: boolean } = { lineId: l.lineId, name: l.name, short: r.short, substituted: r.substituted };
     if (r.substituteName) row.substituteName = r.substituteName;
+    if (r.subAccepted !== undefined) row.subAccepted = r.subAccepted;
     out.push(row);
   }
   return out;
 }
 
-/** 已暂存但订单已取消、需要移到回收专区的框 */
+/** 订单已取消、需要移到回收专区的框：在暂存格位里的，和交付准备时已经取出的 */
 export function recoveryNeeded(s: OpsState): LiveTote[] {
-  return Object.values(s.totes).filter((t) => t.status === 'STAGED' && s.orders[t.orderId]?.status === 'CANCELLED');
+  return Object.values(s.totes).filter((t) => (t.status === 'STAGED' || t.status === 'PULLED') && s.orders[t.orderId]?.status === 'CANCELLED');
+}
+
+/** 待暂存的框：拣完的，和取出后没在交付准备里、要放回暂存区的；不含自动运营的订单（员工手机不显示） */
+export function toStageTotes(s: OpsState): LiveTote[] {
+  const inPrep = new Set(Object.values(s.sessions).flatMap((x) => (x.status !== 'COMPLETED' ? x.scanned : [])));
+  return Object.values(s.totes)
+    .filter((t) => s.orders[t.orderId]?.track !== 'AUTO' && (t.status === 'PICKED' || (t.status === 'PULLED' && !inPrep.has(t.id) && s.orders[t.orderId]?.status !== 'CANCELLED')))
+    .sort((a, b) => a.dueAt - b.dueAt || a.id.localeCompare(b.id));
 }
 
 /** 今日概况 */

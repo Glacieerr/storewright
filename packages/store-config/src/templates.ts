@@ -1,5 +1,6 @@
 import { createRng, lbToKg, type TempZone } from '@storewright/domain';
 import type { CategoryConfig, RunConfig, StagingRackConfig, StoreConfig, SizeRule } from './schema';
+import { backroomFrame } from './areas';
 
 /**
  * 门店模板（决策 G-03）：小型 / 中型（默认）/ 大型。
@@ -121,6 +122,12 @@ function round2(v: number): number {
 }
 
 const PITCH_M = 3.2;
+/** 二楼通道以外的宽度：左墙到第一条通道 8 米，最后一条通道到右墙 12 米（右侧走廊和通道） */
+const F2_SIDES_M = 20;
+/** 二楼要盖到的位置：货梯井（宽 3.6 米）旁 7 米宽的卸货区，再留 2.5 米 */
+function liftReach(liftX: number): number {
+  return liftX + 1.8 + 7 + 2.5;
+}
 const BAY_M = 1.22;
 const MARGIN_M = 1.5;
 
@@ -221,6 +228,7 @@ export interface GeneratorParams {
    * 二楼百货区；null 表示单层。
    * 电梯（1–3 部，员工推车只能乘电梯）按「左前 → 左后 → 右前」依次布置；
    * 自动扶梯（0–2 组，每组上下各一条，供顾客使用）布置在前走廊上靠近顾客入口处。
+   * gmAisles 为 0 时按货梯的位置自动铺满二楼（决策记录 0019）。
    */
   secondFloor: { gmAisles: number; bays: number; levels: number; elevators?: number; escalators?: number } | null;
   /** 暂存区规模（1 = 中型店） */
@@ -239,11 +247,15 @@ export interface GeneratorParams {
   staffScale?: number;
   /** 后仓：加深米数、货架排数与层数、卸货门、叉车与搬运车 */
   backroom?: { extraDepthM: number; rackRows: number; rackLevels: number; docks: number; forklifts: number; palletJacks: number };
+  /** 卸货场（决策记录 0019）：进场道路在哪一侧、接主路还是经支路、离停车场多远、待命车位与甩挂车位；不给时用缺省值 */
+  yard?: { side: 'RIGHT' | 'LEFT'; via: 'DRIVE' | 'STREET'; offsetM: number; slots: number; trailerStalls: number };
 }
 
 const PARAMS: Record<TemplateName, GeneratorParams> = {
-  small: { name: 'Small neighborhood store', ambientAisles: 6, frozenAisles: 1, gmAislesF1: 1, bays: 10, levels: 5, perimeter: true, secondFloor: null, stagingScale: 0.5, autoService: null },
-  medium: { name: 'Mid-size supermarket', ambientAisles: 11, frozenAisles: 2, gmAislesF1: 3, bays: 16, levels: 5, perimeter: true, secondFloor: null, stagingScale: 1, autoService: null },
+  // 小型店两个卸货门、一台叉车（决策记录 0019）
+  small: { name: 'Small neighborhood store', ambientAisles: 6, frozenAisles: 1, gmAislesF1: 1, bays: 10, levels: 5, perimeter: true, secondFloor: null, stagingScale: 0.5, autoService: null, backroom: { extraDepthM: 0, rackRows: 0, rackLevels: 3, docks: 2, forklifts: 1, palletJacks: 2 } },
+  // 中型店两台叉车（一台主卸货、一台主上架），大型店三台（决策记录 0018）
+  medium: { name: 'Mid-size supermarket', ambientAisles: 11, frozenAisles: 2, gmAislesF1: 3, bays: 16, levels: 5, perimeter: true, secondFloor: null, stagingScale: 1, autoService: null, backroom: { extraDepthM: 0, rackRows: 0, rackLevels: 3, docks: 3, forklifts: 2, palletJacks: 2 } },
   large: {
     name: 'Large two-floor store',
     ambientAisles: 18,
@@ -252,9 +264,11 @@ const PARAMS: Record<TemplateName, GeneratorParams> = {
     bays: 20,
     levels: 6,
     perimeter: true,
-    secondFloor: { gmAisles: 10, bays: 16, levels: 5 },
+    secondFloor: { gmAisles: 0, bays: 16, levels: 5 },
     stagingScale: 2,
     autoService: null,
+    // 大型店到货多：五个卸货门（决策记录 0019）
+    backroom: { extraDepthM: 0, rackRows: 0, rackLevels: 3, docks: 5, forklifts: 3, palletJacks: 3 },
   },
   hardware: {
     name: 'Home improvement store',
@@ -272,7 +286,7 @@ const PARAMS: Record<TemplateName, GeneratorParams> = {
     pharmacy: null,
     // 施工队一早来取货：6 点开门
     hours: { openMin: 6 * 60, closeMin: 21 * 60 },
-    backroom: { extraDepthM: 10, rackRows: 0, rackLevels: 4, docks: 3, forklifts: 2, palletJacks: 3 },
+    backroom: { extraDepthM: 10, rackRows: 0, rackLevels: 4, docks: 4, forklifts: 2, palletJacks: 3 },
   },
 };
 
@@ -287,7 +301,7 @@ export const GENERATOR_PRESETS: Array<{ id: string; label: string; params: () =>
     params: () => ({
       ...templateParams('large'),
       name: 'Large store with auto center',
-      secondFloor: { gmAisles: 10, bays: 16, levels: 5, elevators: 2, escalators: 1 },
+      secondFloor: { gmAisles: 0, bays: 16, levels: 5, elevators: 2, escalators: 1 },
       autoService: { side: 'LEFT', oilBays: 3, tireBays: 3 },
       hours: { openMin: 7 * 60, closeMin: 23 * 60 },
     }),
@@ -307,7 +321,7 @@ export const GENERATOR_LIMITS = {
   gmAislesF1: [0, 8],
   bays: [6, 26],
   levels: [3, 7],
-  secondFloorGmAisles: [2, 14],
+  secondFloorGmAisles: [0, 24],
   stagingScale: [0.5, 3],
   serviceBays: [0, 6],
   elevators: [1, 3],
@@ -319,7 +333,10 @@ export const GENERATOR_LIMITS = {
   extraDepth: [0, 30],
   rackRows: [0, 8],
   rackLevels: [2, 5],
-  docks: [1, 4],
+  docks: [1, 10],
+  yardOffset: [0, 40],
+  yardSlots: [0, 6],
+  trailerStalls: [0, 10],
   forklifts: [0, 4],
   palletJacks: [0, 6],
   closeHour: [17, 24],
@@ -340,7 +357,7 @@ export function randomGeneratorParams(seed: number): GeneratorParams {
     bays: rng.int(9, 22),
     levels: rng.int(4, 6),
     perimeter: rng.chance(0.85),
-    secondFloor: twoFloors ? { gmAisles: rng.int(5, 12), bays: rng.int(12, 18), levels: 5, elevators: rng.int(1, 2), escalators: rng.int(0, 2) } : null,
+    secondFloor: twoFloors ? { gmAisles: 0, bays: rng.int(12, 18), levels: 5, elevators: rng.int(1, 2), escalators: rng.int(0, 2) } : null,
     stagingScale: Math.round((0.5 + size * 1.8) * 2) / 2,
     autoService: auto ? { side: rng.chance(0.7) ? 'LEFT' : 'RIGHT', oilBays: rng.int(1, 4), tireBays: rng.int(1, 4) } : null,
     garden: rng.chance(0.4) ? { side: rng.chance(0.5) ? 'LEFT' : 'RIGHT' } : null,
@@ -348,7 +365,15 @@ export function randomGeneratorParams(seed: number): GeneratorParams {
     hours: { openMin: rng.pick([6, 7, 7, 8]) * 60, closeMin: rng.pick([21, 22, 22, 23, 24]) * 60 },
     parking: { rows: 0, pickupBays: 0 },
     staffScale: 1,
-    backroom: { extraDepthM: Math.round(size * 16), rackRows: 0, rackLevels: rng.int(3, 4), docks: rng.int(2, 3), forklifts: size > 0.5 ? 2 : 1, palletJacks: rng.int(1, 3) },
+    // 卸货门数随规模（1–6 个，有随机起伏）；卸货场的进场道路、待命车位、甩挂车位也随机（决策记录 0019）
+    backroom: { extraDepthM: Math.round(size * 16), rackRows: 0, rackLevels: rng.int(3, 4), docks: Math.max(1, Math.min(6, Math.round(1.5 + size * 4 + rng.uniform(-1, 1)))), forklifts: size > 0.5 ? 2 : 1, palletJacks: rng.int(1, 3) },
+    yard: {
+      side: rng.chance(0.7) ? 'RIGHT' : 'LEFT',
+      via: rng.chance(0.7) ? 'DRIVE' : 'STREET',
+      offsetM: Math.round(rng.uniform(16, 36)),
+      slots: rng.chance(0.5) ? 0 : rng.int(1, 4),
+      trailerStalls: rng.chance(0.4) ? 0 : rng.int(2, 8),
+    },
   };
 }
 
@@ -383,6 +408,15 @@ export function createTemplate(template: TemplateName): StoreConfig {
 
 /** 由生成参数构建一份完整的门店配置（楼层、通道、走廊、电梯、暂存、附属设施、规则） */
 export function generateStoreConfig(t: GeneratorParams, template: TemplateName | 'custom' = 'custom'): StoreConfig {
+  // 二楼通道 0 = 自动（决策记录 0019）：先排一次求出货梯的位置（只取决于一楼和后仓），二楼从左墙铺到货梯旁卸货区的外侧
+  if (t.secondFloor && t.secondFloor.gmAisles <= 0) {
+    const probe = generateStoreConfig({ ...t, secondFloor: { ...t.secondFloor, gmAisles: 2 } }, template);
+    const lift = backroomFrame(probe).lift;
+    const f1w = probe.layout.floors[0]?.widthM ?? 0;
+    const width = lift ? Math.min(f1w, liftReach(lift.x)) : f1w;
+    const gmAisles = Math.max(2, Math.floor((width - F2_SIDES_M) / PITCH_M) + 1);
+    return generateStoreConfig({ ...t, secondFloor: { ...t.secondFloor, gmAisles } }, template);
+  }
   const hw = t.industry === 'HARDWARE';
   const aisles: Array<{ temp: TempZone; categories: string[] }> = [];
   for (const cats of splitEvenly(hw ? HARDWARE_AISLE_ORDER : AMBIENT_AISLE_ORDER, t.ambientAisles)) aisles.push({ temp: 'AMBIENT', categories: cats });
@@ -418,7 +452,9 @@ export function generateStoreConfig(t: GeneratorParams, template: TemplateName |
   if (t.secondFloor) {
     const gmAisles = splitEvenly(f2GmOrder, t.secondFloor.gmAisles).map((cats) => ({ temp: 'AMBIENT' as TempZone, categories: cats }));
     const f2 = floorPlan({ floorId: 'F2', aisles: gmAisles, bays: t.secondFloor.bays, levels: t.secondFloor.levels, perimeter: false, startSequence: f1.nextSequence });
-    floors.push({ id: 'F2', name: '2F', level: 1, widthM: f2.width, depthM: f2.depth });
+    // 二楼和一楼一样深（决策记录 0019）：卖场后面是货梯口的卸货区和补货区，收银区在前走廊外侧；宽度在最后按货梯的位置定
+    const f1Floor = floors[0] as (typeof floors)[number];
+    floors.push({ id: 'F2', name: '2F', level: 1, widthM: f2.xEnd + 8, depthM: Math.max(f2.depth, f1Floor.depthM) });
     runs.push(...f2.runs);
     corridors.push(...f2.corridors);
     // 电梯井和扶梯在两层的同一位置；取两层都能走到的坐标（前后走廊、左侧通道）
@@ -448,7 +484,7 @@ export function generateStoreConfig(t: GeneratorParams, template: TemplateName |
   }
 
   const stagingPoint = { floorId: 'F1', x: f1.xStage, y: f1.yFront };
-  return {
+  const config: StoreConfig = {
     schemaVersion: 1,
     configVersion: 1,
     id: template === 'custom' ? `custom-${slug(t.name)}` : `template-${template}`,
@@ -509,11 +545,19 @@ export function generateStoreConfig(t: GeneratorParams, template: TemplateName |
         ? [{ id: 'PHARM-1', kind: 'PHARMACY' as const, name: 'Pharmacy', counters: t.pharmacy.counters, patientsPerDay: 0, hours: { openMin: (t.hours?.openMin ?? 420) + 60, closeMin: Math.min(21 * 60, t.hours?.closeMin ?? 1320) } }]
         : []),
     ],
-    outdoor: { parkingRows: t.parking?.rows ?? 0, pickupBays: t.parking?.pickupBays ?? 0 },
+    outdoor: { parkingRows: t.parking?.rows ?? 0, pickupBays: t.parking?.pickupBays ?? 0, ...(t.yard ? { yard: { ...t.yard } } : {}) },
     backroom: t.backroom ? { ...t.backroom } : { extraDepthM: 0, rackRows: 0, rackLevels: 3, docks: 3, forklifts: 1, palletJacks: 2 },
     // 建材店默认打开包裹中转（承运商自提点）；没有熟食现做
     modules: { gm: true, mto: false, parcelHub: hw, returns: true, exceptions: true, trips: true, sensors: false, staffingAi: false },
   };
+  // 二楼的宽度（决策记录 0019）：从左墙一直到货梯旁卸货区的外侧（盖住一楼收货区旁的货梯），不超过一楼；
+  // 二楼自己的通道更宽时按通道（一楼其余部分是单层，屋顶在一楼高度）
+  const f2 = floors.find((f) => f.id === 'F2');
+  if (f2) {
+    const lift = backroomFrame(config).lift;
+    if (lift) f2.widthM = Math.round(Math.max(f2.widthM, Math.min(floors[0]?.widthM ?? f2.widthM, liftReach(lift.x))) * 100) / 100;
+  }
+  return config;
 }
 
 function slug(s: string): string {

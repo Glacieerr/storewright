@@ -52,83 +52,190 @@ function StaticBoxes({ items }: { items: Box[] }) {
   );
 }
 
-/** 叉车：车身、配重、护顶架、门架、货叉；举升高度和托盘由每帧更新 */
-function Forklift({ id, register }: { id: string; register: (id: string, g: THREE.Group | null, forks: THREE.Group | null) => void }) {
-  const forks = useRef<THREE.Group>(null);
+interface EquipRefs {
+  g: THREE.Group | null;
+  forks: THREE.Group | null;
+  /** 门架（含货叉）：行驶时载货后倾 */
+  mast: THREE.Group | null;
+  beacon: THREE.MeshBasicMaterial | null;
+  /** 地面上的蓝色警示光斑（行驶方向前方） */
+  spot: THREE.Mesh | null;
+}
+type Register = (id: string, part: Partial<EquipRefs>) => void;
+
+const tg = () => toonGradient();
+
+/**
+ * 平衡重式叉车（室内常见的液化气款，按公开的常见外形）：圆角车身与后部配重、四柱护顶架、座椅与司机、方向盘、
+ * 后部卧放的液化气瓶、门架（两根立柱、横梁、倾斜油缸）、货叉架与 L 形货叉、前大后小的实心轮胎；
+ * 护顶架上的琥珀色警示灯、行驶时投在前方地面的蓝色光斑。举升高度、门架后倾和灯光由每帧更新。
+ */
+function Forklift({ id, register }: { id: string; register: Register }) {
   return (
-    <group ref={(g) => register(id, g, forks.current)}>
-      <mesh position={[0, 0.65, -0.1]} castShadow>
-        <boxGeometry args={[1.15, 0.9, 1.7]} />
-        <meshToonMaterial color="#e8a33d" gradientMap={toonGradient()} />
+    <group ref={(g) => register(id, { g })}>
+      {/* 车身与配重 */}
+      <mesh position={[0, 0.62, -0.05]} castShadow>
+        <boxGeometry args={[1.12, 0.62, 1.55]} />
+        <meshToonMaterial color="#e8a33d" gradientMap={tg()} />
       </mesh>
-      <mesh position={[0, 0.75, -0.95]} castShadow>
-        <boxGeometry args={[1.15, 0.8, 0.35]} />
-        <meshToonMaterial color="#3d4247" gradientMap={toonGradient()} />
+      <mesh position={[0, 0.98, 0.25]} castShadow>
+        <boxGeometry args={[1.05, 0.12, 0.7]} />
+        <meshToonMaterial color="#e8a33d" gradientMap={tg()} />
       </mesh>
+      <mesh position={[0, 0.72, -0.92]} castShadow>
+        <cylinderGeometry args={[0.42, 0.42, 1.12, 18, 1, false, 0, Math.PI]} />
+        <meshToonMaterial color="#3d4247" gradientMap={tg()} />
+      </mesh>
+      <mesh position={[0, 0.72, -0.86]} rotation={[0, 0, Math.PI / 2]} castShadow>
+        <boxGeometry args={[0.84, 1.12, 0.14]} />
+        <meshToonMaterial color="#3d4247" gradientMap={tg()} />
+      </mesh>
+      {/* 液化气瓶（卧放在配重上） */}
+      <mesh position={[0, 1.34, -0.95]} rotation={[0, 0, Math.PI / 2]} castShadow>
+        <cylinderGeometry args={[0.17, 0.17, 0.82, 14]} />
+        <meshToonMaterial color="#e9ecef" gradientMap={tg()} />
+      </mesh>
+      {/* 护顶架：四根立柱 + 顶棚格栅 */}
       {[-0.5, 0.5].flatMap((x) =>
-        [-0.75, 0.35].map((z) => (
-          <mesh key={`${x}${z}`} position={[x, 1.55, z]}>
-            <boxGeometry args={[0.06, 1.1, 0.06]} />
-            <meshToonMaterial color="#2b2e31" gradientMap={toonGradient()} />
+        [-0.62, 0.42].map((z) => (
+          <mesh key={`${x}${z}`} position={[x, 1.55, z]} rotation={[z > 0 ? -0.08 : 0, 0, 0]}>
+            <boxGeometry args={[0.07, 1.15, 0.07]} />
+            <meshToonMaterial color="#2b2e31" gradientMap={tg()} />
           </mesh>
         )),
       )}
-      <mesh position={[0, 2.12, -0.2]}>
-        <boxGeometry args={[1.1, 0.06, 1.2]} />
-        <meshToonMaterial color="#2b2e31" gradientMap={toonGradient()} />
+      <mesh position={[0, 2.13, -0.12]}>
+        <boxGeometry args={[1.1, 0.05, 1.18]} />
+        <meshToonMaterial color="#2b2e31" gradientMap={tg()} />
       </mesh>
-      <mesh position={[0, 1.35, -0.3]}>
-        <capsuleGeometry args={[0.22, 0.4, 4, 8]} />
-        <meshToonMaterial color="#2f5d8a" gradientMap={toonGradient()} />
-      </mesh>
-      {[-0.35, 0.35].map((x) => (
-        <mesh key={x} position={[x, 1.25, 0.8]}>
-          <boxGeometry args={[0.08, 2.5, 0.08]} />
-          <meshToonMaterial color="#5c636a" gradientMap={toonGradient()} />
+      {[-0.3, 0, 0.3].map((x) => (
+        <mesh key={x} position={[x, 2.16, -0.12]}>
+          <boxGeometry args={[0.05, 0.03, 1.15]} />
+          <meshToonMaterial color="#2b2e31" gradientMap={tg()} />
         </mesh>
       ))}
-      <group ref={forks} position={[0, 0.15, 0.9]}>
-        <mesh position={[0, 0.35, 0]}>
-          <boxGeometry args={[0.9, 0.7, 0.06]} />
-          <meshToonMaterial color="#3d4247" gradientMap={toonGradient()} />
-        </mesh>
-        {[-0.25, 0.25].map((x) => (
-          <mesh key={x} position={[x, 0.03, 0.55]}>
-            <boxGeometry args={[0.12, 0.05, 1.1]} />
-            <meshToonMaterial color="#3d4247" gradientMap={toonGradient()} />
+      {/* 警示灯 */}
+      <mesh position={[0.38, 2.24, -0.6]}>
+        <cylinderGeometry args={[0.07, 0.08, 0.13, 10]} />
+        <meshBasicMaterial ref={(m) => register(id, { beacon: m })} color="#ffb11a" toneMapped={false} />
+      </mesh>
+      {/* 座椅、司机、方向盘 */}
+      <mesh position={[0, 1.08, -0.35]}>
+        <boxGeometry args={[0.5, 0.12, 0.45]} />
+        <meshToonMaterial color="#25282b" gradientMap={tg()} />
+      </mesh>
+      <mesh position={[0, 1.36, -0.53]} rotation={[-0.15, 0, 0]}>
+        <boxGeometry args={[0.48, 0.5, 0.1]} />
+        <meshToonMaterial color="#25282b" gradientMap={tg()} />
+      </mesh>
+      <mesh position={[0, 1.42, -0.3]}>
+        <capsuleGeometry args={[0.21, 0.36, 4, 10]} />
+        <meshToonMaterial color="#2f5d8a" gradientMap={tg()} />
+      </mesh>
+      <mesh position={[0, 1.83, -0.28]}>
+        <sphereGeometry args={[0.13, 12, 10]} />
+        <meshToonMaterial color="#e0b48a" gradientMap={tg()} />
+      </mesh>
+      <mesh position={[0, 1.25, 0.12]} rotation={[-0.9, 0, 0]}>
+        <torusGeometry args={[0.15, 0.02, 6, 16]} />
+        <meshToonMaterial color="#25282b" gradientMap={tg()} />
+      </mesh>
+      {/* 门架：以前轮轴为支点后倾；立柱、横梁、倾斜油缸，货叉架在里面上下 */}
+      <group ref={(g) => register(id, { mast: g })} position={[0, 0.28, 0.82]}>
+        {[-0.36, 0.36].map((x) => (
+          <mesh key={x} position={[x, 1.08, 0]} castShadow>
+            <boxGeometry args={[0.09, 2.3, 0.12]} />
+            <meshToonMaterial color="#5c636a" gradientMap={tg()} />
           </mesh>
         ))}
+        <mesh position={[0, 2.18, 0]}>
+          <boxGeometry args={[0.82, 0.08, 0.1]} />
+          <meshToonMaterial color="#5c636a" gradientMap={tg()} />
+        </mesh>
+        <mesh position={[0, 0.5, 0]}>
+          <boxGeometry args={[0.82, 0.08, 0.1]} />
+          <meshToonMaterial color="#5c636a" gradientMap={tg()} />
+        </mesh>
+        {[-0.45, 0.45].map((x) => (
+          <mesh key={`c${x}`} position={[x, 0.75, -0.3]} rotation={[0.75, 0, 0]}>
+            <cylinderGeometry args={[0.035, 0.035, 0.75, 8]} />
+            <meshToonMaterial color="#c7ccd1" gradientMap={tg()} />
+          </mesh>
+        ))}
+        <group ref={(g) => register(id, { forks: g })} position={[0, -0.13, 0.08]}>
+          <mesh position={[0, 0.38, 0]}>
+            <boxGeometry args={[0.92, 0.6, 0.06]} />
+            <meshToonMaterial color="#3d4247" gradientMap={tg()} />
+          </mesh>
+          {[-0.25, 0.25].map((x) => (
+            <group key={x}>
+              <mesh position={[x, 0.32, 0.04]}>
+                <boxGeometry args={[0.12, 0.62, 0.05]} />
+                <meshToonMaterial color="#3d4247" gradientMap={tg()} />
+              </mesh>
+              <mesh position={[x, 0.03, 0.58]}>
+                <boxGeometry args={[0.12, 0.05, 1.1]} />
+                <meshToonMaterial color="#3d4247" gradientMap={tg()} />
+              </mesh>
+            </group>
+          ))}
+        </group>
       </group>
-      {[-0.55, 0.55].flatMap((x) =>
-        [-0.7, 0.55].map((z) => (
-          <mesh key={`w${x}${z}`} position={[x, 0.22, z]} rotation={[0, 0, Math.PI / 2]}>
-            <cylinderGeometry args={[0.22, 0.22, 0.2, 10]} />
-            <meshToonMaterial color="#25282b" gradientMap={toonGradient()} />
+      {/* 实心轮胎：前轮大（驱动）、后轮小（转向） */}
+      {[-0.5, 0.5].flatMap((x) =>
+        (
+          [
+            [0.62, 0.3],
+            [-0.68, 0.23],
+          ] as const
+        ).map(([z, r]) => (
+          <mesh key={`w${x}${z}`} position={[x, r, z]} rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[r, r, 0.24, 14]} />
+            <meshToonMaterial color="#25282b" gradientMap={tg()} />
           </mesh>
         )),
       )}
+      {/* 蓝色警示光斑：行驶方向前方 3 米的地面上 */}
+      <mesh ref={(m) => register(id, { spot: m })} position={[0, 0.03, 3.2]} rotation={[-Math.PI / 2, 0, 0]} visible={false}>
+        <circleGeometry args={[0.32, 18]} />
+        <meshBasicMaterial color="#3d8bff" transparent opacity={0.85} toneMapped={false} depthWrite={false} />
+      </mesh>
     </group>
   );
 }
 
-/** 手动液压搬运车 */
-function Jack({ id, register }: { id: string; register: (id: string, g: THREE.Group | null, forks: THREE.Group | null) => void }) {
+/** 手动液压搬运车：两根货叉、承载轮、液压泵和手柄 */
+function Jack({ id, register }: { id: string; register: Register }) {
   return (
-    <group ref={(g) => register(id, g, null)}>
+    <group ref={(g) => register(id, { g })}>
       {[-0.28, 0.28].map((x) => (
         <mesh key={x} position={[x, 0.07, 0.35]}>
           <boxGeometry args={[0.16, 0.08, 1.15]} />
-          <meshToonMaterial color="#c8433a" gradientMap={toonGradient()} />
+          <meshToonMaterial color="#c8433a" gradientMap={tg()} />
         </mesh>
       ))}
       <mesh position={[0, 0.25, -0.3]}>
         <boxGeometry args={[0.6, 0.3, 0.25]} />
-        <meshToonMaterial color="#c8433a" gradientMap={toonGradient()} />
+        <meshToonMaterial color="#c8433a" gradientMap={tg()} />
       </mesh>
-      <mesh position={[0, 0.75, -0.55]} rotation={[0.5, 0, 0]}>
+      <mesh position={[0, 0.42, -0.3]}>
+        <cylinderGeometry args={[0.07, 0.07, 0.25, 10]} />
+        <meshToonMaterial color="#c7ccd1" gradientMap={tg()} />
+      </mesh>
+      <mesh position={[0, 0.85, -0.55]} rotation={[0.5, 0, 0]}>
         <boxGeometry args={[0.05, 1.0, 0.05]} />
-        <meshToonMaterial color="#2b2e31" gradientMap={toonGradient()} />
+        <meshToonMaterial color="#2b2e31" gradientMap={tg()} />
       </mesh>
+      <mesh position={[0, 1.27, -0.79]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.03, 0.03, 0.32, 8]} />
+        <meshToonMaterial color="#2b2e31" gradientMap={tg()} />
+      </mesh>
+      {[-0.12, 0.12].map((x) => (
+        <mesh key={`w${x}`} position={[x, 0.09, -0.32]} rotation={[0, 0, Math.PI / 2]}>
+          <cylinderGeometry args={[0.09, 0.09, 0.07, 10]} />
+          <meshToonMaterial color="#25282b" gradientMap={tg()} />
+        </mesh>
+      ))}
     </group>
   );
 }
@@ -207,49 +314,80 @@ export function Warehouse() {
     return { carries: m, lifts };
   }, [equipment]);
 
-  const groups = useRef(new Map<string, { g: THREE.Group | null; forks: THREE.Group | null }>());
-  const register = (id: string, g: THREE.Group | null, forks: THREE.Group | null) => {
-    const cur = groups.current.get(id) ?? { g: null, forks: null };
-    if (g) cur.g = g;
-    if (forks) cur.forks = forks;
+  const groups = useRef(new Map<string, EquipRefs>());
+  const register: Register = (id, part) => {
+    const cur = groups.current.get(id) ?? { g: null, forks: null, mast: null, beacon: null, spot: null };
+    for (const [k, v] of Object.entries(part)) if (v) (cur as unknown as Record<string, unknown>)[k] = v;
     groups.current.set(id, cur);
   };
+  /** 主通道靠右行驶的横向偏移（每台设备平滑过渡） */
+  const lateral = useRef(new Map<string, number>());
   const base = useRef<THREE.InstancedMesh>(null);
   const stack = useRef<THREE.InstancedMesh>(null);
   const pose = useMemo(() => makePolyPose(), []);
-  const eqPose = useRef(new Map<string, { x: number; z: number; heading: number; forkY: number }>());
+  const eqPose = useRef(new Map<string, { x: number; z: number; y: number; heading: number; forkY: number }>());
   const glowB = useNightGlow<THREE.MeshToonMaterial>(0.12);
   const glowS = useNightGlow<THREE.MeshToonMaterial>(0.12);
 
-  useFrame(() => {
+  useFrame((_, delta) => {
     const t = clock.time;
-    // 叉车与搬运车
+    const blink = Math.floor(performance.now() / 420) % 2 === 0;
+    // 叉车与搬运车：起步加速、刹车减速（不是匀速平移），拐角处车头逐渐转过去
     for (const e of equipment) {
       const ref = groups.current.get(e.id);
       if (!ref?.g) continue;
-      const ok = polyPose(e.segments, t, pose);
+      const ok = polyPose(e.segments, t, pose, { ease: e.kind === 'forklift' ? 1.4 : 0.8, corner: e.kind === 'forklift' ? 1.1 : 0.6 });
       const last = eqPose.current.get(e.id);
       let x = last?.x ?? b.receiving.x0 + 1;
       let z = last?.z ?? b.receiving.z0 + 1;
       let heading = last?.heading ?? Math.PI;
+      // 所在楼层的高度（搬运车乘货梯上二楼时随轿厢升上去，决策记录 0019）
+      let fy = last?.y ?? 0;
       let forkY = 0.15;
       let back = 0;
+      let moving = false;
+      let reversing = false;
+      let loaded = false;
       if (ok) {
         x = pose.x;
         z = pose.z;
+        fy = pose.y;
         heading = pose.heading;
+        moving = pose.moving;
+        loaded = !!pose.carry && pose.carry !== 'cases';
+        const seg = pose.gapAfter ? undefined : pose.seg;
+        if (seg?.reverseLegs && moving) {
+          const p1 = seg.pts[1];
+          const p0 = seg.pts[0];
+          reversing = !!p0 && !!p1 && Math.cos(Math.atan2(p1.x - p0.x, p1.z - p0.z) - heading) < 0;
+        }
         // 在货位前举升：放货时货叉升到目标层、放下托盘后降回；取货时空叉升上去、托着托盘降到地面
         const lf = pose.gapAfter ? pose.gapAfter.lift : pose.seg?.lift;
         if (lf && !pose.gapAfter) forkY = 0.15 + lf.y * liftCurve(lf.mode, pose.k);
         // 取下高层托盘：一边降叉一边倒车，把托盘放在货位前的地面上
         if (lf?.mode === 'down') back = LETDOWN_DIST * (pose.gapAfter ? 1 : Math.max(0, (pose.k - DOWN_PICK) / (1 - DOWN_PICK)));
       }
+      // 主通道上靠右行驶（双向通行）：沿主通道纵向行驶时向自己的右侧让 0.55 米，进出主通道时逐渐过渡
+      const alongMain = moving && Math.abs(x - b.mainAisleX) < 0.4 && Math.abs(Math.cos(heading)) > 0.9;
+      const curLat = lateral.current.get(e.id) ?? 0;
+      const nextLat = curLat + ((alongMain ? (reversing ? -0.55 : 0.55) : 0) - curLat) * Math.min(1, delta * 3);
+      lateral.current.set(e.id, nextLat);
+      x += -Math.cos(heading) * nextLat;
+      z += Math.sin(heading) * nextLat;
       // 车身停在货位前（不压在货架上）：搬运时车头朝向前进方向
       const off = (e.kind === 'forklift' ? 1.5 : 0.8) + back;
-      ref.g.position.set(x - Math.sin(heading) * off, 0, z - Math.cos(heading) * off);
+      ref.g.position.set(x - Math.sin(heading) * off, fy, z - Math.cos(heading) * off);
       ref.g.rotation.set(0, heading, 0);
-      if (ref.forks) ref.forks.position.y = forkY;
-      eqPose.current.set(e.id, { x, z, heading, forkY });
+      if (ref.forks) ref.forks.position.y = forkY - 0.15 - 0.13;
+      // 门架：载货行驶时后倾 4°，举升放货时竖直
+      if (ref.mast) ref.mast.rotation.x = THREE.MathUtils.lerp(ref.mast.rotation.x, loaded && moving && forkY < 0.4 ? -0.07 : 0, Math.min(1, delta * 4));
+      // 行驶时警示灯闪烁、蓝色光斑投在行驶方向前方（倒车时在后方）
+      if (ref.beacon) ref.beacon.color.set(moving && blink ? '#ffcc44' : '#7a5a1a');
+      if (ref.spot) {
+        ref.spot.visible = moving;
+        ref.spot.position.z = reversing ? -3.2 : 3.6;
+      }
+      eqPose.current.set(e.id, { x, z, y: fy, heading, forkY });
     }
     // 托盘
     const bm = base.current;
@@ -283,10 +421,20 @@ export function Warehouse() {
         if (ep) {
           px = ep.x;
           pz = ep.z;
-          py = ep.forkY + 0.05;
+          py = ep.y + ep.forkY + 0.05;
           rot = ep.heading;
         }
       } else if (p.emptiedAt !== undefined && t >= p.emptiedAt) continue;
+      else if (p.upSpot && p.upAt !== undefined && t >= p.upAt) {
+        // 二楼补货区（货梯送上去的托盘）
+        px = p.upSpot.x;
+        pz = p.upSpot.z;
+        py = p.upSpot.y;
+      } else if (p.overflowSpot && p.overflowAt !== undefined && t >= p.overflowAt) {
+        // 暂存区的溢流位（经连通通道送过去的托盘）
+        px = p.overflowSpot.x;
+        pz = p.overflowSpot.z;
+      }
       else if (p.location && p.storedAt !== undefined && t >= p.storedAt) {
         const l = locById.get(p.location);
         if (!l) continue;

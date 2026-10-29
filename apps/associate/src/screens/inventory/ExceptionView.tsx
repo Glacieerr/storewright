@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { planogramByItem, resolveScan, sellableCases, type LiveException, type StoreStatic } from '@storewright/ops';
+import { planogramByItem, resolveScan, usableCases, type LiveException, type StoreStatic } from '@storewright/ops';
 import { feedback } from '../../feedback';
 import { clock, t } from '../../i18n';
 import { useLive } from '../../live';
@@ -69,11 +69,14 @@ function ExceptionTask({ x }: { x: LiveException }) {
   const s = client.state;
   const st = client.statics as StoreStatic;
   const [picked, setPicked] = useState<string | undefined>();
+  // 箱里剩下的顺手上架（决策记录 0026）：默认打开，不用别人再跑一趟
+  const [alsoRestock, setAlsoRestock] = useState(true);
+  const strict = !!s.settings?.requireScan;
   const o = s.orders[x.orderId];
   const line = o?.lines.find((l) => l.lineId === x.lineId);
   const p = planogramByItem(st).get(x.itemId);
   const tote = o?.toteIds.map((id) => s.totes[id]).find((tt) => tt?.lines.some((l) => l.lineId === x.lineId));
-  const cases = sellableCases(s, x.itemId);
+  const cases = usableCases(s, x.itemId);
 
   const onScan = (raw: string) => {
     const r = resolveScan(s, st, raw);
@@ -113,7 +116,7 @@ function ExceptionTask({ x }: { x: LiveException }) {
           <ul className="tote-list">
             {cases.map((c) => (
               <li key={c.id}>
-                <button className={`row-btn${picked === c.id ? ' selected' : ''}`} onClick={() => setPicked(c.id)}>
+                <button className={`row-btn${picked === c.id ? ' selected' : ''}`} disabled={strict} onClick={() => setPicked(c.id)}>
                   <span className="mono strong">{c.binCode}</span>
                   <span className="mono">{c.id}</span>
                   <span>{t('{0} 件', c.units)}</span>
@@ -125,22 +128,43 @@ function ExceptionTask({ x }: { x: LiveException }) {
           {picked && (
             <div className="card">
               <p>{t('取出 {0} 件后，这个库位里这个商品：', x.qty)}</p>
+              {(s.cases[picked]?.units ?? 0) > x.qty && (
+                <label className="toggle">
+                  <input type="checkbox" checked={alsoRestock} onChange={(e) => setAlsoRestock(e.target.checked)} />
+                  <span>{t('箱里剩下的 {0} 件我顺手上架（补货任务交给我）', (s.cases[picked]?.units ?? 0) - x.qty)}</span>
+                </label>
+              )}
               <div className="actions">
-                <button className="primary" onClick={() => void run({ type: 'ExceptionFound', exceptionId: x.id, caseId: picked, binEmpty: false })}>
+                <button className="primary" onClick={() => void run({ type: 'ExceptionFound', exceptionId: x.id, caseId: picked, binEmpty: false, alsoRestock })}>
                   {t('还有')}
                 </button>
-                <button onClick={() => void run({ type: 'ExceptionFound', exceptionId: x.id, caseId: picked, binEmpty: true })}>{t('已空')}</button>
+                <button onClick={() => void run({ type: 'ExceptionFound', exceptionId: x.id, caseId: picked, binEmpty: true, alsoRestock })}>{t('已空')}</button>
               </div>
             </div>
           )}
-          <button className="block warn" onClick={() => void run({ type: 'ExceptionMissing', exceptionId: x.id })}>
-            {t('后仓也找不到')}
+          {/* 只盘找过的这个库位（决策记录 0026）：别的库位的箱子照样能用 */}
+          <button className="block warn" onClick={() => void run({ type: 'ExceptionMissing', exceptionId: x.id, ...((picked ? s.cases[picked]?.binCode : cases[0]?.binCode) ? { binCode: (picked ? s.cases[picked]?.binCode : cases[0]?.binCode) as string } : {}) })}>
+            {cases[0]?.binCode ? t('{0} 也找不到', picked ? (s.cases[picked]?.binCode ?? '') : cases[0].binCode) : t('后仓也找不到')}
+          </button>
+          {/* 放回队列（决策记录 0026） */}
+          <button className="link" onClick={() => void run({ type: 'ReleaseException', exceptionId: x.id })}>
+            {t('放回队列')}
           </button>
         </section>
       )}
-      {x.status === 'FOUND' && (
+      {x.status === 'FOUND' && o && (o.status === 'COMPLETED' || o.status === 'CANCELLED') && (
+        // 订单已交付或已取消（流程梳理发现，决策记录 0025）：送不到暂存了，放回货架
+        <section className="phase">
+          <p className="banner warn">{t(o.status === 'COMPLETED' ? '订单已经交付，顾客已取走：把取出的 {0} 件放回货架 {1}。' : '订单已取消：把取出的 {0} 件放回货架 {1}。', x.units ?? x.qty, p?.locationId ?? '')}</p>
+          <button className="primary block" onClick={() => void run({ type: 'ReturnExceptionItems', exceptionId: x.id })}>
+            {t('已放回货架')}
+          </button>
+        </section>
+      )}
+      {x.status === 'FOUND' && !(o && (o.status === 'COMPLETED' || o.status === 'CANCELLED')) && (
         <section className="phase">
           <p className="banner info">{t('已找到。补货任务已自动生成，箱里剩下的件数会补到货架上。')}</p>
+          {x.units !== undefined && x.units < x.qty && <p className="note">{t('箱子里只有 {0} 件：送这些，其余按缺货。', x.units)}</p>}
           {tote?.status === 'STAGED' ? (
             <>
               <h3 className="section-title">{t('送到暂存格位 {0}，放进框 {1}/{2}', tote.slotCode ?? '', tote.index, tote.count)}</h3>

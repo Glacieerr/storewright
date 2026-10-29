@@ -1,11 +1,13 @@
 import { useMemo } from 'react';
-import { congestionAt, DEFAULT_TRAFFIC, ROLES, type Role } from '@storewright/sim-engine';
+import { congestionAt, DEFAULT_TRAFFIC, ROLES, WEEKDAY_LABEL, type Role } from '@storewright/sim-engine';
 import { useApp } from '../state/store';
 import { useClock } from '../state/clock';
 import { ROLE_COLOR, ROLE_LABEL, ZONE_LABEL } from '../scene/palette';
 import { LineChart, type ChartSeries } from './Chart';
 import { at, CHART_ZONE_COLOR, clockText, num, pct } from './format';
 import { IncidentPanel } from './IncidentPanel';
+import { DeliveryList } from './DeliveryList';
+import { StudentCrew } from './StudentCrew';
 import { SEASON_LABEL, WEATHER_LABEL, type Season, type Weather } from '../scene/site';
 import { WEATHER_KIND_LABEL, weatherAt, weatherPlan, type WeatherKind } from '../sim/weatherPlan';
 
@@ -20,6 +22,7 @@ export function LiveData() {
   const demandFactor = useApp((s) => s.demandFactor);
   const longWait = useApp((s) => s.config.rules.handoff.longWaitMin);
   const traffic = useApp((s) => s.site.traffic);
+  const weekday = useApp((s) => s.weekday);
   const weather = useApp((s) => s.site.weather ?? 'clear');
   const season = useApp((s) => s.site.season ?? 'autumn');
   const nightCrew = useApp((s) => s.nightCrew);
@@ -27,6 +30,8 @@ export function LiveData() {
   const crewSize = useApp((s) => s.nightCrewSize());
   const hours = useApp((s) => s.config.hours);
   const app = useApp.getState;
+  // 这一刻在岗的学生兼职工（决策记录 0020）
+  const studentsOn = (r: Role) => (timeline?.students ?? []).filter((x) => x.role === r && x.start <= tm && tm < x.end).length;
 
   const charts = useMemo(() => {
     if (!timeline) return undefined;
@@ -208,6 +213,7 @@ export function LiveData() {
                       −
                     </button>
                     <span className="mono">{staffing[r][hour] ?? 0}</span>
+                    {studentsOn(r) > 0 && <span className="muted student-on" title={t('这一小时在岗的学生兼职工（在全职排班之外）')}>{t('+{0} 学生', studentsOn(r))}</span>}
                     <button aria-label={t('增加{0}', ROLE_LABEL[r])} onClick={() => app().adjustStaff(r, 1)}>
                       ＋
                     </button>
@@ -249,6 +255,15 @@ export function LiveData() {
               </button>
             ))}
           </div>
+          <div className="chips gap-top" role="group" aria-label={t('星期')}>
+            <span className="chips-label">{t('星期')}</span>
+            {WEEKDAY_LABEL.map((label, w) => (
+              <button key={w} className={weekday === w ? 'chip active' : 'chip'} onClick={() => app().setWeekday(w)} title={t('到货车辆按星期排班：供应商直送多在工作日上午，周六晚没有配送中心的车，周日最少')}>
+                {t(label)}
+              </button>
+            ))}
+          </div>
+          <DeliveryList />
           <div className="chips gap-top" role="group" aria-label={t('道路拥堵')}>
             <span className="chips-label">{t('道路拥堵')}</span>
             {([0, 1, 2] as const).map((lv) => (
@@ -287,6 +302,7 @@ export function LiveData() {
               </span>
             )}
           </div>
+          <StudentCrew />
           <p className="hint">{t('雨雪雾天路上更慢；雨雪天车边装车变慢、线上订单增加（雨 +8%，雪 +15%），到店购物的人减少。季节只改变日照时间和植物颜色。')}</p>
           <p className="hint">
             {t('夜班 {0}–次日 {1} 只做补货，人数少；需补箱数按当天线上件数和线上占比假设估算。', clockText(hours.closeMin * 60), clockText(hours.openMin * 60))}

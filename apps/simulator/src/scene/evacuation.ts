@@ -1,5 +1,5 @@
 import type { Timeline } from '../sim/protocol';
-import { roundCorners, TimedPath, type LotLayout, type Pt, type RoadAccess } from './lot';
+import { inLaneX, outLaneX, roundCorners, TimedPath, type LotLayout, type Pt, type RoadAccess } from './lot';
 
 /**
  * 火警疏散的画面：警报响起时，店内的人从当前位置走到停车场靠路一侧的集合点，
@@ -96,9 +96,9 @@ export function emergencyPaths(lot: LotLayout, road: RoadAccess, stopX: number, 
     roundCorners(
       [
         { x: startX, z: lane },
-        { x: px, z: lane },
-        { x: px, z: lot.edgeZ },
-        { x: px, z: fire },
+        { x: inLaneX(px), z: lane },
+        { x: inLaneX(px), z: lot.edgeZ },
+        { x: inLaneX(px), z: fire },
         { x: stopX, z: fire },
       ],
       4,
@@ -113,9 +113,9 @@ export function emergencyPaths(lot: LotLayout, road: RoadAccess, stopX: number, 
     roundCorners(
       [
         { x: stopX, z: fire },
-        { x: other, z: fire },
-        { x: other, z: lot.edgeZ },
-        { x: other, z: outLane },
+        { x: outLaneX(other), z: fire },
+        { x: outLaneX(other), z: lot.edgeZ },
+        { x: outLaneX(other), z: outLane },
         { x: endX, z: outLane },
       ],
       4,

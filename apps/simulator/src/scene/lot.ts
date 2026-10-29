@@ -46,6 +46,19 @@ export interface LotLayout {
 export const SPOT_W = 2.8;
 export const SPOT_D = 5.4;
 export const AISLE_W = 7;
+
+/**
+ * 进出分道（决策记录 0019）：出入口和两侧环形车道是一进一出两条车道（靠右行驶）：
+ * 驶入的车走 x 小的一侧（向 +Z 行驶时右侧是 −X），驶出的车走 x 大的一侧；出入口中间有一道隔离岛。
+ */
+export const LANE_OFF = 1.75;
+export const inLaneX = (px: number) => px - LANE_OFF;
+export const outLaneX = (px: number) => px + LANE_OFF;
+/** 车位之间的车道也靠右：沿 +X 行驶时偏 +Z，沿 −X 时偏 −Z */
+export const AISLE_OFF = 1.5;
+export const aisleLaneZ = (aisleZ: number, dirX: number) => aisleZ + (dirX >= 0 ? AISLE_OFF : -AISLE_OFF);
+/** 出入口隔离岛的宽度（米） */
+export const MEDIAN_W = 0.9;
 const SIDEWALK = 3;
 const FIRE_LANE = 6;
 const PERIM_W = 7;
@@ -202,7 +215,10 @@ export interface Dynamics {
   wheelbase?: number;
 }
 
-/** 按时间取到的车辆状态；speed / accel / steer / dist 供车轮转动、刹车灯和转向灯使用 */
+/**
+ * 按时间取到的车辆状态；speed / accel / steer / dist 供车轮转动、刹车灯和转向灯使用，
+ * accel（最近 0.4 秒的平均加速度）和 lat（侧向加速度，向左为正）供车身的俯仰和侧倾使用
+ */
 export interface PathState {
   x: number;
   z: number;
@@ -211,9 +227,14 @@ export interface PathState {
   accel?: number;
   steer?: number;
   dist?: number;
+  lat?: number;
 }
 
+/** 车身姿态的平滑窗口（秒）：悬架的响应不是瞬时的 */
+const POSTURE_WINDOW = 0.4;
+
 const CAR_DYN: Required<Omit<Dynamics, 'v0' | 'v1'>> = { accel: 2.2, decel: 3, lat: 2, wheelbase: 2.7 };
+const probe: PathState = { x: 0, z: 0, heading: 0 };
 const PIECE = 3;
 
 function angDiff(a: number, b: number): number {
@@ -308,8 +329,23 @@ export class TimedPath {
     this.duration = this.cumT[this.cumT.length - 1] ?? 0;
   }
 
-  /** 时刻 τ（0…duration）的位置、车头朝向，以及速度、加速度、前轮转角和已行驶距离 */
+  /** 时刻 τ（0…duration）的位置、车头朝向，以及速度、加速度、前轮转角、已行驶距离和侧向加速度 */
   at(tau: number, out: PathState): void {
+    this.sample(tau, out);
+    // 俯仰和侧倾按最近一小段时间的平均值：加速度 = 速度差 / 时间，侧向加速度 = 车速 × 横摆角速度
+    const t = Math.min(this.duration, Math.max(0, tau));
+    const w = Math.min(POSTURE_WINDOW, t);
+    if (w < 0.05) {
+      out.lat = 0;
+      return;
+    }
+    this.sample(t - w, probe);
+    out.accel = ((out.speed ?? 0) - (probe.speed ?? 0)) / w;
+    const yaw = angDiff(probe.heading, out.heading) / w;
+    out.lat = (this.reverse ? -1 : 1) * (out.speed ?? 0) * yaw;
+  }
+
+  private sample(tau: number, out: PathState): void {
     const n = this.pts.length;
     if (n < 2) {
       const p = this.pts[0];
@@ -362,6 +398,52 @@ export class TimedPath {
   }
 }
 
+/** 按时间取状态的路径（TimedPath、带停车等待的 PathChain） */
+export interface PathLike {
+  readonly duration: number;
+  at(tau: number, out: PathState): void;
+}
+
+/**
+ * 几段路径首尾相接，中间可以停车等待（数字 = 在上一段终点停多少秒）：
+ * 例如驶出停车场时在路边停下、看清来车再拐上主路（决策记录 0018）。
+ */
+export class PathChain implements PathLike {
+  readonly duration: number;
+  private readonly starts: number[] = [];
+
+  constructor(private readonly parts: Array<PathLike | number>) {
+    let t = 0;
+    for (const p of parts) {
+      this.starts.push(t);
+      t += typeof p === 'number' ? p : p.duration;
+    }
+    this.duration = t;
+  }
+
+  at(tau: number, out: PathState): void {
+    const t = Math.min(this.duration, Math.max(0, tau));
+    for (let i = this.parts.length - 1; i >= 0; i--) {
+      if (t < (this.starts[i] as number) && i > 0) continue;
+      const p = this.parts[i] as PathLike | number;
+      if (typeof p === 'number') {
+        // 停车等待：停在上一段的终点
+        const prev = this.parts[i - 1];
+        if (prev && typeof prev !== 'number') prev.at(prev.duration, out);
+        out.speed = 0;
+        out.accel = 0;
+        out.lat = 0;
+        return;
+      }
+      p.at(t - (this.starts[i] as number), out);
+      return;
+    }
+  }
+}
+
+/** 驶出停车场：在人行道前停下（车头离路边 2.6 米），等一会儿再拐上主路 */
+export const YIELD_SEC = 2.5;
+
 export interface RoadAccess {
   /** 路上靠门店一侧（+X 方向行驶）车道的 Z */
   nearLaneZ: number;
@@ -388,13 +470,16 @@ export function entryPath(lot: LotLayout, road: RoadAccess, spot: ParkingSpot, f
   const startX = fromLeft ? road.spawnMinX : road.spawnMaxX;
   const into = spot.heading === 0 ? 1 : -1; // 车头朝 +Z 时从下方车道向 +Z 驶入
   const dir = Math.sign(spot.x - px) || 1;
+  // 走进场的那条车道（出入口和环形车道靠右、车位间的车道靠右），到车位前再拐进去
+  const xi = inLaneX(px);
+  const az = aisleLaneZ(aisleZ, dir);
   const pts = roundCorners(
     [
       { x: startX, z: laneZ },
-      { x: px, z: laneZ },
-      { x: px, z: lot.edgeZ },
-      { x: px, z: aisleZ },
-      { x: spot.x - dir * 2.2, z: aisleZ },
+      { x: xi, z: laneZ },
+      { x: xi, z: lot.edgeZ },
+      { x: xi, z: az },
+      { x: spot.x - dir * 2.2, z: az },
       { x: spot.x, z: aisleZ + into * 2.2 },
       { x: spot.x, z: spot.z },
     ],
@@ -404,41 +489,44 @@ export function entryPath(lot: LotLayout, road: RoadAccess, spot: ParkingSpot, f
 }
 
 /** 离开：先倒车退出车位，再沿车道开到较远一侧的出入口并驶离 */
-export function exitPaths(lot: LotLayout, road: RoadAccess, spot: ParkingSpot, toLeft: boolean): [TimedPath, TimedPath] {
+export function exitPaths(lot: LotLayout, road: RoadAccess, spot: ParkingSpot, toLeft: boolean): [TimedPath, PathLike] {
   const aisleZ = lot.aisles[spot.aisle] as number;
   const into = spot.heading === 0 ? 1 : -1;
   const side = toLeft ? 0 : 1;
   const px = lot.perimeterX[side];
   const dir = Math.sign(px - spot.x) || 1;
   // 倒车时车尾朝向要去的方向，退出后车头正好朝出口
+  // 倒出来时车尾朝要去的方向，退到往出口去的那条车道上
+  const az = aisleLaneZ(aisleZ, dir);
   const back = new TimedPath(
     roundCorners(
       [
         { x: spot.x, z: spot.z },
         { x: spot.x, z: aisleZ + into * 1.2 },
-        { x: spot.x - dir * 2.6, z: aisleZ },
+        { x: spot.x - dir * 2.6, z: az },
       ],
       2.4,
     ),
     () => 1.6,
     true,
   );
+  const drive = leaveLot(lot, road, [{ x: spot.x - dir * 2.6, z: az }, { x: outLaneX(px), z: az }], px, toLeft);
+  return [back, drive];
+}
+
+/**
+ * 从停车场里的一段路开到出口、在人行道前停下让行、再拐上主路：pts 是停车场里的点（最后一个在环形车道上），
+ * px 是出口所在的环形车道。stopSec 为让行等待时间。
+ */
+export function leaveLot(lot: LotLayout, road: RoadAccess, pts: Pt[], px: number, toLeft: boolean, opts: { lotSpeed?: number; stopSec?: number; radius?: number; dyn?: Dynamics } = {}): PathChain {
   const laneZ = toLeft ? road.farLaneZ : road.nearLaneZ;
   const endX = toLeft ? road.spawnMinX : road.spawnMaxX;
-  const drive = new TimedPath(
-    roundCorners(
-      [
-        { x: spot.x - dir * 2.6, z: aisleZ },
-        { x: px, z: aisleZ },
-        { x: px, z: lot.edgeZ },
-        { x: px, z: laneZ },
-        { x: endX, z: laneZ },
-      ],
-      3,
-    ),
-    (a, b) => (Math.max(a.z, b.z) < lot.edgeZ - 1 ? ROAD_SPEED : LOT_SPEED),
-    false,
-    { v1: 'cap' },
-  );
-  return [back, drive];
+  const stopZ = lot.edgeZ - 2.6;
+  const speed = (a: Pt, b: Pt) => (Math.max(a.z, b.z) < lot.edgeZ - 1 ? ROAD_SPEED : (opts.lotSpeed ?? LOT_SPEED));
+  const r = opts.radius ?? 3;
+  // 出口走驶出的那条车道（隔离岛靠 x 大的一侧）
+  const xo = outLaneX(px);
+  const inLot = new TimedPath(roundCorners([...pts, { x: xo, z: stopZ }], r), speed, false, { ...opts.dyn, v1: 0 });
+  const onRoad = new TimedPath(roundCorners([{ x: xo, z: stopZ }, { x: xo, z: laneZ }, { x: endX, z: laneZ }], r), speed, false, { ...opts.dyn, v0: 0, v1: 'cap' });
+  return new PathChain([inLot, opts.stopSec ?? YIELD_SEC, onRoad]);
 }

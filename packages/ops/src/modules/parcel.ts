@@ -11,7 +11,7 @@ import { no, yes, type OpsModule } from './framework';
 
 export const PARCEL_GRACE_MIN = 30;
 
-const COMMANDS = new Set(['CreateParcelAsn', 'InductParcel', 'StageParcel', 'ReportParcelDamaged', 'HandOffParcels'] as const);
+const COMMANDS = new Set(['CreateParcelAsn', 'InductParcel', 'StageParcel', 'ReportParcelDamaged', 'HandOffParcels', 'ResolveParcel'] as const);
 
 export const parcelModule: OpsModule = {
   id: 'parcel',
@@ -32,7 +32,8 @@ export const parcelModule: OpsModule = {
         const code = cmd.code.trim().toUpperCase();
         if (!code) return no('PARCEL_NOT_FOUND');
         const p = s.parcels[code];
-        if (!p) return yes([ev('ParcelOver', { parcelId: code })]);
+        // 到货通知里没有的编码：确认是多出的包裹才登记（决策记录 0026：扫错、输错的编码不再直接变成「多出」）
+        if (!p) return cmd.extra === true ? yes([ev('ParcelOver', { parcelId: code })]) : no('PARCEL_NOT_FOUND');
         if (p.status !== 'EXPECTED' && p.status !== 'SHORT') return no('PARCEL_STATE', { status: p.status });
         return yes([ev('ParcelInducted', { parcelId: p.id })]);
       }
@@ -53,6 +54,12 @@ export const parcelModule: OpsModule = {
         if (p.status === 'HANDED_OFF' || p.status === 'DAMAGED') return no('PARCEL_STATE', { status: p.status });
         return yes([ev('ParcelDamaged', { parcelId: p.id })]);
       }
+      case 'ResolveParcel': {
+        const p = s.parcels[cmd.parcelId.trim().toUpperCase()];
+        if (!p) return no('PARCEL_NOT_FOUND');
+        if (p.status !== 'OVER' && p.status !== 'DAMAGED') return no('PARCEL_STATE', { status: p.status });
+        return yes([ev('ParcelResolved', { parcelId: p.id, action: cmd.action === 'RETURN' ? 'RETURN' : 'HOLD' })]);
+      }
       case 'HandOffParcels': {
         const trip = cmd.tripRef.trim().toUpperCase();
         const inTrip = Object.values(s.parcels).filter((p) => p.tripRef === trip);
@@ -71,6 +78,11 @@ export const parcelModule: OpsModule = {
         for (const p of e.payload.parcels) s.parcels[p.parcelId] = { id: p.parcelId, asnId: e.payload.asnId, carrier: e.payload.carrier, tripRef: p.tripRef, sizeClass: p.sizeClass, weightKg: p.weightKg, status: 'EXPECTED', expectedBy: e.payload.expectedBy };
         s.counters.asns += 1;
         return true;
+      case 'ParcelResolved': {
+        const p = s.parcels[e.payload.parcelId];
+        if (p) p.status = e.payload.action === 'RETURN' ? 'RETURNED' : 'HELD';
+        return true;
+      }
       case 'ParcelInducted': {
         const p = s.parcels[e.payload.parcelId];
         if (p) {
@@ -151,7 +163,8 @@ export function suggestParcelSlot(s: OpsState, st: StoreStatic, parcel: Parcel):
 export function parcelTrips(s: OpsState): Array<{ tripRef: string; parcels: Parcel[] }> {
   const m = new Map<string, Parcel[]>();
   for (const p of Object.values(s.parcels)) {
-    if (!p.tripRef || p.status === 'HANDED_OFF') continue;
+    // 已交接、已退回、放在异常区的不算在行程里（决策记录 0026）
+    if (!p.tripRef || p.status === 'HANDED_OFF' || p.status === 'RETURNED' || p.status === 'HELD') continue;
     const list = m.get(p.tripRef) ?? [];
     list.push(p);
     m.set(p.tripRef, list);

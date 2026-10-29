@@ -11,6 +11,7 @@ import { customerEntrance } from './crowd';
 import { toonGradient } from './toon';
 import { People, type PersonState } from './People';
 import { useSiteLayout } from './useSite';
+import { cutX } from './BuildingShell';
 import type { RunConfig } from '@storewright/store-config';
 import { t } from '../i18n';
 
@@ -70,6 +71,8 @@ function visibleFloor(_geo: StoreGeometry, floor: string, view: string, floorId:
 
 export function StoreDetails() {
   const geo = useApp((s) => s.geo);
+  const buildingView = useApp((s) => s.buildingView);
+  const cutPos = useApp((s) => s.cutPos);
   const model = useApp((s) => s.model);
   const floor = useApp((s) => s.floor);
   const view = useApp((s) => s.view);
@@ -265,7 +268,7 @@ export function StoreDetails() {
         <planeGeometry />
         <meshBasicMaterial ref={poolMat} map={poolTex} transparent opacity={0.1} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
       </instancedMesh>
-      {deliParts.label && (
+      {deliParts.label && (buildingView === 'interior' || (buildingView === 'cutaway' && deliParts.label.x < cutX(geo, cutPos))) && (
         <Html position={[deliParts.label.x, deliParts.label.y, deliParts.label.z]} center className="scene-label area-label deli-label">
           {t('熟食柜台')}
         </Html>
@@ -291,10 +294,15 @@ function SignGlow() {
   useFrame(() => {
     for (const m of mats.current) m.opacity = (m.userData.k as number) * env.night;
   });
+  const buildingView = useApp((s) => s.buildingView);
   const visible = floor === 'ALL' || geo.floors.find((f) => f.floorId === floor)?.level === 0;
   if (!visible) return null;
   const x = customerEntrance(model, geo).outside.x;
-  const pylon = { x: geo.lot.minX + 5, z: (site.roadTopZ + 2.4 + geo.lot.edgeZ) / 2 };
+  // 外观和半剖时店招在门头墙上（更高、更靠前）
+  const signY = buildingView === 'interior' ? 5.2 : 7.55;
+  const signZ = buildingView === 'interior' ? -0.04 : -0.75;
+  // 立柱招牌：在左边出入口的喇叭口外侧（决策记录 0019）
+  const pylon = { x: geo.lot.minX + 16, z: (site.roadTopZ + 2.4 + geo.lot.edgeZ) / 2 };
   const halo = (k: number, map: THREE.Texture) => (m: THREE.MeshBasicMaterial | null) => {
     if (m) m.userData.k = k;
     add(m);
@@ -302,8 +310,8 @@ function SignGlow() {
   };
   return (
     <group>
-      <mesh position={[x, 5.2, -0.04]} rotation={[0, Math.PI, 0]} renderOrder={2}>
-        <planeGeometry args={[12, 4.5]} />
+      <mesh position={[x, signY, signZ]} rotation={[0, Math.PI, 0]} renderOrder={2}>
+        <planeGeometry args={[buildingView === 'interior' ? 12 : 16, 4.5]} />
         <meshBasicMaterial ref={halo(0.6, tex)} map={tex} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
       </mesh>
       {[-0.42, 0.42].map((dz) => (

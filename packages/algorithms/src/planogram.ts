@@ -40,6 +40,9 @@ export interface PlanogramEntry {
   chemical: boolean;
   /** 每箱件数 */
   packQty: number;
+  /** 一箱大约多重、多大（千克、升）：补货推车按这个分批（决策记录 0026） */
+  caseKg?: number;
+  caseL?: number;
   /** 预期销售速度（件 / 小时），作为估算的初值 */
   baseVelocity: number;
 }
@@ -223,6 +226,9 @@ export function buildPlanogram(model: StoreModel, items: ReadonlyMap<string, Ite
       area: storageArea(it),
       chemical: it.handling.includes('CHEMICAL'),
       packQty: packQty(it),
+      // 箱子比里面的商品多约一成（纸箱、空隙）
+      caseKg: Math.round(it.weightKg * packQty(it) * 1.05 * 10) / 10,
+      caseL: Math.round(((it.dims.l * it.dims.w * it.dims.h) / 1000) * packQty(it) * 1.1 * 10) / 10,
       baseVelocity: Math.round(velocity(it) * 1000) / 1000,
     };
     const sensor = sensors.get(it.id);

@@ -1,6 +1,6 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import { Recorder } from './recorder';
-import { signIn, SITE, tab } from './helpers';
+import { signIn, SITE, tab, test } from './helpers';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Sw = any;
@@ -37,7 +37,8 @@ test('13 区域、卸货门与取货车位', async ({ browser }) => {
   }, { shot: p, device: '电脑' });
 
   await r.step('选中冷藏库：名称、类型、温区、容量、预警线、位置都可以改；场景里出现移动把手和改大小把手', async () => {
-    await p.locator('.area-row', { hasText: 'COOLER-1' }).click();
+    // 线上订单区也有一个冷藏库（STAGING_COOLER-1，决策记录 0019），按名称开头区分
+    await p.getByRole('button', { name: /^冷藏库 COOLER-1 / }).click();
     const fields = p.locator('.area-fields');
     await fields.getByLabel('容量').fill('480');
     await p.waitForTimeout(800);

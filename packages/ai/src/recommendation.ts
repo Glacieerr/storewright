@@ -6,9 +6,27 @@
  */
 
 /** 可以单独设置运行模式的 AI 模块 */
-export type AiModule = 'FORECAST' | 'ETA' | 'AVAILABILITY' | 'SUBSTITUTION' | 'STAFFING' | 'REPLENISH' | 'COUNT' | 'MTO' | 'RETURNS';
+export type AiModule =
+  | 'FORECAST'
+  | 'ETA'
+  | 'AVAILABILITY'
+  | 'SUBSTITUTION'
+  | 'STAFFING'
+  | 'REPLENISH'
+  | 'COUNT'
+  | 'MTO'
+  | 'RETURNS'
+  // 门店 AI 第二轮（决策记录 0021–0024）
+  | 'FORESIGHT'
+  | 'PICKING'
+  | 'EQUIPMENT'
+  | 'INBOUND'
+  | 'FRONT'
+  | 'CAPACITY'
+  | 'STAGING'
+  | 'EXPIRY';
 
-export const AI_MODULES: readonly AiModule[] = ['FORECAST', 'ETA', 'AVAILABILITY', 'SUBSTITUTION', 'STAFFING', 'REPLENISH', 'COUNT', 'MTO', 'RETURNS'];
+export const AI_MODULES: readonly AiModule[] = ['FORESIGHT', 'FORECAST', 'ETA', 'AVAILABILITY', 'PICKING', 'SUBSTITUTION', 'STAFFING', 'REPLENISH', 'COUNT', 'STAGING', 'CAPACITY', 'INBOUND', 'FRONT', 'EQUIPMENT', 'EXPIRY', 'MTO', 'RETURNS'];
 
 /** 只显示 / 需要确认 / 自动执行 */
 export type AiMode = 'SHOW' | 'CONFIRM' | 'AUTO';
@@ -20,14 +38,26 @@ export const DEFAULT_AI_MODES: Record<AiModule, AiMode> = {
   FORECAST: 'SHOW',
   // 到店时间修正只改变交付看板上的提醒时间，风险低、频率高，默认自动执行（可以改成需确认）
   ETA: 'AUTO',
-  AVAILABILITY: 'CONFIRM',
+  // 核对货架、盘点只给补货员和后仓派任务，风险低：默认自动执行，不用等带班负责人采纳（决策记录 0026）
+  AVAILABILITY: 'AUTO',
   SUBSTITUTION: 'CONFIRM',
   STAFFING: 'CONFIRM',
   REPLENISH: 'CONFIRM',
-  COUNT: 'CONFIRM',
+  COUNT: 'AUTO',
   // 出餐时间预测只调整熟食看板上的建议开始时间，默认自动执行
   MTO: 'AUTO',
   RETURNS: 'CONFIRM',
+  // 运营预警：调人、提前开始、冷冻晚点拣、通知顾客延后，都要带班负责人确认
+  FORESIGHT: 'CONFIRM',
+  // 拣货：拆批、顺路核对只改变批次的组成和清单上的提示，风险低、频率高，默认自动执行
+  PICKING: 'AUTO',
+  EQUIPMENT: 'CONFIRM',
+  INBOUND: 'CONFIRM',
+  // 前场收银通道：只给建议（叫谁去开通道由带班负责人决定）
+  FRONT: 'SHOW',
+  CAPACITY: 'CONFIRM',
+  STAGING: 'CONFIRM',
+  EXPIRY: 'CONFIRM',
 };
 
 /**

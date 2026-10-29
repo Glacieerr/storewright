@@ -2,8 +2,11 @@ import { useEffect, useState } from 'react';
 import { displayName, driverCancelWindow, noShowWindow, parcelTrips, planogramByItem, sellableCases, shelfNow, summary, type AnyOpsEvent, type LiveOrder, type LiveTrip } from '@storewright/ops';
 import { demo, labelUrl, type AutoPilotStatus, type CreatedOrder, type SimStatus } from '../api';
 import { clock, t } from '../i18n';
+import { StoreSettingsCard } from '../ui/StoreSettings';
 import { useLive, useNow } from '../live';
 import { AreaBoard } from './inventory/AreaView';
+import { TwinCard } from './TwinCard';
+import { coldAlertOn, sensorsFor } from '@storewright/twin';
 import { rejectText } from '../rejects';
 import { toast } from '../ui/Toasts';
 
@@ -66,7 +69,10 @@ export function ConsoleScreen() {
       for (const o of r.orders as CreatedOrder[]) next[o.orderId] = o.code;
       setCodes(next);
       localStorage.setItem(CODES_KEY, JSON.stringify(next));
-      toast(t('已创建 {0} 张订单', r.orders.length), 'ok');
+      const bad = r.rejected ?? [];
+      const first = bad[0]?.reject;
+      if (bad.length) toast(t('已创建 {0} 张订单，{1} 张被拒：{2}', r.orders.length, bad.length, first ? rejectText(first, (x) => x) : ''), 'info');
+      else toast(t('已创建 {0} 张订单', r.orders.length), 'ok');
     } catch (e) {
       toast(String(e), 'error');
     }
@@ -104,6 +110,9 @@ export function ConsoleScreen() {
           <small>{t('已完成')}</small>
         </div>
       </section>
+
+      {/* 门店设置（决策记录 0026） */}
+      <StoreSettingsCard />
 
       <section className="card">
         <h2 className="section-title">{t('创建测试订单')}</h2>
@@ -186,13 +195,15 @@ export function ConsoleScreen() {
                   <td className="mono">{clock(o.slotStart)}</td>
                   <td>
                     {t(STATUS_TEXT[o.status])}
+                    {client.statics && coldAlertOn(s, client.statics, o.id, sensorsFor(client.statics)) && <span className="pill alarm">{t('冷链告警')}</span>}
                     {o.tripId ? ` · ${o.tripId}` : ''}
                     {o.arrivedAt !== undefined ? ` · ${t('已到达')}` : o.etaAt !== undefined ? ` · ${t('{0} 到', clock(o.etaAt))}` : ''}
                   </td>
                   <td className="mono strong">{o.tripId ? '—' : (codes[o.id] ?? '?')}</td>
                   <td className="actions">
                     {o.status === 'CREATED' && <button onClick={() => void run({ type: 'LockOrder', orderId: o.id })}>{t('锁单')}</button>}
-                    {!o.tripId && o.arrivedAt === undefined && (
+                    {/* 配送订单的顾客不来店里：只有自取订单有「我在路上」「到店」（流程梳理发现，决策记录 0025） */}
+                    {o.type === 'PICKUP' && o.arrivedAt === undefined && (
                       <>
                         <button onClick={() => void run({ type: 'UpdateEta', orderId: o.id, etaAt: client.now() + 4 * 60_000 })}>{t('我在路上')}</button>
                         <button onClick={() => void run({ type: 'CheckIn', orderId: o.id, bay: bayFor(client.statics?.pickupBays, o.id) })}>{t('到店')}</button>
@@ -234,6 +245,8 @@ export function ConsoleScreen() {
           </ul>
         </section>
       )}
+
+      <TwinCard />
 
       <section className="card">
         <h2 className="section-title">{t('区域管理')}</h2>
@@ -311,6 +324,12 @@ const EVENT_TEXT: Record<string, string> = {
   ExceptionItemFound: '后仓找到商品',
   ExceptionNotFound: '后仓也找不到',
   ExceptionDeliveredToStaging: '补取送到暂存格位',
+  ExceptionItemsReturned: '补取的商品放回货架',
+  StoreSettingsChanged: '门店设置改了',
+  PrepAbandoned: '结束交付准备',
+  CycleCountReleased: '盘点放回队列',
+  ExceptionReleased: '补取放回队列',
+  LotTaskDone: '货架批次任务完成',
   ExceptionVoided: '后仓补取作废',
   InventoryLoaded: '载入期初库存',
   AsnReceived: '收到到货通知',
@@ -336,6 +355,8 @@ const EVENT_TEXT: Record<string, string> = {
   AiModeSet: '修改 AI 运行模式',
   AiEtaApplied: 'AI 修正到店时间',
   AssociateRoleChanged: '员工调岗',
+  AssociateMoveQueued: '排队调动（做完手上的再去）',
+  AssociateMoveCancelled: '取消排队的调动',
   AssociateLockChanged: '固定名单变更',
   NoteAdded: '记下门店经验',
   NoteRemoved: '删除门店经验',
@@ -347,20 +368,68 @@ const EVENT_TEXT: Record<string, string> = {
   MtoDiscarded: '熟食丢弃',
   ReturnStarted: '开始退货',
   ReturnItemScanned: '扫描退货商品',
+  ReturnLineRemoved: '删掉扫错的退货行',
   ReturnDispositionSet: '退货去向',
   ReturnCompleted: '退货完成',
   OversizedPiecesCreated: '生成大件任务',
   OversizedClaimed: '领取大件',
   OversizedReleased: '放回大件',
   OversizedLabeled: '大件贴标签',
+  OversizedLabelPrinted: '打印大件标签',
   OversizedStaged: '大件放进大件区',
   ParcelAsnReceived: '包裹到货通知',
   ParcelInducted: '包裹入站',
   ParcelOver: '多出的包裹',
+  ParcelResolved: '处理多出或损坏的包裹',
   ParcelStaged: '包裹放进格位',
   ParcelDamaged: '包裹损坏',
   ParcelShort: '包裹短少',
   ParcelsHandedOff: '包裹交给司机',
+  EquipmentAlertRaised: '设备告警',
+  EquipmentAlertAcknowledged: '确认设备告警',
+  EquipmentAlertCleared: '设备告警解除',
+  PickWalkEstimated: 'AI 估计拣货用时',
+  DemandOutlookPublished: 'AI 发布订单量展望',
+  WalkLinesFlagged: 'AI 标出可能缺货的行',
+  ReplenishmentExpedited: '补货任务提前',
+  OrdersExpedited: '订单提前开始',
+  FrozenDeferred: '冷冻商品晚点拣',
+  DelayNoticeSent: '通知顾客延后',
+  NudgesSent: '发出提醒',
+  NudgesClosed: '提醒关闭',
+  NudgeRead: '提醒已读',
+  SchedulePublished: '发布排班',
+  AbsenceReported: '报告缺勤',
+  ShiftOffered: '发出补班邀请',
+  ShiftOfferAnswered: '答复补班邀请',
+  MaintenanceRequested: '设备报修',
+  MaintenanceClosed: '报修关单',
+  WalkCheckAdded: 'AI 加了顺路核对',
+  WalkCheckSkipped: '跳过顺路核对',
+  AsnEtaUpdated: '供应商更新预计到达',
+  OutcomeRecorded: 'AI 记下建议的实际效果',
+  AiHealthPublished: 'AI 运行状态更新',
+  PickWalkSplit: 'AI 拆分冷链批次',
+  WalkHandedOver: '剩下的行转给别人',
+  TotesAdded: '拣货中加了一个框',
+  ColdRiskFlagged: 'AI 标出冷链风险',
+  ToteFactorsUpdated: 'AI 更新分框系数',
+  SlotClosed: '取货时段停止接单',
+  SlotReopened: '取货时段重新开放',
+  SubstitutionRated: '记下顾客对替代品的反应',
+  MarkdownApplied: '临期批次降价',
+  LotDonated: '临期批次捐赠',
+  RecallOpened: '开启召回',
+  RecallStepMarked: '召回步骤打勾',
+  RecallClosed: '召回结束',
+  IncidentStarted: '开启突发状况清单',
+  IncidentStepChecked: '突发状况清单打勾',
+  IncidentEnded: '突发状况结束',
+  FoodSafetyLogConfirmed: '确认食品安全记录',
+  AnswerLogged: '门店助手回答了一个问题',
+  AnswerRated: '标记回答有用 / 没用',
+  SopAcknowledged: '看过操作提示',
+  NextTaskFeedback: '对「下一步」的反馈',
 };
 
 /** 演示用的到店车位：门店配置了明确车位时从中选一个，否则用 1–8 号 */
@@ -474,7 +543,7 @@ function EventFeed() {
 
 /** 后仓与补货（演示）：到货通知、顾客购物仿真（销售流水 + 传感器）、让某个商品的货架变空 */
 function BackroomConsole() {
-  const { client, auth } = useLive();
+  const { client, auth, run } = useLive();
   const s = client.state;
   const st = client.statics;
   const [sim, setSim] = useState<SimStatus | undefined>();
@@ -528,7 +597,18 @@ function BackroomConsole() {
         </div>
       </div>
       <div className="actions">
-        <button onClick={() => void demo.asn(auth, 6).then(() => toast(t('已发送到货通知'), 'ok'))}>{t('发送到货通知（ASN）')}</button>
+        <button onClick={() => void demo.asn(auth, 6).then(() => toast(t('已发送到货通知（预计 30 分钟后到）'), 'ok'))}>{t('发送到货通知（ASN）')}</button>
+        {(() => {
+          // 演示：最近一张还没到的收货单，供应商通知晚到 25 分钟（决策记录 0022 · A3）
+          const r = Object.values(s.receipts)
+            .filter((x) => x.arrivedAt === undefined && x.closedAt === undefined)
+            .sort((a, b) => b.createdAt - a.createdAt)[0];
+          return r ? (
+            <button onClick={() => void run({ type: 'UpdateAsnEta', receiptId: r.id, expectedAt: (r.expectedAt ?? Date.now()) + 25 * 60_000 }).then((ok) => ok && toast(t('{0} 的供应商通知晚到 25 分钟', r.id), 'ok'))}>
+              {t('供应商通知晚到 25 分钟')}
+            </button>
+          ) : null;
+        })()}
         <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} aria-label={t('仿真速度')}>
           <option value={30}>30×</option>
           <option value={120}>120×</option>

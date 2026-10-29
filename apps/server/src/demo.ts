@@ -27,18 +27,48 @@ export function newSalt(p: HubPlatform): string {
   return toHex(p.randomBytes(16));
 }
 
+/** 工作日上午 7–15 点（兼职员工的可上班时间示例，决策记录 0022） */
+const WEEKDAY_MORNINGS = [0, 1, 2, 3, 4].map((day) => ({ day, from: 7 * 60, to: 15 * 60 }));
+/** 工作日傍晚 15–22 点、周末全天 */
+const EVENINGS_AND_WEEKENDS = [0, 1, 2, 3, 4, 5, 6].map((day) => (day >= 5 ? { day, from: 8 * 60, to: 21 * 60 } : { day, from: 15 * 60, to: 22 * 60 }));
+
+/**
+ * 入职日期只用来分熟练度组（新人 / 中等 / 熟手，决策记录 0021），不对个人建模；
+ * 技能、可上班时间、雇佣类型给排班和补位用（决策记录 0022）
+ */
 const ROSTER: AssociateInfo[] = [
-  { id: 'A01', name: 'Avery', role: 'PICK', exceptionAuthorized: false },
-  { id: 'A02', name: 'Jordan', role: 'PICK', exceptionAuthorized: false },
-  { id: 'A03', name: 'Sam', role: 'PICK', exceptionAuthorized: false },
-  { id: 'A04', name: 'Riley', role: 'STAGE', exceptionAuthorized: false },
-  { id: 'A05', name: 'Morgan', role: 'HANDOFF', exceptionAuthorized: false },
-  { id: 'A06', name: 'Casey', role: 'HANDOFF', exceptionAuthorized: false },
-  { id: 'A07', name: 'Quinn', role: 'HANDOFF', exceptionAuthorized: false },
-  { id: 'A08', name: 'Taylor', role: 'LEAD', exceptionAuthorized: true },
-  { id: 'A09', name: 'Drew', role: 'BACKROOM', exceptionAuthorized: true },
-  { id: 'A10', name: 'Robin', role: 'RESTOCK', exceptionAuthorized: false },
-  { id: 'A11', name: 'Jamie', role: 'DELI', exceptionAuthorized: false },
+  { id: 'A01', name: 'Avery', role: 'PICK', exceptionAuthorized: false, hiredAt: '2024-03-11', skills: ['STAGE'] },
+  { id: 'A02', name: 'Jordan', role: 'PICK', exceptionAuthorized: false, hiredAt: '2026-09-14' },
+  { id: 'A03', name: 'Sam', role: 'PICK', exceptionAuthorized: false, hiredAt: '2025-11-03', employment: 'PART_TIME', skills: ['HANDOFF'], availability: WEEKDAY_MORNINGS },
+  { id: 'A04', name: 'Riley', role: 'STAGE', exceptionAuthorized: false, hiredAt: '2023-06-19', skills: ['PICK', 'HANDOFF'] },
+  { id: 'A05', name: 'Morgan', role: 'HANDOFF', exceptionAuthorized: false, hiredAt: '2025-04-07', skills: ['STAGE'] },
+  { id: 'A06', name: 'Casey', role: 'HANDOFF', exceptionAuthorized: false, hiredAt: '2026-08-24', employment: 'PART_TIME' },
+  { id: 'A07', name: 'Quinn', role: 'HANDOFF', exceptionAuthorized: false, hiredAt: '2022-10-03', skills: ['PICK', 'AGE_CHECK'] },
+  { id: 'A08', name: 'Taylor', role: 'LEAD', exceptionAuthorized: true, hiredAt: '2021-05-17', skills: ['PICK', 'HANDOFF', 'AGE_CHECK', 'FORKLIFT'] },
+  { id: 'A09', name: 'Drew', role: 'BACKROOM', exceptionAuthorized: true, hiredAt: '2023-02-06', skills: ['RESTOCK', 'FORKLIFT'] },
+  { id: 'A10', name: 'Robin', role: 'RESTOCK', exceptionAuthorized: false, hiredAt: '2025-07-21', skills: ['BACKROOM', 'PICK'] },
+  { id: 'A11', name: 'Jamie', role: 'DELI', exceptionAuthorized: false, hiredAt: '2024-09-09', skills: ['HANDOFF'] },
+  // 学生兼职工（决策记录 0020）：放学后来，每天 4 小时
+  { id: 'A12', name: 'Skyler', role: 'PICK', exceptionAuthorized: false, hiredAt: '2026-09-28', employment: 'STUDENT', shift: { from: 16 * 60, to: 20 * 60 } },
+  { id: 'A13', name: 'Rowan', role: 'HANDOFF', exceptionAuthorized: false, hiredAt: '2026-06-15', employment: 'STUDENT', shift: { from: 17 * 60, to: 21 * 60 } },
+  // 中型店的完整班组（决策记录 0022）：每天约 260 单线上订单，高峰要 10 人以上拣货，排班和补位要有足够的人可排
+  { id: 'A14', name: 'Harper', role: 'PICK', exceptionAuthorized: false, hiredAt: '2023-09-04', skills: ['STAGE'] },
+  { id: 'A15', name: 'Logan', role: 'PICK', exceptionAuthorized: false, hiredAt: '2024-11-18' },
+  { id: 'A16', name: 'Emery', role: 'PICK', exceptionAuthorized: false, hiredAt: '2025-02-24', skills: ['HANDOFF'] },
+  { id: 'A17', name: 'Finley', role: 'PICK', exceptionAuthorized: false, hiredAt: '2022-04-11', skills: ['STAGE', 'AGE_CHECK'] },
+  { id: 'A18', name: 'Sage', role: 'PICK', exceptionAuthorized: false, hiredAt: '2026-07-06' },
+  { id: 'A19', name: 'Reese', role: 'PICK', exceptionAuthorized: false, hiredAt: '2024-06-03', skills: ['RESTOCK'] },
+  { id: 'A20', name: 'Dakota', role: 'PICK', exceptionAuthorized: false, hiredAt: '2025-08-25' },
+  { id: 'A21', name: 'Kendall', role: 'PICK', exceptionAuthorized: false, hiredAt: '2025-01-13', employment: 'PART_TIME', availability: WEEKDAY_MORNINGS },
+  { id: 'A22', name: 'Parker', role: 'PICK', exceptionAuthorized: false, hiredAt: '2024-10-07', employment: 'PART_TIME', availability: EVENINGS_AND_WEEKENDS },
+  { id: 'A23', name: 'Ellis', role: 'PICK', exceptionAuthorized: false, hiredAt: '2026-09-21', employment: 'STUDENT' },
+  { id: 'A24', name: 'Remy', role: 'PICK', exceptionAuthorized: false, hiredAt: '2026-05-11', employment: 'STUDENT' },
+  { id: 'A25', name: 'Hayden', role: 'STAGE', exceptionAuthorized: false, hiredAt: '2023-12-04', skills: ['PICK'] },
+  { id: 'A26', name: 'Marlowe', role: 'HANDOFF', exceptionAuthorized: false, hiredAt: '2024-02-19', skills: ['STAGE', 'AGE_CHECK'] },
+  { id: 'A27', name: 'Jesse', role: 'LEAD', exceptionAuthorized: true, hiredAt: '2022-08-29', skills: ['PICK', 'HANDOFF', 'AGE_CHECK'] },
+  { id: 'A28', name: 'Shiloh', role: 'BACKROOM', exceptionAuthorized: true, hiredAt: '2024-03-25', skills: ['RESTOCK', 'FORKLIFT'] },
+  { id: 'A29', name: 'Arden', role: 'RESTOCK', exceptionAuthorized: false, hiredAt: '2025-10-06', employment: 'PART_TIME', skills: ['BACKROOM'] },
+  { id: 'A30', name: 'Lane', role: 'DELI', exceptionAuthorized: false, hiredAt: '2025-05-19', employment: 'PART_TIME', skills: ['HANDOFF'] },
 ];
 
 /** 建材店没有熟食区：第 11 位员工在后仓（板材和建材的装车也归后仓） */
@@ -126,7 +156,7 @@ export function createDemoStore(opts: { id: string; template?: TemplateName; con
     },
     slots: model.stagingSlots.map((s) => {
       const areaId = rackArea.get(s.rackId);
-      return { code: s.code, tempZone: s.tempZone, capacity: s.capacityTotes, area: s.area, purpose: s.purpose, ...(areaId ? { areaId } : {}) };
+      return { code: s.code, tempZone: s.tempZone, capacity: s.capacityTotes, area: s.area, purpose: s.purpose, distM: Math.round(s.distanceM * 10) / 10, ...(areaId ? { areaId } : {}) };
     }),
     roster: opts.staff && opts.staff > ROSTER.length ? largeRoster(opts.staff, hw) : hw ? HARDWARE_ROSTER : ROSTER,
     bins: buildBins(model),

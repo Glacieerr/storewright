@@ -29,13 +29,6 @@ let lang: Lang = typeof window === 'undefined' ? 'zh' : initialLang();
 let EN: Record<string, string> = {};
 let EN_PATTERNS: Array<[RegExp, string]> = [];
 let enLoaded = false;
-// 扩展模块（例如线上版的私有模块）自带的译文，和英文字典分开保存，不受加载先后影响
-const ADDED: Record<string, string> = {};
-
-/** 扩展模块注册自己的英文译文 */
-export function addEnglish(entries: Record<string, string>): void {
-  Object.assign(ADDED, entries);
-}
 
 /** 确保某种语言的字典已加载（英文字典单独打包） */
 export async function ensureLang(l: Lang): Promise<void> {
@@ -66,7 +59,7 @@ export function applyLang(l: Lang, persist = true): void {
 export function syncDocument(): void {
   try {
     document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
-    document.title = lang === 'zh' ? 'Storewright 模拟器' : 'Storewright Simulator';
+    document.title = lang === 'zh' ? 'Storewright 数字孪生' : 'Storewright Digital Twin';
   } catch {
     // Worker 等没有页面的环境里跳过
   }
@@ -84,13 +77,13 @@ const NUM = /-?\d+(?:\.\d+)?/g;
 
 /** 英文译文；查不到返回 undefined */
 function lookup(s: string): string | undefined {
-  const exact = EN[s] ?? ADDED[s];
+  const exact = EN[s];
   if (exact !== undefined) return exact;
   // 把数字换成占位符再查（例如「装车 12 箱」→「装车 {0} 箱」）
   const nums: string[] = [];
   const tpl = s.replace(NUM, (m) => `{${nums.push(m) - 1}}`);
   if (nums.length) {
-    const hit = EN[tpl] ?? ADDED[tpl];
+    const hit = EN[tpl];
     if (hit !== undefined) return fill(hit, nums);
   }
   for (const [re, out] of EN_PATTERNS) {

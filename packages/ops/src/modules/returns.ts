@@ -9,7 +9,8 @@ import { no, yes, type OpsModule } from './framework';
  * - 完成时发出「退货完成」事件（退款由外部系统处理），所有件都要有去向。
  */
 
-const COMMANDS = new Set(['StartReturn', 'ScanReturnItem', 'SetReturnDisposition', 'CompleteReturn'] as const);
+const COMMANDS_EXTRA = ['RemoveReturnLine'] as const;
+const COMMANDS = new Set([...COMMANDS_EXTRA, 'StartReturn', 'ScanReturnItem', 'SetReturnDisposition', 'CompleteReturn'] as const);
 const DISPOSITIONS: readonly ReturnDisposition[] = ['RESTOCK', 'DISPOSE', 'HAZMAT', 'VENDOR'];
 
 /** 规则禁止某个去向的原因 */
@@ -65,8 +66,21 @@ export const returnsModule: OpsModule = {
         const qty = Math.max(1, Math.min(50, Math.round(cmd.qty)));
         const o = r.orderId ? s.orders[r.orderId] : undefined;
         const inOrder = !!o?.lines.some((l) => l.itemId === item.id || l.gtin === item.gtin);
+        // 退的件数不能比订单里交出去的多（决策记录 0026）
+        if (o && inOrder) {
+          const handed = o.lines.filter((l) => l.itemId === item.id || l.gtin === item.gtin).reduce((n, l) => n + (o.lineResults[l.lineId]?.picked ?? 0), 0);
+          const already = r.lines.filter((l) => l.itemId === item.id).reduce((n, l) => n + l.qty, 0);
+          if (handed > 0 && already + qty > handed) return no('RETURN_QTY_EXCEEDED', { remaining: Math.max(0, handed - already) });
+        }
         const condition = cmd.condition === 'OPENED' || cmd.condition === 'DAMAGED' ? cmd.condition : 'SEALED';
         return yes([ev('ReturnItemScanned', { returnId: r.id, itemId: item.id, gtin: item.gtin, name: item.name, qty, condition, inOrder, tempZone: item.tempZone, unitPrice: item.unitPrice, ...(item.chemical ? { chemical: true } : {}), ...(item.sealedOnly ? { sealedOnly: true } : {}) })]);
+      }
+      case 'RemoveReturnLine': {
+        const r = s.returns[cmd.returnId];
+        if (!r) return no('RETURN_NOT_FOUND');
+        if (r.status !== 'OPEN') return no('RETURN_CLOSED');
+        if (!r.lines[cmd.index]) return no('RETURN_NOT_FOUND');
+        return yes([ev('ReturnLineRemoved', { returnId: r.id, index: cmd.index })]);
       }
       case 'SetReturnDisposition': {
         const r = s.returns[cmd.returnId];
@@ -86,7 +100,14 @@ export const returnsModule: OpsModule = {
         if (!r.lines.length || r.lines.some((l) => !l.disposition)) return no('RETURN_INCOMPLETE');
         const refundValue = Math.round(r.lines.reduce((a, l) => a + l.unitPrice * l.qty, 0) * 100) / 100;
         const restocked = r.lines.filter((l) => l.disposition === 'RESTOCK').map((l) => ({ itemId: l.itemId, qty: l.qty }));
-        return yes([ev('ReturnCompleted', { returnId: r.id, refundValue, restocked })]);
+        // 可售回架（决策记录 0026）：给补货员一个「退货放回货架」的任务，放回后货架估算才增加
+        const tasks = restocked
+          .map((x, k) => {
+            const pe = ctx.statics.planogram.find((p) => p.itemId === x.itemId);
+            return pe ? ev('ShelfCheckRequested', { checkId: `SC${String(s.counters.checks + 1 + k).padStart(4, '0')}`, itemId: x.itemId, locationId: pe.locationId, reason: 'RETURN', expected: x.qty }) : undefined;
+          })
+          .filter((x): x is NonNullable<typeof x> => !!x);
+        return yes([ev('ReturnCompleted', { returnId: r.id, refundValue, restocked }), ...tasks]);
       }
       default:
         return no('INVALID_ORDER');
@@ -98,6 +119,11 @@ export const returnsModule: OpsModule = {
         const p = e.payload;
         s.returns[p.returnId] = { id: p.returnId, ...(p.orderId ? { orderId: p.orderId } : {}), kind: p.kind, status: 'OPEN', createdAt: e.at, associateId: e.actor, lines: [] };
         s.counters.returns += 1;
+        return true;
+      }
+      case 'ReturnLineRemoved': {
+        const r = s.returns[e.payload.returnId];
+        if (r) r.lines.splice(e.payload.index, 1);
         return true;
       }
       case 'ReturnItemScanned': {
@@ -130,15 +156,7 @@ export const returnsModule: OpsModule = {
           r.status = 'COMPLETED';
           r.completedAt = e.at;
           r.refundValue = e.payload.refundValue;
-          // 回架的商品：货架估算增加（低置信度，等下一次扫描确认）
-          for (const x of e.payload.restocked) {
-            const sh = s.shelf[x.itemId];
-            const cap = st?.planogram.find((p) => p.itemId === x.itemId)?.capacity;
-            if (sh) {
-              sh.est = cap !== undefined ? Math.min(cap, sh.est + x.qty) : sh.est + x.qty;
-              sh.at = e.at;
-            }
-          }
+          // 回架的商品在补货员放回货架、确认件数后才加到货架估算（决策记录 0026）
         }
         return true;
       }

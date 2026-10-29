@@ -13,6 +13,16 @@ export function locationParts(id: string): { aisle: string; side: string; bay: s
   return { aisle, side, bay: sideBay.slice(1).replace(/^0+/, ''), level };
 }
 
+/** 同一通道里的几个货位，简写成「左侧 11 号第 3 层、右侧 12 号第 1 层」（附近找一找用） */
+export function nearText(ids: readonly string[]): string {
+  return ids
+    .map((id) => {
+      const p = locationParts(id);
+      return t('{0} {1} 号第 {2} 层', p.side, p.bay, p.level);
+    })
+    .join(t('、'));
+}
+
 export function locationText(id: string): string {
   const p = locationParts(id);
   return t('{0} 通道 · {1} {2} 号 · 第 {3} 层', p.aisle, p.side, p.bay, p.level);

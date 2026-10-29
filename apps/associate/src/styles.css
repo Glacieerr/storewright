@@ -526,12 +526,20 @@ button:focus-visible {
   border-radius: 18px;
   box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.35);
 }
-.camera-close {
+/* 按钮放在一行里居中：不用 transform 居中，按下时（button:active 的 transform）按钮不会跳开 */
+.camera-actions {
   position: absolute;
+  left: 0;
+  right: 0;
   bottom: calc(24px + env(safe-area-inset-bottom));
-  left: 50%;
-  transform: translateX(-50%);
-  min-width: 140px;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 0 16px;
+}
+.camera-actions button {
+  min-width: 120px;
 }
 .camera-error {
   color: #fff;
@@ -1031,6 +1039,10 @@ li.done .check {
   color: var(--muted);
   font-weight: 500;
 }
+.person small.student-tag {
+  color: var(--brand);
+  font-weight: 600;
+}
 .avatar {
   width: 34px;
   height: 34px;
@@ -1195,9 +1207,8 @@ td.actions button {
 .toast {
   max-width: 560px;
   width: 100%;
-  /* 点一下关闭 */
-  pointer-events: auto;
-  cursor: pointer;
+  /* 提示条点不到、会自己消失：它常常盖在「已拣到」这类按钮上，点下去不能被它吃掉 */
+  pointer-events: none;
   background: var(--ink);
   color: var(--bg);
   border-radius: 12px;
@@ -1721,4 +1732,895 @@ body.embed .console-views {
 }
 .demo-banner.isolated {
   background: color-mix(in srgb, var(--warn) 18%, var(--surface));
+}
+
+/* 数字孪生（决策记录 0016）：控制台的「设备与告警」、员工手机顶部的告警条 */
+.pill {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.pill.ok {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 40%, var(--line));
+}
+.pill.alarm {
+  margin-left: 6px;
+  font-size: 11px;
+  padding: 1px 8px;
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--line));
+  background: color-mix(in srgb, var(--danger) 10%, var(--surface));
+}
+.twin-readings {
+  list-style: none;
+  margin: 10px 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+.twin-readings li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 13px;
+  background: var(--surface);
+}
+.twin-readings li b {
+  font-size: 15px;
+}
+.twin-readings li small {
+  grid-column: span 2;
+  color: var(--muted);
+}
+.twin-readings li.s-warn {
+  border-color: color-mix(in srgb, var(--warn) 50%, var(--line));
+  background: color-mix(in srgb, var(--warn) 8%, var(--surface));
+}
+.twin-readings li.s-alarm {
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, var(--surface));
+}
+.twin-readings li.s-alarm small,
+.twin-readings li.s-alarm b {
+  color: var(--danger);
+}
+.twin-readings li.s-stale small {
+  color: var(--warn);
+}
+.twin-alerts {
+  list-style: none;
+  margin: 10px 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.twin-alert {
+  border-radius: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.twin-alert.alarm {
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+}
+.twin-alert.warn {
+  border-color: color-mix(in srgb, var(--warn) 55%, var(--line));
+  background: color-mix(in srgb, var(--warn) 8%, var(--surface));
+}
+.twin-alert .row-head b {
+  color: var(--ink);
+}
+.twin-alert .note {
+  margin: 4px 0;
+}
+.twin-alert .ok-text,
+.ok-text {
+  color: var(--ok);
+  font-weight: 600;
+}
+.alert-banner {
+  margin: 0 0 10px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.alert-banner.alarm {
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, var(--surface));
+}
+.alert-banner.warn {
+  border-color: color-mix(in srgb, var(--warn) 55%, var(--line));
+  background: color-mix(in srgb, var(--warn) 10%, var(--surface));
+}
+.alert-banner-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: var(--tap);
+  padding: 8px 12px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.alert-banner.alarm .alert-banner-head b {
+  color: var(--danger);
+}
+.alert-banner .twin-alerts {
+  margin: 0;
+  padding: 0 10px 10px;
+}
+
+/* —— 门店 AI 第二轮 · 第一批（决策记录 0021）—— */
+/* 提醒（建议中枢） */
+.bell {
+  position: relative;
+  min-width: 40px;
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 18px;
+  line-height: 1;
+}
+.bell.on {
+  border-color: var(--warn);
+}
+.bell.urgent {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger) 25%, transparent);
+}
+.bell em {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  padding: 1px 5px;
+  border-radius: 9px;
+  background: var(--danger);
+  color: var(--danger-ink);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
+}
+.nudge-list ul li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.nudge-list ul li.unread .grow {
+  font-weight: 600;
+}
+.nudge-list .grow {
+  flex: 1 1 60%;
+}
+.nudge-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.tag.warn-tag,
+.warn-tag {
+  background: color-mix(in srgb, var(--warn) 14%, var(--surface));
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 40%, transparent);
+}
+/* 缺货预判 */
+.flag-note {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--warn) 12%, var(--surface));
+  color: var(--warn);
+  font-size: 14px;
+  font-weight: 600;
+}
+.repl-why {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 2px;
+}
+/* 运营预警 */
+.ai-action {
+  margin: 8px 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.ai-effect {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 6px 0 10px;
+  font-size: 14px;
+}
+.ai-effect th,
+.ai-effect td {
+  padding: 4px 6px;
+  text-align: right;
+  border-bottom: 1px solid var(--line);
+}
+.ai-effect th:first-child,
+.ai-effect td:first-child {
+  text-align: left;
+}
+.good-text {
+  color: var(--ok);
+}
+/* 订单量展望 */
+.outlook-bars {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  height: 92px;
+  margin: 8px 0;
+}
+.outlook-bars > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  gap: 2px;
+}
+.outlook-bars i {
+  display: block;
+  width: 70%;
+  min-height: 3px;
+  border-radius: 6px 6px 2px 2px;
+  background: color-mix(in srgb, var(--brand) 70%, transparent);
+}
+.outlook-bars small {
+  color: var(--muted);
+}
+
+/* —— 第二批（决策记录 0022）—— */
+/* 排班与补位 */
+.offer {
+  margin: 0 0 10px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--info) 40%, var(--line));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--info) 8%, var(--surface));
+}
+.my-shifts li {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+.my-shifts li.today {
+  font-weight: 700;
+}
+.plan.schedule th small,
+.plan.schedule td small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+.plan.schedule td {
+  white-space: nowrap;
+  font-size: 12px;
+}
+.plan.schedule th:first-child {
+  text-align: left;
+  white-space: nowrap;
+}
+.cover-chart h4 {
+  margin: 6px 0 2px;
+  font-size: 13px;
+}
+.cover-bars {
+  display: flex;
+  gap: 3px;
+  align-items: flex-end;
+  height: 70px;
+}
+.cover-bars > div {
+  position: relative;
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+}
+.cover-bars i {
+  display: block;
+  width: 80%;
+  min-height: 2px;
+  border-radius: 4px 4px 1px 1px;
+  background: color-mix(in srgb, var(--brand) 70%, transparent);
+}
+.cover-bars i.short {
+  background: color-mix(in srgb, var(--danger) 70%, transparent);
+}
+.cover-bars em {
+  position: absolute;
+  left: 5%;
+  right: 5%;
+  height: 2px;
+  background: var(--ink);
+  margin-bottom: 14px;
+}
+.cover-bars small {
+  color: var(--muted);
+  font-size: 10px;
+}
+.form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.form-row select {
+  flex: 1 1 180px;
+  min-height: 40px;
+}
+.block-note {
+  display: block;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+/* 门店 AI 第四批（决策记录 0024）：操作提示与小测验、下一步、顺路核对、语音、替代品反馈、召回、突发状况、简报列表 */
+.sop-tip,
+.next-task,
+.walk-check {
+  border-left: 4px solid var(--brand);
+}
+/* 「下一步」做得紧凑：一行说明、一行按钮，不把当前页面要做的事挤到屏幕外 */
+.next-task {
+  padding: 10px 12px;
+}
+.next-task p {
+  margin: 0 0 6px;
+}
+.next-task-what {
+  line-height: 1.45;
+}
+.next-task-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.next-task-actions button:not(.link) {
+  min-height: 40px;
+  padding: 0 14px;
+}
+.sop-quiz {
+  margin-top: 10px;
+}
+.sop-quiz .chip:disabled {
+  opacity: 1;
+}
+.sop-quiz .chip:disabled:not(.on):not(.wrong) {
+  opacity: 0.55;
+}
+.chip.wrong {
+  background: color-mix(in srgb, var(--danger) 12%, var(--surface));
+  color: var(--danger);
+  border-color: var(--danger);
+}
+.sub-rate {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+.sub-rate .chip {
+  min-height: 36px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+.voice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 8px 0;
+}
+.voice input {
+  flex: 1 1 220px;
+  min-height: 44px;
+}
+.voice .note {
+  flex-basis: 100%;
+  margin: 0;
+}
+.timeline li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  border-left: 2px solid var(--line);
+  padding: 4px 0 4px 10px;
+}
+.timeline .mono {
+  min-width: 3.2em;
+  color: var(--muted);
+}
+.recall-matches li,
+.brief-list li,
+.ai-health li,
+.contact-list li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+.recall-matches li:last-child,
+.brief-list li:last-child,
+.ai-health li:last-child,
+.contact-list li:last-child {
+  border-bottom: none;
+}
+.recall-matches .toggle {
+  align-items: flex-start;
+}
+.recall-matches .toggle small {
+  display: block;
+}
+ol.brief-list {
+  counter-reset: brief;
+}
+ol.brief-list li::before {
+  counter-increment: brief;
+  content: counter(brief) '. ';
+  color: var(--muted);
+}
+.ai-health li,
+.contact-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.ai-health li small {
+  flex-basis: 100%;
+}
+
+/* 手机宽度（展示页里的手机约 300 像素宽）的修复 */
+/* 标签多（5 个以上）的分段控件：不换行，不把「模式与统计」挤成三行；宽屏一行（放不下时横向滑动），窄屏排成三列 */
+.segmented.wide:has(> button:nth-child(5)) {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.segmented.wide:has(> button:nth-child(5))::-webkit-scrollbar {
+  display: none;
+}
+.segmented.wide:has(> button:nth-child(5)) > button {
+  flex: 1 0 auto;
+  white-space: nowrap;
+  padding: 0 12px;
+}
+@media (max-width: 420px) {
+  .segmented.wide:has(> button:nth-child(5)) {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1px;
+    overflow: hidden;
+    background: var(--line);
+  }
+  .segmented.wide:has(> button:nth-child(5)) > button {
+    padding: 0 6px;
+    min-height: 42px;
+    background: var(--surface);
+  }
+  .segmented.wide:has(> button:nth-child(5)) > button.on {
+    background: var(--brand);
+  }
+  /* 窄屏的分段标签不换行；数字角标放到右上角，不占标签的宽度（「熟食现做」不再挤成两行） */
+  .segmented.wide > button {
+    white-space: nowrap;
+    padding: 0 6px;
+  }
+  .segmented.wide em {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    min-width: 16px;
+    height: 16px;
+    line-height: 16px;
+    font-size: 10px;
+    padding: 0 4px;
+  }
+}
+/* 突发状况横幅的标题：点一下展开 / 收起 */
+.incident-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 10px;
+  width: 100%;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  font-weight: inherit;
+}
+.incident-count {
+  font-size: 13px;
+  white-space: nowrap;
+}
+.banner.incident ul {
+  margin-top: 6px;
+}
+/* 现场页的文本框占满宽度 */
+.field-text {
+  width: 100%;
+  margin-bottom: 8px;
+  font: inherit;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1.5px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+}
+/* 退货的数量：标签不要竖着换行，加减按钮做小一点，手机宽度放得下 */
+.return-qty-label {
+  white-space: nowrap;
+}
+.qty-row .stepper {
+  gap: 12px;
+  margin: 6px 0;
+  flex: 1;
+}
+.qty-row .stepper button {
+  width: 52px;
+  height: 52px;
+  font-size: 24px;
+}
+.qty-row .stepper b {
+  font-size: 34px;
+  min-width: 48px;
+}
+/* 框的行：窄屏时各项整个换到下一行，不逐字挤成一列 */
+.tote-list .row-btn,
+.prep-list .row-btn {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+.tote-list .row-btn > span,
+.prep-list .row-btn > span {
+  white-space: nowrap;
+}
+/* 面板底部固定的操作（内容比面板高时不用滚动也能点到） */
+.sheet-foot {
+  position: sticky;
+  bottom: calc(-18px - env(safe-area-inset-bottom));
+  display: grid;
+  gap: 6px;
+  margin: 10px -16px calc(-18px - env(safe-area-inset-bottom));
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+}
+.sheet-foot .link {
+  justify-self: center;
+}
+/* 送货单比对：表头不竖着换行；批号和保质期分两行 */
+.note-compare th {
+  white-space: nowrap;
+}
+.lot-cell span {
+  display: block;
+}
+.lot-cell small {
+  display: block;
+  color: var(--muted);
+}
+@media (max-width: 420px) {
+  .note-compare table {
+    font-size: 13px;
+  }
+  .note-compare th,
+  .note-compare td {
+    padding: 6px 4px;
+  }
+}
+
+
+/* —— 在岗人员与调配（决策记录 0025）—— */
+.team-btn {
+  min-width: 44px;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 0 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1;
+}
+.team-btn em {
+  font-style: normal;
+  font-size: 13px;
+  font-weight: 700;
+}
+.team-group {
+  margin: 10px 0;
+}
+.team-group h4 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 0 0 2px;
+  font-size: 14px;
+}
+.team-group h4 .tag {
+  margin-right: 0;
+}
+.team-group.short h4 > span:first-child {
+  color: var(--danger);
+}
+.team-list .team-row {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+.team-list .team-row:last-child {
+  border-bottom: none;
+}
+.team-row.me {
+  margin: 0 -6px;
+  padding-left: 6px;
+  padding-right: 6px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--brand) 8%, transparent);
+}
+.team-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+}
+.team-line .tag {
+  margin-right: 0;
+}
+.team-line .small,
+.team-dur .small {
+  font-size: 12px;
+}
+.team-line .team-toggle {
+  margin-left: auto;
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+.team-move {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 4px;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--bg);
+}
+.team-move .note {
+  margin: 0;
+}
+.team-dur,
+.team-targets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.team-dur .chip,
+.team-targets .chip {
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+.team-targets .chip.knows {
+  border-color: var(--ok);
+}
+.team-move .link {
+  justify-self: start;
+}
+.team-group.off > .link {
+  padding: 4px 0;
+}
+/* 窄屏手机：顶栏放下「在岗」和铃铛（手机自己有时钟，这里不再显示；连接状态只留圆点） */
+@media (max-width: 360px) {
+  .statusbar {
+    gap: 6px;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+  .statusbar .clock {
+    display: none;
+  }
+  .statusbar .link-state {
+    font-size: 0;
+    gap: 0;
+  }
+  .statusbar .link-state em {
+    margin-left: 4px;
+    font-size: 11px;
+  }
+  .bell,
+  .team-btn {
+    min-width: 38px;
+  }
+}
+
+/* —— 修复全部卡点（决策记录 0026）—— */
+/* 数量：加减按钮 + 可以直接输入的数字 */
+.qty-input {
+  gap: 12px;
+}
+.qty-input input {
+  width: 4.6em;
+  min-height: 48px;
+  text-align: center;
+  font: 700 22px/1 ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  -moz-appearance: textfield;
+}
+.qty-input input::-webkit-outer-spin-button,
+.qty-input input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+/* 摄像头连续扫：读到的码 */
+.camera-last {
+  position: absolute;
+  left: 50%;
+  bottom: calc(96px + env(safe-area-inset-bottom));
+  translate: -50% 0;
+  max-width: calc(100% - 32px);
+  margin: 0;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 13px;
+  text-align: center;
+}
+/* 拣货：贴标签可以折叠；跳过、加框、转给别人 */
+.bind-phase > summary {
+  cursor: pointer;
+}
+.pick-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+}
+.confirm-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.confirm-row button {
+  min-height: 36px;
+  font-size: 13px;
+}
+/* 门店设置 */
+.store-settings .radio-set {
+  border: 0;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.store-settings legend {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+/* 补货整批取箱、箱子放回、盘点数量 */
+.row-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 10px;
+  margin: 4px 0;
+}
+.batch-cases .row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  padding: 2px 0 6px 34px;
+  font-size: 13px;
+}
+.putback {
+  border-color: var(--warn);
+}
+.count-row .qty-input {
+  gap: 8px;
+}
+.count-row .qty-input button {
+  width: 44px;
+}
+.count-row .qty-input input {
+  width: 3.6em;
+  min-height: 40px;
+  font-size: 18px;
+}
+/* 送货单：实收和破损可以改 */
+.note-qty {
+  width: 4.2em;
+  min-height: 36px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 决策记录 0026：排班草稿可以改、AI 建议二次确认、补班邀请的其他人选 */
+.plan.schedule td .cell-btn {
+  all: unset;
+  display: block;
+  width: 100%;
+  min-height: 32px;
+  cursor: pointer;
+  border-radius: 6px;
+  text-align: center;
+}
+.plan.schedule td .cell-btn:hover,
+.plan.schedule td .cell-btn:focus-visible {
+  background: var(--surface-2);
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+}
+.plan.schedule td .cell-btn.on {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+}
+.shift-editor .form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+.shift-editor label {
+  display: grid;
+  gap: 4px;
+}
+.ai-confirm {
+  border: 2px solid var(--warn);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-top: 8px;
+}
+.offer-options {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0;
 }

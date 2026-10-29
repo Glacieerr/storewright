@@ -6,3 +6,4 @@ export * from './trips';
 export * from './staging';
 export * from './replenish';
 export * from './planogram';
+export * from './queue';

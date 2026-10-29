@@ -1,6 +1,6 @@
-import { expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
 import { Recorder } from './recorder';
-import { scan, signIn, state, tab, until, type AnyState } from './helpers';
+import { scan, signIn, state, tab, until, test, type AnyState } from './helpers';
 
 /** 后仓：到货通知 → 卡车到 → 逐个商品收货（含破损、少收）→ 关闭收货单显示差异 → 上架 → 待检处理 → 盲盘 */
 test('04 收货、上架与盘点', async ({ browser }) => {
@@ -19,12 +19,12 @@ test('04 收货、上架与盘点', async ({ browser }) => {
     return `收货单 ${rc.id}：${rc.expected.length} 个商品，共 ${rc.expected.reduce((a: number, l: AnyState) => a + l.cases, 0)} 箱`;
   }, { shot: con, device: '控制台' });
 
-  await r.step('后仓员打开收货单，卡车到了开始收货', async () => {
+  await r.step('后仓员打开收货单直接扫箱：第一次扫箱就算卡车到了（「卡车已到」可以不点，决策记录 0026）', async () => {
     await tab(br, '库存');
     await br.getByRole('tab', { name: /收货/ }).click();
     await br.locator('.row-btn', { hasText: receiptId }).click();
-    await br.getByRole('button', { name: '卡车已到，开始收货' }).click();
-    await expect(br.getByLabel('扫描箱上原有条码', { exact: true })).toBeVisible();
+    await expect(br.getByRole('button', { name: /卡车已到（扫第一箱时也会自动记下）/ })).toBeVisible();
+    await expect(br.getByLabel('扫描箱上原有条码，或送货单上的二维码', { exact: true })).toBeVisible();
   }, { shot: br, device: '后仓员手机' });
 
   await r.step('逐个商品扫箱上原有条码收货：一个商品少收 1 箱，另一个有 1 箱破损（进待检区），其余按通知收', async () => {
@@ -33,11 +33,11 @@ test('04 收货、上架与盘点', async ({ browser }) => {
     const notes: string[] = [];
     // 扫描后数量默认是 1；按目标箱数加上去
     const receive = async (gtin: string, name: string, cases: number, damaged: boolean) => {
-      await scan(br, '扫描箱上原有条码', gtin);
+      await scan(br, '扫描箱上原有条码，或送货单上的二维码', gtin);
       const card = br.locator('.card', { hasText: name }).filter({ has: br.locator('.stepper') });
       for (let k = 1; k < cases; k++) await card.locator('.stepper button').last().click();
       if (damaged) await card.getByLabel('有破损（进入待检区）').check();
-      await card.getByRole('button', { name: /收货并打印/ }).click();
+      await card.getByRole('button', { name: /^收货 \d+ 箱$/ }).click();
       await expect(card).toHaveCount(0);
     };
     const lines = rc.expected as AnyState[];
@@ -60,8 +60,9 @@ test('04 收货、上架与盘点', async ({ browser }) => {
     return notes.join('；');
   }, { shot: br, device: '后仓员手机', fullPage: true });
 
-  await r.step('关闭收货单：与通知比较，列出短少和破损', async () => {
+  await r.step('关闭收货单（要确认，决策记录 0026）：与通知比较，列出短少和破损', async () => {
     await br.getByRole('button', { name: '关闭收货单' }).click();
+    await br.getByRole('button', { name: '确认关闭' }).click();
     await until(br, (s) => !!s.receipts[receiptId].closedAt);
     const s = await state(br);
     const rc = s.receipts[receiptId];
@@ -98,14 +99,18 @@ test('04 收货、上架与盘点', async ({ browser }) => {
     return `本单 ${cs.length} 箱：可售 ${cs.filter((c) => c.status === 'SELLABLE').length}，退供应商 ${cs.filter((c) => c.status === 'RTV').length}，待检 ${cs.filter((c) => c.status === 'QA').length}`;
   }, { shot: br, device: '后仓员手机' });
 
-  await r.step('生成一个盘点任务（控制台代替排程），后仓员领取', async () => {
+  await r.step('生成一个盘点任务（控制台代替排程），后仓员领取，到库位先扫库位标签（决策记录 0026）', async () => {
     const s = await state(br);
     const bin = Object.values(s.cases as Record<string, AnyState>).find((c) => c.receiptId === receiptId && c.status === 'SELLABLE')?.binCode;
     await con.evaluate((b) => (window as unknown as { __swa: { send(c: unknown): Promise<unknown> } }).__swa.send({ type: 'CreateCount', binCode: b }), bin);
     await br.getByRole('tab', { name: /盘点/ }).click();
     await br.getByRole('button', { name: '领取' }).first().click();
+    // 领到的是最早的盘点任务（可能是排程生成的另一个库位）：扫它自己的库位标签
+    await until(br, (st) => Object.values(st.counts as Record<string, AnyState>).some((c) => c.status === 'CLAIMED' && c.associateId === 'A09'));
+    const mine = Object.values((await state(br)).counts as Record<string, AnyState>).find((c) => c.status === 'CLAIMED' && c.associateId === 'A09');
+    await scan(br, `到库位 ${mine.binCode}，扫描库位标签开始`, mine.binCode);
     await expect(br.getByRole('button', { name: '提交盘点' })).toBeVisible();
-    return `库位 ${bin}`;
+    return `新建库位 ${bin} 的盘点；领到库位 ${mine.binCode}，扫库位标签后开始数`;
   }, { shot: br, device: '后仓员手机' });
 
   await r.step('盲盘：不显示系统数量，逐个商品数箱数后提交；数量一致时记录一致', async () => {

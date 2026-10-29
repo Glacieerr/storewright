@@ -66,7 +66,10 @@ export function customerEntrance(model: StoreModel, geo: StoreGeometry): { outsi
   return { outside: { x: nw.x, y: 0, z: -1.5 }, node: best };
 }
 
-export function planShopper(model: StoreModel, geo: StoreGeometry, stay: Stay, index: number): ShopperTrack | undefined {
+/**
+ * openManual：采纳了收银通道计划时（决策记录 0020），某层某小时开几条人工通道（其余关着）；自助收银一直开着。
+ */
+export function planShopper(model: StoreModel, geo: StoreGeometry, stay: Stay, index: number, openManual?: (floorId: string, hour: number) => number | undefined): ShopperTrack | undefined {
   const spot = geo.lot.spots[stay.spot];
   if (!spot) return undefined;
   const rng = createRng(index * 7919 + stay.spot * 31 + 17);
@@ -92,13 +95,29 @@ export function planShopper(model: StoreModel, geo: StoreGeometry, stay: Stay, i
     route.push(entrance.node);
     const segs: Vec3[][] = [];
     for (let k = 1; k < route.length; k++) segs.push(walkBetween(model, geo, route[k - 1] as number, route[k] as number));
-    // 结账：从入口附近走到一个收银通道，排队结账后再出门
-    const lanes = geo.checkouts;
+    // 结账：最后逛的是二楼就在二楼的收银区结账、再乘扶梯下楼（决策记录 0019），否则在一楼入口旁结账
+    const lastStop = model.nodes[route[route.length - 2] as number];
+    const upper = lastStop && lastStop.floorId !== (geo.floors[0]?.floorId ?? 'F1') ? lastStop.floorId : undefined;
+    const onUpper = upper ? geo.checkouts.filter((c) => c.floorId === upper) : [];
+    const floorLanes = onUpper.length ? onUpper : geo.checkouts.filter((c) => c.floorId === (geo.floors[0]?.floorId ?? 'F1'));
+    // 按计划只去开着的通道：前 k 条人工通道和自助收银
+    const k = openManual?.(floorLanes[0]?.floorId ?? '', Math.floor(tBack / 3600) % 24);
+    const openLanes = k === undefined ? floorLanes : [...floorLanes.filter((c) => !c.self).slice(0, k), ...floorLanes.filter((c) => c.self)];
+    const lanes = openLanes.length ? openLanes : floorLanes;
     if (lanes.length) {
       const lane = lanes[(index * 7 + stay.spot) % lanes.length] as (typeof lanes)[number];
-      const last = segs[segs.length - 1];
-      const from = last ? (last[last.length - 1] as Vec3) : node(entrance.node);
-      segs.push([from, { x: lane.x, y: 0, z: lane.z + 2.2 }, { x: lane.x, y: 0, z: lane.z - 1.6 }, node(entrance.node)]);
+      if (onUpper.length) {
+        // 走回入口的那段路改成：先到二楼收银台，结完账再下楼回入口
+        segs.pop();
+        const prev = route[route.length - 2] as number;
+        const toLane = walkBetween(model, geo, prev, nearestNode(model, upper as string, lane.x, lane.z + 2.2));
+        segs.push([...toLane, { x: lane.x, y: lane.y, z: lane.z + 2.2 }, { x: lane.x, y: lane.y, z: lane.z - 1.6 }]);
+        segs.push(walkBetween(model, geo, nearestNode(model, upper as string, lane.x, lane.z - 1.6), entrance.node));
+      } else {
+        const last = segs[segs.length - 1];
+        const from = last ? (last[last.length - 1] as Vec3) : node(entrance.node);
+        segs.push([from, { x: lane.x, y: lane.y, z: lane.z + 2.2 }, { x: lane.x, y: lane.y, z: lane.z - 1.6 }, node(entrance.node)]);
+      }
     }
     const lens = segs.map((p) => leg(p, 0, 1, cart).len);
     const walkTotal = lens.reduce((a, b) => a + b, 0) / WALK;
@@ -120,6 +139,21 @@ export function planShopper(model: StoreModel, geo: StoreGeometry, stay: Stay, i
   const tOut = Math.max(tDoor, tBack);
   legs.push(leg(back, tOut, tOut + walkSec, cart));
   return { legs, start: tIn, end: tOut + walkSec, cart };
+}
+
+/** 某一层上离 (x, z) 最近的行走网络节点 */
+function nearestNode(model: StoreModel, floorId: string, x: number, z: number): number {
+  let best = 0;
+  let bd = Infinity;
+  model.nodes.forEach((n, i) => {
+    if (n.floorId !== floorId) return;
+    const d = Math.hypot(n.x - x, n.y - z);
+    if (d < bd) {
+      bd = d;
+      best = i;
+    }
+  });
+  return best;
 }
 
 /**

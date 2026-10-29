@@ -1,23 +1,17 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import { Recorder } from './recorder';
-import { SITE } from './helpers';
+import { SITE, test } from './helpers';
 
 const app = (p: Page, fn: string) => p.evaluate(`(() => { const s = window.__sw.useApp.getState(); return (${fn})(s); })()`);
-// 「你的商店」在私有模块里（在线版的付费部分）；公开仓库里没有时跳过整个部分
-const PRIVATE_MODULE = 'private/your-store-app/src/index.tsx';
-// 测试授权码只在作者的电脑上；没有时跳过专业版的步骤
-const LICENSE = 'private/your-store-app/keys/test-license.txt';
 
-/** 「你的商店」（决策记录 0013）：从零搭建自己的门店 → 编辑 → 开业检查 → 全天仿真；专业版：实时沙盒 */
+/** 「你的商店」（决策记录 0013、0027）：从零搭建自己的门店 → 编辑 → 开业检查 → 全天仿真 → 复制、导出 → 实时沙盒 */
 test('15 你的商店', async ({ browser }) => {
-  test.skip(!existsSync(PRIVATE_MODULE), '「你的商店」的私有模块不在这台电脑上');
   const r = new Recorder('你的商店', 15);
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'zh-CN', baseURL: SITE });
   const p = await ctx.newPage();
   await p.addInitScript(() => localStorage.setItem('storewright.tour.seen', '1'));
 
-  await r.step('顶栏的「你的商店」：项目页（免费版可以搭建并运行一家门店）', async () => {
+  await r.step('顶栏的「你的商店」：项目页（门店保存在这台电脑的浏览器里，数量不限）', async () => {
     await p.goto('/sim/?debug');
     await expect(p.getByText(/仿真用时/)).toBeVisible({ timeout: 60_000 });
     await p.getByRole('button', { name: '你的商店', exact: true }).click();
@@ -73,38 +67,33 @@ test('15 你的商店', async ({ browser }) => {
     return (await p.locator('.ys-card').innerText()).replace(/\n/g, ' ');
   }, { shot: p, device: '电脑' });
 
-  await r.step('免费版只能保存一家门店：再点「新建门店」时提示专业版', async () => {
-    await p.getByRole('button', { name: '新建门店' }).click();
-    await expect(p.locator('.ys-modal')).toBeVisible();
-    return (await p.locator('.ys-modal-card p').first().innerText()).trim();
+  await r.step('复制门店：门店数量不限，复制出的门店排在前面，方便在副本上试另一种方案', async () => {
+    await p.locator('.ys-card').getByRole('button', { name: '复制' }).click();
+    await expect(p.locator('.ys-card')).toHaveCount(2);
+    return (await p.locator('.ys-card h3').allInnerTexts()).join('、');
   }, { shot: p, device: '电脑' });
 
-  if (!existsSync(LICENSE)) {
-    r.note('专业版', '没有测试授权码（private/ 只在作者的电脑上），跳过实时沙盒的步骤');
-  } else {
-    await r.step('购买 / 授权提示：一次性购买、不需要账号；输入测试授权码激活专业版（测试授权码只在本机有效）', async () => {
-      await p.locator('#ys-license').fill(readFileSync(LICENSE, 'utf8').trim());
-      await p.getByRole('button', { name: '激活' }).click();
-      await expect(p.locator('.ys-plan.pro')).toBeVisible();
-      return (await p.locator('.ys-plan').innerText()).trim();
-    }, { shot: p, device: '电脑' });
+  await r.step('导出门店文件：下载 .storewright.json，换电脑或换浏览器时用「导入门店文件」导回来', async () => {
+    const [file] = await Promise.all([p.waitForEvent('download'), p.locator('.ys-card').first().getByRole('button', { name: '导出' }).click()]);
+    expect(file.suggestedFilename()).toMatch(/\.storewright\.json$/);
+    return file.suggestedFilename();
+  });
 
-    const id = String(await p.evaluate(`new Promise((res) => { const r = indexedDB.open('storewright-projects', 1); r.onsuccess = () => { const g = r.result.transaction('projects').objectStore('projects').getAll(); g.onsuccess = () => res(g.result[0].id); }; })`));
-    const sc = await ctx.newPage();
-    await r.step('实时沙盒：浏览器里的门店中枢按你搭的门店建店；控制台、两部手机和门店实况都连到这家门店', async () => {
-      await sc.goto(`/app/showcase.html?project=${encodeURIComponent(id)}&layout=split`);
-      await expect(sc.locator('.sc-head h1')).toContainText('社区生鲜店', { timeout: 60_000 });
-      await expect(sc.frameLocator('iframe.sc-sim').locator('.live-chip', { hasText: '社区生鲜店' })).toBeVisible({ timeout: 120_000 });
-      await expect(sc.frameLocator('.phone iframe').first().locator('.link-state.live')).toBeVisible({ timeout: 60_000 });
-      await sc.waitForTimeout(3000);
-      return (await sc.locator('.sc-head p').innerText()).trim();
-    }, { shot: sc, device: '电脑' });
+  const id = String(await p.evaluate(`new Promise((res) => { const r = indexedDB.open('storewright-projects', 1); r.onsuccess = () => { const g = r.result.transaction('projects').objectStore('projects').getAll(); g.onsuccess = () => res(g.result.find((x) => x.name === '社区生鲜店').id); }; })`));
+  const sc = await ctx.newPage();
+  await r.step('实时沙盒：浏览器里的门店中枢按你搭的门店建店；控制台、两部手机和数字孪生都连到这家门店', async () => {
+    await sc.goto(`/app/showcase.html?project=${encodeURIComponent(id)}&layout=split`);
+    await expect(sc.locator('.sc-head h1')).toContainText('社区生鲜店', { timeout: 60_000 });
+    await expect(sc.frameLocator('iframe.sc-sim').locator('.live-chip', { hasText: '社区生鲜店' })).toBeVisible({ timeout: 120_000 });
+    await expect(sc.frameLocator('.phone iframe').first().locator('.link-state.live')).toBeVisible({ timeout: 60_000 });
+    await sc.waitForTimeout(3000);
+    return (await sc.locator('.sc-head p').innerText()).trim();
+  }, { shot: sc, device: '电脑' });
 
-    await r.step('在你的门店里下单：拣货员手机出现批次', async () => {
-      await sc.frameLocator('iframe.sc-console').getByRole('button', { name: '创建', exact: true }).click();
-      await expect(sc.frameLocator('.phone iframe').first().getByText(/可以领取的批次/)).toBeVisible({ timeout: 30_000 });
-      await sc.waitForTimeout(1500);
-    }, { shot: sc, device: '电脑' });
-  }
+  await r.step('在你的门店里下单：拣货员手机出现批次', async () => {
+    await sc.frameLocator('iframe.sc-console').getByRole('button', { name: '创建', exact: true }).click();
+    await expect(sc.frameLocator('.phone iframe').first().getByText(/可以领取的批次/)).toBeVisible({ timeout: 30_000 });
+    await sc.waitForTimeout(1500);
+  }, { shot: sc, device: '电脑' });
   expect(r.failures, r.failures.join('\n')).toEqual([]);
 });

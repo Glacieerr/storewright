@@ -1,6 +1,6 @@
 import type { ServiceJob } from '@storewright/sim-engine';
 import type { FacilityGeometry } from './layout';
-import { entryPath, roundCorners, TimedPath, type LotLayout, type Pt, type RoadAccess } from './lot';
+import { entryPath, inLaneX, outLaneX, roundCorners, TimedPath, type LotLayout, type Pt, type RoadAccess } from './lot';
 
 /**
  * 汽车快修中心的车辆动线：从道路驶入 → 在等候车位（或消防车道上排队）等待 →
@@ -79,9 +79,9 @@ export function planServiceVisits(fac: FacilityGeometry, lot: LotLayout, road: R
         roundCorners(
           [
             { x: startX, z: inLane },
-            { x: px, z: inLane },
-            { x: px, z: lot.edgeZ },
-            { x: px, z: fire },
+            { x: inLaneX(px), z: inLane },
+            { x: inLaneX(px), z: lot.edgeZ },
+            { x: inLaneX(px), z: fire },
             { x: slotX, z: fire },
           ],
           3,
@@ -121,9 +121,9 @@ export function planServiceVisits(fac: FacilityGeometry, lot: LotLayout, road: R
       roundCorners(
         [
           { x: bay.x - dir * 2.6, z: fire },
-          { x: px, z: fire },
-          { x: px, z: lot.edgeZ },
-          { x: px, z: laneZ },
+          { x: outLaneX(px), z: fire },
+          { x: outLaneX(px), z: lot.edgeZ },
+          { x: outLaneX(px), z: laneZ },
           { x: endX, z: laneZ },
         ],
         3,

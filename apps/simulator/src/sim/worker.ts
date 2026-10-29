@@ -1,12 +1,13 @@
 /// <reference lib="webworker" />
 import { buildPlanogram } from '@storewright/algorithms';
 import { formatCustomerName, keyedUniform, type AnyDomainEvent, type DomainEvent } from '@storewright/domain';
-import { StoreModel } from '@storewright/store-config';
+import { backroomLayout, StoreModel } from '@storewright/store-config';
 import { generateCatalog, generateOrders } from '@storewright/synth';
-import { BASELINE, DEFAULT_AUTO_SERVICE, DEFAULT_INBOUND, defaultInboundVolume, DEFAULT_SMALL_INCIDENTS, DEFAULT_TRAFFIC, DISRUPTION_LABEL, EFFICIENCY, OPTIMIZED, ROLES, defaultScenario, estimateRestockCases, printerJam, randomDisruptions, ShelfStock, simulateAutoService, simulateDay, simulateInbound, simulatePharmacy, WEEKDAY_FACTORS, type Disruption, type Policy, type Role } from '@storewright/sim-engine';
+import { BASELINE, DEFAULT_AUTO_SERVICE, DEFAULT_INBOUND, defaultInboundVolume, DEFAULT_SMALL_INCIDENTS, DEFAULT_TRAFFIC, DISRUPTION_LABEL, EFFICIENCY, OPTIMIZED, ROLES, defaultScenario, estimateRestockCases, printerJam, RAILWAY_CROSSING, randomDisruptions, SCHOOL_RUSH, ShelfStock, simulateAutoService, studentShifts, inboundDeliveries, moveDelivery, adviseInbound, adviseBackroom, adviseStaging, adviseFront, adviseRisks, defaultNightCrew, STAGING_ZONES, type Advice, type BackroomLab, type StagingLab, type StagingRun, type StagingZone, type InboundAdjust, type InboundParams, type InboundRun, type Season, simulateDay, simulateInbound, simulatePharmacy, WEEKDAY_FACTORS, type Disruption, type Policy, type Role } from '@storewright/sim-engine';
 import { simWeather, weatherPlan } from './weatherPlan';
+import { digestOf } from '../state/scenarios';
 import { applyLang, ensureLang, t, translate, trRecord } from '../i18n';
-import type { AutoServiceTimeline, CarInfo, DayDigest, Notification, OrderInfo, PolicyDigest, Series, ShelfEventInfo, ShelfTimeline, SimRequest, SimResponse, Timeline, WorkerRequest } from './protocol';
+import type { AdviceResult, AdviseRequest, WhatIfDigest, AutoServiceTimeline, CarInfo, DayDigest, Notification, OrderInfo, PolicyDigest, Series, ShelfEventInfo, ShelfTimeline, SimRequest, SimResponse, Timeline, WorkerRequest } from './protocol';
 
 const POLICIES: Record<SimRequest['policy'], Policy> = { baseline: BASELINE, optimized: OPTIMIZED, efficiency: EFFICIENCY };
 const ZONES_CN: Record<string, string> = trRecord({ AMBIENT: '常温', CHILLED: '冷藏', FROZEN: '冷冻' });
@@ -15,9 +16,8 @@ function of<K extends AnyDomainEvent['type']>(events: AnyDomainEvent[], type: K)
   return events.filter((e) => e.type === type) as Array<DomainEvent<K>>;
 }
 
-function buildTimeline(req: SimRequest): Timeline {
-  applyLang(req.lang ?? 'zh', false);
-  const t0 = performance.now();
+/** 一天仿真的准备：门店模型、商品、场景（排班、天气、路况、突发状况、学生兼职工）、订单、货架存量、策略 */
+function prepare(req: SimRequest) {
   const model = new StoreModel(req.config);
   const catalog = generateCatalog(model, { seed: 7 });
   const scenario = defaultScenario(req.demandTemplate);
@@ -33,7 +33,14 @@ function buildTimeline(req: SimRequest): Timeline {
   const dyn = req.weather === 'dynamic' ? simWeather(weatherPlan(req.weatherSeed ?? 1, req.season ?? 'autumn'), req.config.hours.openMin * 60, req.config.hours.closeMin * 60) : undefined;
   const [demandK, trafficK] = dyn ? [dyn.demandK, 1] : W[req.weather ?? 'clear'];
   scenario.demand = { ...scenario.demand, ordersPerDay: Math.round((req.ordersPerDay ?? scenario.demand.ordersPerDay) * req.demandFactor * demandK) };
-  scenario.traffic = { ...DEFAULT_TRAFFIC, level: req.traffic * trafficK, profile: DEFAULT_TRAFFIC.profile.map((p, h) => p * (dyn?.trafficByHour[h] ?? 1)) };
+  // 周边的问题（决策记录 0019）：学校的上学放学高峰、铁路道口关闭（与拥堵强度无关，强度关闭时也有）
+  scenario.traffic = {
+    ...DEFAULT_TRAFFIC,
+    level: req.traffic * trafficK,
+    profile: DEFAULT_TRAFFIC.profile.map((p, h) => p * (dyn?.trafficByHour[h] ?? 1)),
+    ...(req.school ? { extra: SCHOOL_RUSH } : {}),
+    ...(req.railway ? { railway: RAILWAY_CROSSING } : {}),
+  };
   // 突发状况：手动触发的 + 随机大事件 + 打印机卡纸（随小状况一起开启）
   const inc = req.incidents;
   const weatherSlow: Disruption[] = dyn
@@ -47,6 +54,10 @@ function buildTimeline(req: SimRequest): Timeline {
     const disruptions: Disruption[] = [...(inc?.manual ?? []), ...(inc?.randomLarge ? randomDisruptions(req.seed, open, close) : []), ...(inc?.small ? printerJam(req.seed, open, close) : [])].sort((a, b) => a.start - b.start);
     scenario.incidents = { small: inc?.small ? DEFAULT_SMALL_INCIDENTS : null, disruptions: [...disruptions, ...weatherSlow] };
   }
+  // 学生兼职工（决策记录 0020）：按星期、季节和营业时间排出当天的班次，在全职排班之外加人
+  const season = (['spring', 'summer', 'autumn', 'winter'] as const).find((x) => x === req.season) ?? 'autumn';
+  const students = req.students ? studentShifts(req.students, { weekday: req.weekday ?? 3, season, open: req.config.hours.openMin * 60, close: req.config.hours.closeMin * 60 }) : [];
+  if (students.length) scenario.students = students;
   const orders = generateOrders(model, catalog, scenario.demand, { seed: req.seed });
   // 货架存量模型（Phase 4）：后仓按「后仓有货概率」放 1–2 箱；夜班补货关闭时开门填充率偏低
   // 货架容量按「店内销售 + 线上订单」的总需求配置；店内销售只占其中一部分
@@ -73,6 +84,53 @@ function buildTimeline(req: SimRequest): Timeline {
     : undefined;
   const base = POLICIES[req.policy];
   const policy = req.ai ? { ...base, ai: { staffing: true, eta: true, substitution: true } } : base;
+  return { model, catalog, scenario, orders, shelf, policy, season, students, dyn, planogram };
+}
+
+/** 到货、后仓的参数：按当天各通道的拣货量估算销售分布（夜班补货用），到货量按门店规模 */
+function inboundSetup(req: SimRequest, prep: { model: StoreModel; catalog: ReturnType<typeof generateCatalog>; scenario: ReturnType<typeof defaultScenario>; season: Season }, res: ReturnType<typeof simulateDay>): { params: InboundParams; runWeights: Record<string, number> } {
+  const { model, catalog, scenario, season } = prep;
+  const runWeights: Record<string, number> = {};
+  for (const e of of(res.events, 'ItemPicked')) {
+    const item = catalog.byId.get(e.payload.itemId);
+    const loc = item ? model.locations.get(item.locationIds[0] as string) : undefined;
+    if (loc) runWeights[loc.runId] = (runWeights[loc.runId] ?? 0) + e.payload.qty;
+  }
+  const hours = req.config.hours;
+  const scaleK = Math.max(0.3, (req.ordersPerDay ?? scenario.demand.ordersPerDay / Math.max(0.01, req.demandFactor)) / 260);
+  const nightCrewN = req.nightCrew?.enabled ? req.nightCrew.crew : 0;
+  const params: InboundParams = {
+    ...DEFAULT_INBOUND,
+    ...defaultInboundVolume(scaleK),
+    open: hours.openMin * 60,
+    close: hours.closeMin * 60,
+    nextOpen: (hours.openMin + 24 * 60) * 60,
+    nightCrew: nightCrewN,
+    totalCases: estimateRestockCases(res.metrics.units),
+    weekday: req.weekday ?? 3,
+    season,
+    ...(scenario.traffic && (scenario.traffic.level > 0 || scenario.traffic.extra || scenario.traffic.railway) ? { traffic: scenario.traffic } : {}),
+  };
+  return { params, runWeights };
+}
+
+/** 把采纳的 AI 建议（或正在试的改动）应用到到货、后仓的参数上（决策记录 0020） */
+function withInboundAdjust(p: InboundParams, model: StoreModel, seed: number, adj?: InboundAdjust): InboundParams {
+  if (!adj) return p;
+  const out: InboundParams = { ...p };
+  if (adj.receivers !== undefined) out.receivers = adj.receivers;
+  if (adj.nightCrew !== undefined) out.nightCrew = adj.nightCrew;
+  if (adj.slotting) out.slotting = adj.slotting;
+  if (adj.liftOrder) out.liftOrder = adj.liftOrder;
+  const moves = adj.appt;
+  if (moves && Object.keys(moves).length) out.deliveries = inboundDeliveries(model, p, seed).map((d) => (moves[d.id] !== undefined ? moveDelivery(d, moves[d.id] as number, p.traffic) : d));
+  return out;
+}
+
+function buildTimeline(req: SimRequest): Timeline {
+  applyLang(req.lang ?? 'zh', false);
+  const t0 = performance.now();
+  const { model, catalog, scenario, orders, shelf, policy, season, students, dyn, planogram } = prepare(req);
   const res = simulateDay({ model, items: catalog.byId, orders, scenario, policy, seed: req.seed * 31, retainEvents: true, trace: true, ...(shelf ? { shelf } : {}) });
   const trace = res.trace;
   if (!trace) throw new Error('仿真没有返回轨迹');
@@ -125,31 +183,11 @@ function buildTimeline(req: SimRequest): Timeline {
     return car;
   });
 
-  // 夜班补货：按当天各通道的拣货量估算销售分布，关门后开工、次日开门前收工
-  const runWeights: Record<string, number> = {};
-  for (const e of of(events, 'ItemPicked')) {
-    const item = catalog.byId.get(e.payload.itemId);
-    const loc = item ? model.locations.get(item.locationIds[0] as string) : undefined;
-    if (loc) runWeights[loc.runId] = (runWeights[loc.runId] ?? 0) + e.payload.qty;
-  }
   const hours = req.config.hours;
-  // 到货、收货、上架与夜班补货（后仓库存仓库）
-  const scaleK = Math.max(0.3, (req.ordersPerDay ?? scenario.demand.ordersPerDay / Math.max(0.01, req.demandFactor)) / 260);
-  const nightCrewN = req.nightCrew?.enabled ? req.nightCrew.crew : 0;
-  const inbound = simulateInbound(
-    model,
-    runWeights,
-    {
-      ...DEFAULT_INBOUND,
-      ...defaultInboundVolume(scaleK),
-      open: hours.openMin * 60,
-      close: hours.closeMin * 60,
-      nextOpen: (hours.openMin + 24 * 60) * 60,
-      nightCrew: nightCrewN,
-      totalCases: estimateRestockCases(res.metrics.units),
-    },
-    req.seed,
-  );
+  // 到货、收货、上架与夜班补货（后仓库存仓库）；采纳的 AI 建议改动到货、后仓的参数
+  const { params: inboundP, runWeights } = inboundSetup(req, { model, catalog, scenario, season }, res);
+  const nightCrewN = inboundP.nightCrew;
+  const inbound = simulateInbound(model, runWeights, withInboundAdjust(inboundP, model, req.seed, req.inbound), req.seed);
   const timelineEnd = Math.max(trace.end, (hours.openMin + 24 * 60) * 60);
 
   // 按分钟采样的时间序列
@@ -434,7 +472,7 @@ function buildTimeline(req: SimRequest): Timeline {
     notifications,
     pickHeat,
     ...(shelfTl ? { shelf: shelfTl } : {}),
-    traffic: { level: req.traffic, profile: [...(scenario.traffic?.profile ?? [])] },
+    traffic: { level: req.traffic, profile: [...(scenario.traffic?.profile ?? [])], ...(scenario.traffic?.extra ? { extra: scenario.traffic.extra } : {}), ...(scenario.traffic?.railway ? { railway: scenario.traffic.railway } : {}) },
     autoService,
     pharmacy: (() => {
       const f = req.config.facilities.find((x) => x.kind === 'PHARMACY');
@@ -444,14 +482,136 @@ function buildTimeline(req: SimRequest): Timeline {
     })(),
     incidents: { disruptions, small: smallIncidents },
     inbound: { trucks: inbound.trucks, pallets: inbound.pallets, workers: inbound.workers, equipment: inbound.equipment, metrics: inbound.metrics, nightCrew: nightCrewN },
+    students,
     simMs: performance.now() - t0,
   };
+}
+
+/**
+ * AI 建议（决策记录 0020）：当前方案跑一遍当天的线上订单（得到各通道的销量），到货、后仓按当前方案和另外三天（随机种子）各跑一遍；
+ * 建议模块在「实验台」上试动作（挪预约、收货员人数……），每个改动按种子缓存结果。
+ */
+function advise(req: AdviseRequest): AdviceResult {
+  const t0 = performance.now();
+  const base: SimRequest = { ...req.base, type: 'simulate', reqId: req.reqId };
+  applyLang(base.lang ?? 'zh', false);
+  const prep = prepare(base);
+  const res = simulateDay({ model: prep.model, items: prep.catalog.byId, orders: prep.orders, scenario: prep.scenario, policy: prep.policy, seed: base.seed * 31, retainEvents: true, ...(prep.shelf ? { shelf: prep.shelf } : {}) });
+  const { params, runWeights } = inboundSetup(base, prep, res);
+  const adopted: InboundAdjust = base.inbound ?? {};
+  const seeds = [base.seed, base.seed + 1009, base.seed + 2027, base.seed + 3011];
+  const cache = new Map<string, InboundRun>();
+  const run = (adjust: InboundAdjust, seed: number): InboundRun => {
+    const merged: InboundAdjust = { ...adopted, ...adjust, appt: { ...(adopted.appt ?? {}), ...(adjust.appt ?? {}) } };
+    const key = JSON.stringify([merged, seed]);
+    let r = cache.get(key);
+    if (!r) {
+      const out = simulateInbound(prep.model, runWeights, withInboundAdjust(params, prep.model, seed, merged), seed);
+      r = { trucks: out.trucks, metrics: out.metrics, pallets: out.pallets, equipment: out.equipment };
+      cache.set(key, r);
+    }
+    return r;
+  };
+  const staffScale = Math.max(0.3, (base.ordersPerDay ?? prep.scenario.demand.ordersPerDay / Math.max(0.01, base.demandFactor)) / 260);
+  const lab: BackroomLab = {
+    plans: withInboundAdjust(params, prep.model, base.seed, adopted).deliveries ?? inboundDeliveries(prep.model, params, base.seed),
+    docks: backroomLayout(prep.model.config).docks.length,
+    receivers: adopted.receivers ?? params.receivers,
+    nightCrew: params.nightCrew,
+    twoFloor: prep.model.config.layout.floors.length > 1,
+    ...(params.traffic ? { traffic: params.traffic } : {}),
+    run,
+    seeds,
+    slotting: adopted.slotting ?? 'default',
+    liftOrder: adopted.liftOrder ?? 'fifo',
+    defaultNightCrew: defaultNightCrew(staffScale),
+    forklifts: prep.model.config.backroom.forklifts,
+  };
+  const runs = seeds.map((s) => run({}, s));
+  const advice: Advice[] = [...adviseInbound(lab, runs), ...adviseBackroom(lab, runs)];
+
+  // 线上订单暂存：当前方案和另外两天各跑一遍当天的线上订单（带轨迹，得到各温区暂存的占用）
+  const stagingCache = new Map<string, StagingRun>();
+  const stagingLab: StagingLab = {
+    seeds: seeds.slice(0, 3),
+    run: (staff, seed) => {
+      const key = JSON.stringify([staff, seed]);
+      let r = stagingCache.get(key);
+      if (!r) {
+        const staffing = structuredClone(base.staffing ?? prep.scenario.staffing);
+        for (const c of staff) for (let h = c.fromHour; h < c.toHour; h++) staffing[c.role][h] = Math.max(0, (staffing[c.role][h] ?? 0) + c.delta);
+        const p = prepare({ ...base, seed, staffing });
+        const day = simulateDay({ model: p.model, items: p.catalog.byId, orders: p.orders, scenario: p.scenario, policy: p.policy, seed: seed * 31, trace: true, ...(p.shelf ? { shelf: p.shelf } : {}) });
+        r = stagingRunOf(p.model, day, base.config.rules.handoff.longWaitMin);
+        stagingCache.set(key, r);
+      }
+      return r;
+    },
+  };
+  const stagingRuns = stagingLab.seeds.map((s) => stagingLab.run([], s));
+  advice.push(...adviseStaging(stagingLab, stagingRuns));
+  // 前场：收银通道和停车场（输入由主线程按停车场模型算好）
+  if (req.front) advice.push(...adviseFront(req.front));
+  // 异常与风险：顾客等太久、订单没按时备好、叉车在通道口等、冷链超时、当天的突发状况
+  const lateByHour = new Array<number>(24).fill(0);
+  for (const e of of(res.events, 'OrderStaged')) if (e.payload.lateBySec > 0) lateByHour[Math.floor(e.t / 3600) % 24] = (lateByHour[Math.floor(e.t / 3600) % 24] as number) + 1;
+  const forkliftWaits = (runs[0]?.equipment ?? []).flatMap((eq) => eq.segments.filter((g) => g.activity === '等待通道空出').map((g) => ({ t: g.t0, sec: g.t1 - g.t0 })));
+  advice.push(
+    ...adviseRisks(
+      {
+        lateOrderPct: res.metrics.lateOrderPct,
+        longWaitPct: res.metrics.longWaitPct,
+        avgWaitMin: res.metrics.avgWaitMin,
+        coldViolationPct: res.metrics.coldViolationPct,
+        maxColdMinutes: res.metrics.maxColdMinutes,
+        coldAlerts: of(res.events, 'ColdChainAlert').map((e) => ({ t: e.t, elapsedSec: e.payload.elapsedSec, limitSec: e.payload.limitSec })),
+        lateByHour,
+        forkliftWaits,
+        forklifts: prep.model.config.backroom.forklifts,
+        disruptions: (prep.scenario.incidents?.disruptions ?? []).map((d) => ({ id: d.id, kind: d.kind, start: d.start, end: d.end })),
+      },
+      stagingLab,
+      stagingRuns,
+    ),
+  );
+  return { advice, seeds, ms: performance.now() - t0 };
+}
+
+/** 线上订单暂存各温区按分钟的占用（0–1，和时间线上的曲线算法一样）与顾客等待 */
+function stagingRunOf(model: StoreModel, res: ReturnType<typeof simulateDay>, longWaitMin: number): StagingRun {
+  const trace = res.trace;
+  const step = 60;
+  const t0 = trace?.start ?? 0;
+  const n = trace ? Math.ceil((trace.end - t0) / step) + 1 : 1;
+  const slotZone = new Map(model.stagingSlots.map((s) => [s.code, s.tempZone]));
+  const capacity: Record<StagingZone, number> = { AMBIENT: 0, CHILLED: 0, FROZEN: 0 };
+  for (const s of model.stagingSlots) if (s.purpose !== 'RECOVERY' && s.tempZone in capacity) capacity[s.tempZone as StagingZone] += s.capacityTotes;
+  const occ: Record<StagingZone, number[]> = { AMBIENT: new Array<number>(n).fill(0), CHILLED: new Array<number>(n).fill(0), FROZEN: new Array<number>(n).fill(0) };
+  for (const c of trace?.staging ?? []) {
+    const z = slotZone.get(c.slotCode) ?? 'AMBIENT';
+    if (!(z in occ)) continue;
+    const i = Math.min(n - 1, Math.max(0, Math.floor((c.t - t0) / step)));
+    const a = occ[z as StagingZone];
+    a[i] = (a[i] as number) + c.delta;
+  }
+  for (const z of STAGING_ZONES) {
+    const a = occ[z];
+    for (let i = 1; i < n; i++) a[i] = (a[i] as number) + (a[i - 1] as number);
+    for (let i = 0; i < n; i++) a[i] = capacity[z] ? (a[i] as number) / capacity[z] : 0;
+  }
+  const longWaitByHour = new Array<number>(24).fill(0);
+  for (const se of trace?.sessions ?? []) {
+    if (se.arrivedAt === undefined || se.doneAt === undefined || se.doneAt - se.arrivedAt < longWaitMin * 60) continue;
+    const h = Math.floor(se.arrivedAt / 3600) % 24;
+    longWaitByHour[h] = (longWaitByHour[h] as number) + 1;
+  }
+  return { t0, step, occ, capacity, avgWaitMin: res.metrics.avgWaitMin, longWaitPct: res.metrics.longWaitPct, lateOrderPct: res.metrics.lateOrderPct, longWaitByHour };
 }
 
 self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
   const req = e.data;
   // 事件提醒的语言：英文字典按需加载
-  await ensureLang((req.type === 'simulate' ? req.lang : req.base.lang) ?? 'zh');
+  await ensureLang((req.type === 'simulate' ? req.lang : req.type === 'whatif' ? req.runs[0]?.lang : req.base.lang) ?? 'zh');
   let msg: SimResponse;
   try {
     if (req.type === 'compare') {
@@ -466,7 +626,7 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
         const weekday = d % 7;
         const seed = req.base.seed + d * 101;
         const demandFactor = req.base.demandFactor * (WEEKDAY_FACTORS[weekday] ?? 1);
-        const tl = buildTimeline({ ...req.base, type: 'simulate', reqId: req.reqId, seed, demandFactor });
+        const tl = buildTimeline({ ...req.base, type: 'simulate', reqId: req.reqId, seed, demandFactor, weekday });
         days.push({
           day: d + 1,
           weekday,
@@ -480,7 +640,21 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
         (self as unknown as Worker).postMessage({ type: 'progress', reqId: req.reqId, done: d + 1, total: req.days } satisfies SimResponse);
       }
       msg = { type: 'multiDay', reqId: req.reqId, days };
-    } else msg = { type: 'result', reqId: req.reqId, timeline: buildTimeline(req) };
+    } else if (req.type === 'advise') msg = { type: 'advice', reqId: req.reqId, result: advise(req) };
+    else if (req.type === 'whatif') {
+      const digests: WhatIfDigest[] = req.runs.map((r) => {
+        const tl = buildTimeline({ ...r, type: 'simulate', reqId: req.reqId });
+        const peak = (a: number[]) => a.reduce((m, v) => Math.max(m, v), 0);
+        return {
+          digest: digestOf(tl, r.config),
+          yardWaitMin: tl.inbound.trucks.reduce((sum, x) => sum + Math.max(0, x.dockAt - x.arrive), 0) / 60,
+          overflowPallets: tl.inbound.pallets.filter((x) => x.overflowAt !== undefined).length,
+          stagingPeak: { AMBIENT: peak(tl.series.stagingOcc.AMBIENT), CHILLED: peak(tl.series.stagingOcc.CHILLED), FROZEN: peak(tl.series.stagingOcc.FROZEN) },
+        };
+      });
+      msg = { type: 'whatif', reqId: req.reqId, digests };
+    }
+    else msg = { type: 'result', reqId: req.reqId, timeline: buildTimeline(req) };
   } catch (err) {
     msg = { type: 'error', reqId: req.reqId, message: err instanceof Error ? err.message : String(err) };
   }

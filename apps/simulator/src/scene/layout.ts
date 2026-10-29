@@ -1,5 +1,5 @@
 import type { TempZone } from '@storewright/domain';
-import { storeAreas, type ResolvedArea, type ResolvedDock, type RunConfig, type StagingSlot, type StoreModel } from '@storewright/store-config';
+import { storeAreas, yardSettings, type ResolvedArea, type ResolvedDock, type RunConfig, type StagingSlot, type StoreModel, type YardSettings } from '@storewright/store-config';
 import { buildLot, OVERFLOW_RESERVE, type LotLayout, type ParkingSpot } from './lot';
 
 /**
@@ -131,14 +131,16 @@ export interface StoreGeometry {
   /** 区域与卸货门（决策记录 0013） */
   areas: ResolvedArea[];
   docks: ResolvedDock[];
+  /** 卸货场的进场设置（决策记录 0019） */
+  yard: YardSettings;
   /** 停车位：先是线上取货专用车位（按离门口由近到远），再是普通车位 */
   parking: ParkingSpot[];
   lot: LotLayout;
   facilities: FacilityGeometry[];
   gardens: GardenGeometry[];
   pharmacy?: PharmacyGeometry;
-  /** 收银台（顾客入口旁的前区）：位置为收银通道中心 */
-  checkouts: Array<{ x: number; z: number; self: boolean }>;
+  /** 收银台（顾客入口旁的前区；两层的门店二楼也有一组，决策记录 0019）：位置为收银通道中心 */
+  checkouts: Array<{ x: number; z: number; self: boolean; floorId: string; y: number }>;
   connectors: ConnectorGeometry[];
   door: Vec3;
   center: Vec3;
@@ -334,11 +336,31 @@ export function buildGeometry(model: StoreModel): StoreGeometry {
     x > f0.maxX - 3 ||
     Math.abs(x - entranceX) < 3.2;
   const checkouts: StoreGeometry['checkouts'] = [];
-  for (let x = entranceX + 3.6; checkouts.length < lanes && x < f0.maxX - 3; x += 2.6) if (!blocked(x)) checkouts.push({ x, z: 2.8, self: false });
+  for (let x = entranceX + 3.6; checkouts.length < lanes && x < f0.maxX - 3; x += 2.6) if (!blocked(x)) checkouts.push({ x, z: 2.8, self: false, floorId: f0.floorId, y: f0.y });
   // 自助收银：入口另一侧的 4 台
   for (let k = 0; k < 4; k++) {
     const x = entranceX - 4 - k * 1.6;
-    if (!blocked(x) && x > f0.minX + 2) checkouts.push({ x, z: 2.2, self: true });
+    if (!blocked(x) && x > f0.minX + 2) checkouts.push({ x, z: 2.2, self: true, floorId: f0.floorId, y: f0.y });
+  }
+  // 二楼的收银区（决策记录 0019）：和一楼一样在正面墙与前走廊之间，从卖场右端向左排开（二楼铺满了货架），
+  // 避开扶梯和电梯；人工收银通道之后接 3 台自助收银
+  for (const fu of floors.filter((f) => f.level > 0)) {
+    const busy = (x: number) =>
+      cfg.layout.connectors.some((c) => (c.kind === 'ESCALATOR' && Math.abs(c.a.x - x) < ESCALATOR_RUN / 2 + 1.5) || (c.kind !== 'ESCALATOR' && Math.abs(c.a.x - x) < 2.5 && c.a.y < 8));
+    const n = Math.min(6, Math.max(2, Math.round((fu.maxX - fu.minX) / 18)));
+    let placed = 0;
+    let last = fu.maxX - 4;
+    for (let x = fu.maxX - 4; placed < n && x > fu.minX + 4; x -= 2.6) {
+      if (busy(x)) continue;
+      checkouts.push({ x, z: 2.8, self: false, floorId: fu.floorId, y: fu.y });
+      last = x;
+      placed++;
+    }
+    for (let k = 0, x = last - 3.2; k < 3 && x > fu.minX + 2; x -= 1.6) {
+      if (busy(x)) continue;
+      checkouts.push({ x, z: 2.2, self: true, floorId: fu.floorId, y: fu.y });
+      k++;
+    }
   }
   const connectors: ConnectorGeometry[] = cfg.layout.connectors.map((c) => {
     const y0 = floorY.get(c.a.floorId) ?? 0;
@@ -361,6 +383,7 @@ export function buildGeometry(model: StoreModel): StoreGeometry {
     slots,
     areas: sa.areas,
     docks: sa.docks,
+    yard: yardSettings(cfg),
     parking,
     lot,
     facilities,

@@ -1,6 +1,6 @@
-import { expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
 import { Recorder } from './recorder';
-import { createOrders, scan, signIn, state, statics, tab, until, type AnyState } from './helpers';
+import { createOrders, scan, signIn, state, statics, tab, until, test, type AnyState } from './helpers';
 
 /** 扩展模块：熟食现做、退货（含硬性规则）、大件（先扫后打）、包裹中转 */
 test('07 扩展模块', async ({ browser }) => {
@@ -54,7 +54,11 @@ test('07 扩展模块', async ({ browser }) => {
     return `${plan}；扫描 ${mine.name} 后可以打印 ${mine.index}/${mine.count}`;
   }, { shot: stager, device: '暂存员手机' });
 
-  await r.step('放到大件区；交付看板能看到每单的大件进度', async () => {
+  await r.step('打印这一件的标签后才能放到大件区；交付看板能看到每单的大件进度', async () => {
+    // 打印时记下（决策记录 0026）：没打印就没有「放到」按钮
+    await expect(stager.getByRole('button', { name: /^放到 / })).toHaveCount(0);
+    const [popup] = await Promise.all([stager.waitForEvent('popup'), stager.getByRole('link', { name: /打印标签/ }).first().click()]);
+    await popup.close();
     await stager.getByRole('button', { name: /^放到 / }).first().click();
     await until(stager, (s) => Object.values(s.oversized as Record<string, AnyState>).some((p) => p.status === 'STAGED'));
     const s = await state(stager);
@@ -81,8 +85,11 @@ test('07 扩展模块', async ({ browser }) => {
     return ps.map((p) => `${p.id}（${p.tripRef}，${p.sizeClass}）→ ${after.parcels[p.id].slotCode}`).join('；');
   }, { shot: br, device: '后仓员手机' });
 
-  await r.step('扫描一个没有到货通知的包裹：标为「多出（待核实）」；登记一个损坏的包裹', async () => {
+  await r.step('扫描一个没有到货通知的包裹：先问是不是扫错了，确认后标为「多出（待核实）」；登记一个损坏的包裹', async () => {
     await scan(br, '扫描包裹编码入站', 'PKG-UNKNOWN-1');
+    await expect(br.getByText(/PKG-UNKNOWN-1 不在到货通知里/)).toBeVisible();
+    await br.getByRole('button', { name: '登记为多出（放待核实区）' }).click();
+    await expect.poll(async () => (await state(br)).parcels['PKG-UNKNOWN-1']?.status).toBe('OVER');
     const s = await state(br);
     const next = Object.values(s.parcels as Record<string, AnyState>).find((p) => p.status === 'EXPECTED');
     await scan(br, '扫描包裹编码入站', next.id);
@@ -91,14 +98,23 @@ test('07 扩展模块', async ({ browser }) => {
     return `PKG-UNKNOWN-1 → 多出；${next.id} → 损坏`;
   }, { shot: br, device: '后仓员手机' });
 
-  await r.step('司机交接：行程里还有已入站没暂存的包裹时不能交接；全部暂存后整行程交接', async () => {
-    const s = await state(con);
+  await r.step('多出的包裹退回快递，损坏的放在异常区等认领', async () => {
+    const s = await state(br);
+    const damaged = Object.values(s.parcels as Record<string, AnyState>).find((p) => p.status === 'DAMAGED');
+    await br.locator('.card', { hasText: 'PKG-UNKNOWN-1' }).getByRole('button', { name: '退回快递' }).click();
+    await br.locator('.card', { hasText: damaged.id }).filter({ has: br.getByRole('button', { name: '放异常区等认领' }) }).getByRole('button', { name: '放异常区等认领' }).click();
+    await expect.poll(async () => [(await state(br)).parcels['PKG-UNKNOWN-1']?.status, (await state(br)).parcels[damaged.id]?.status]).toEqual(['RETURNED', 'HELD']);
+    return `PKG-UNKNOWN-1 → 已退回快递；${damaged.id} → 异常区保留`;
+  }, { shot: br, device: '后仓员手机' });
+
+  await r.step('司机来取：后仓员在手机上按行程交给司机（行程里还有已入站没放进格位的包裹时不能交）', async () => {
+    const s = await state(br);
     const trip = Object.values(s.parcels as Record<string, AnyState>).find((p) => p.status === 'STAGED')?.tripRef;
-    await con.locator('.card', { hasText: '包裹中转' }).locator('li', { hasText: trip }).getByRole('button', { name: '司机交接' }).click();
-    await expect.poll(async () => Object.values((await state(con)).parcels as Record<string, AnyState>).some((p) => p.status === 'HANDED_OFF')).toBe(true);
-    const after = await state(con);
+    await br.locator('.card', { hasText: trip }).filter({ has: br.getByRole('button', { name: /交给司机/ }) }).getByRole('button', { name: /交给司机/ }).click();
+    await expect.poll(async () => Object.values((await state(br)).parcels as Record<string, AnyState>).some((p) => p.status === 'HANDED_OFF')).toBe(true);
+    const after = await state(br);
     return `行程 ${trip}：交接 ${Object.values(after.parcels as Record<string, AnyState>).filter((p) => p.status === 'HANDED_OFF').length} 件（没入站的仍为预期到货，超时后标为短少）`;
-  }, { shot: con, device: '控制台' });
+  }, { shot: br, device: '后仓员手机' });
 
   await r.step('退货（无小票）：冷藏商品的「可售回架」不可用并说明规则；AI 建议在允许的去向里', async () => {
     await tab(lead, '扩展');

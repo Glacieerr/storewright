@@ -9,6 +9,7 @@ import type { AnyOpsEvent } from './events';
 import { allowedDispositions, mtoBoard, parcelTrips, suggestParcelSlot } from './modules';
 import { buildBins, buildPlanogram, execute, orderInfoFrom, type OpsContext } from './server';
 import { emptyState, type OpsState, type StoreStatic } from './types';
+import { pickRows } from './views';
 
 const model = new StoreModel(createTemplate('medium'));
 const catalog = generateCatalog(model, { seed: 7 });
@@ -61,6 +62,17 @@ class Store {
     expect(this.run({ type: 'CreateOrder', order: info, codeHash: 'h' })).toBe('OK');
     return info;
   }
+  /** 锁单、生成批次、拣完（每行全部拣到） */
+  pick(orderId: string) {
+    expect(this.run({ type: 'LockOrder', orderId })).toBe('OK');
+    expect(this.run({ type: 'ReleaseWalks' })).toBe('OK');
+    const o = this.s.orders[orderId]!;
+    for (const walkId of new Set(o.toteIds.map((id) => this.s.totes[id]!.walkId!))) {
+      expect(this.run({ type: 'ClaimWalk', walkId }, 'P1')).toBe('OK');
+      const w = this.s.walks[walkId]!;
+      for (const r of pickRows(this.s, w)) expect(this.run({ type: 'PickItem', walkId, toteId: r.toteId, lineId: r.lineId, qty: r.qty - r.done }, 'P1')).toBe('OK');
+    }
+  }
 }
 
 const grocery = catalog.items.filter((i) => i.fulfillmentType === 'GROCERY' && !i.handling.includes('OVERSIZED') && i.weightKg < 5);
@@ -106,6 +118,54 @@ describe('pluggable modules (Phase 6)', () => {
     expect(replay(st.log, emptyState(), base)).toEqual(st.s);
   });
 
+  it('MTO: one portion per hot-hold slot, strict stores scan the slot, discard while cooking (decision 0026)', () => {
+    const st = new Store();
+    st.order('O1', [grocery[0]!.id], 120);
+    st.order('O2', [grocery[1]!.id], 120);
+    st.order('O3', [grocery[2]!.id], 120);
+    st.run({ type: 'CreateMtoTicket', orderId: 'O1', menuId: 'M-CHICKEN', qty: 1 });
+    st.run({ type: 'CreateMtoTicket', orderId: 'O2', menuId: 'M-CHICKEN', qty: 1 });
+    st.run({ type: 'CreateMtoTicket', orderId: 'O3', menuId: 'M-SUB', qty: 1 });
+    const [a, b, c] = Object.values(st.s.mto).sort((x, y) => x.orderId.localeCompare(y.orderId));
+    for (const x of [a!, b!, c!]) expect(st.run({ type: 'StartMto', ticketId: x.id }, 'D1')).toBe('OK');
+    expect(st.run({ type: 'CompleteMto', ticketId: a!.id, slotCode: 'H-01' }, 'D1')).toBe('OK');
+    // 保温位已经有一份
+    expect(st.run({ type: 'CompleteMto', ticketId: b!.id, slotCode: 'h-01' }, 'D1')).toBe('SLOT_FULL');
+    // 门店要求扫码：热食要扫保温位，点选的不算
+    expect(st.run({ type: 'SetStoreSettings', requireScan: true })).toBe('OK');
+    expect(st.run({ type: 'CompleteMto', ticketId: b!.id }, 'D1')).toBe('SCAN_REQUIRED');
+    expect(st.run({ type: 'CompleteMto', ticketId: b!.id, slotCode: 'H-02', tap: true }, 'D1')).toBe('SCAN_REQUIRED');
+    expect(st.run({ type: 'CompleteMto', ticketId: b!.id, slotCode: 'H-02' }, 'D1')).toBe('OK');
+    // 做坏了：制作中也能丢弃
+    expect(st.run({ type: 'DiscardMto', ticketId: c!.id }, 'D1')).toBe('OK');
+    expect(st.s.mto[c!.id]).toMatchObject({ status: 'DISCARDED', discardReason: 'MANUAL' });
+    expect(replay(st.log, emptyState(), base)).toEqual(st.s);
+  });
+
+  it('returns: no more than the order handed over, a wrong scan can be removed (decision 0026)', () => {
+    const st = new Store();
+    const it = grocery[5]!;
+    st.order('O1', [it.id], 60);
+    st.pick('O1');
+    expect(st.s.orders.O1!.lineResults['O1-L1']!.picked).toBe(1);
+    expect(st.run({ type: 'StartReturn', orderId: 'O1', kind: 'CUSTOMER' }, 'L1')).toBe('OK');
+    const r = Object.values(st.s.returns)[0]!;
+    const scan = (qty: number, code = it.gtin) => st.run({ type: 'ScanReturnItem', returnId: r.id, code, qty, condition: 'SEALED' }, 'L1');
+    expect(scan(2)).toBe('RETURN_QTY_EXCEEDED');
+    expect(scan(1)).toBe('OK');
+    expect(scan(1)).toBe('RETURN_QTY_EXCEEDED');
+    // 不在订单里的商品不限件数（另外标出来），扫错了可以删掉
+    expect(scan(3, grocery[6]!.gtin)).toBe('OK');
+    expect(st.s.returns[r.id]!.lines.map((l) => l.inOrder)).toEqual([true, false]);
+    expect(st.run({ type: 'RemoveReturnLine', returnId: r.id, index: 5 }, 'L1')).toBe('RETURN_NOT_FOUND');
+    expect(st.run({ type: 'RemoveReturnLine', returnId: r.id, index: 1 }, 'L1')).toBe('OK');
+    expect(st.s.returns[r.id]!.lines).toHaveLength(1);
+    st.run({ type: 'SetReturnDisposition', returnId: r.id, index: 0, disposition: 'RESTOCK' }, 'L1');
+    expect(st.run({ type: 'CompleteReturn', returnId: r.id }, 'L1')).toBe('OK');
+    expect(st.run({ type: 'RemoveReturnLine', returnId: r.id, index: 0 }, 'L1')).toBe('RETURN_CLOSED');
+    expect(replay(st.log, emptyState(), base)).toEqual(st.s);
+  });
+
   it('returns: line-by-line scan against the order, dispositions with AI adoption, refund and restock', () => {
     const st = new Store();
     const it = grocery[3]!;
@@ -126,6 +186,11 @@ describe('pluggable modules (Phase 6)', () => {
     expect(st.s.aiStats.RETURNS).toMatchObject({ issued: 2, ACCEPTED: 1, OVERRIDDEN: 1 });
     expect(st.run({ type: 'CompleteReturn', returnId: r.id }, 'L1')).toBe('OK');
     expect(st.s.returns[r.id]).toMatchObject({ status: 'COMPLETED', refundValue: Math.round((it.unitPrice + other.unitPrice * 2) * 100) / 100 });
+    // 可售回架：生成「退货放回货架」任务，放回、确认件数后货架估算才增加（决策记录 0026）
+    expect(st.s.shelf[it.id]!.est).toBe(before);
+    const back = Object.values(st.s.checks).find((c) => c.reason === 'RETURN' && c.itemId === it.id)!;
+    expect(back).toMatchObject({ status: 'OPEN', expected: 1 });
+    expect(st.run({ type: 'ConfirmShelf', itemId: it.id, units: 1, checkId: back.id }, 'L1')).toBe('OK');
     expect(st.s.shelf[it.id]!.est).toBe(before + 1);
     expect(st.run({ type: 'ScanReturnItem', returnId: r.id, code: it.gtin, qty: 1, condition: 'SEALED' }, 'L1')).toBe('RETURN_CLOSED');
   });
@@ -187,6 +252,11 @@ describe('pluggable modules (Phase 6)', () => {
     expect(st.run({ type: 'ScanOversized', pieceId: mine, code: big!.gtin }, 'P2')).toBe('PIECE_NOT_YOURS');
     expect(st.run({ type: 'ScanOversized', pieceId: mine, code: big!.gtin }, 'P1')).toBe('OK');
     expect(st.s.oversized[mine]!.labelId).toMatch(/^SW1:/);
+    // 打印了这一件的标签才能放（决策记录 0026）
+    expect(st.run({ type: 'StageOversized', pieceId: mine, area: 'bulk-1' }, 'P1')).toBe('LABEL_NOT_PRINTED');
+    expect(st.run({ type: 'PrintOversizedLabel', pieceId: pieces[1]!.id }, 'P1')).toBe('PIECE_STATE');
+    expect(st.run({ type: 'PrintOversizedLabel', pieceId: mine }, 'P1')).toBe('OK');
+    expect(st.s.oversized[mine]!.printedAt).toBe(st.now);
     expect(st.run({ type: 'StageOversized', pieceId: mine, area: 'DOCK' }, 'P1')).toBe('SLOT_NOT_FOUND');
     expect(st.run({ type: 'StageOversized', pieceId: mine, area: 'bulk-1' }, 'P1')).toBe('OK');
     expect(st.s.oversized[mine]).toMatchObject({ status: 'STAGED', area: 'BULK-1' });
@@ -209,7 +279,10 @@ describe('pluggable modules (Phase 6)', () => {
     ] })).toBe('OK');
     expect(st.run({ type: 'InductParcel', code: 'PK1' }, 'P1')).toBe('OK');
     expect(st.run({ type: 'InductParcel', code: 'pk2' }, 'P1')).toBe('OK');
-    expect(st.run({ type: 'InductParcel', code: 'ZZZ' }, 'P1')).toBe('OK');
+    // 到货通知里没有的编码：确认是多出的包裹才登记（决策记录 0026）
+    expect(st.run({ type: 'InductParcel', code: 'ZZZ' }, 'P1')).toBe('PARCEL_NOT_FOUND');
+    expect(st.s.parcels.ZZZ).toBeUndefined();
+    expect(st.run({ type: 'InductParcel', code: 'ZZZ', extra: true }, 'P1')).toBe('OK');
     expect(st.s.parcels.ZZZ?.status).toBe('OVER');
     const s1 = suggestParcelSlot(st.s, base, st.s.parcels.PK1!);
     expect(s1).toEqual({ slotCode: 'P01', reason: 'SIZE_AND_DISTANCE' });
@@ -227,6 +300,12 @@ describe('pluggable modules (Phase 6)', () => {
     st.run({ type: 'Tick', release: false }, 'system');
     expect(st.s.parcels.PK4?.status).toBe('SHORT');
     expect(parcelTrips(st.s).map((t) => t.tripRef)).toEqual(['T2']);
+    // 多出的退回快递，损坏的放异常区；已交接的不能再处理（决策记录 0026）
+    expect(st.run({ type: 'ResolveParcel', parcelId: 'zzz', action: 'RETURN' }, 'P1')).toBe('OK');
+    expect(st.run({ type: 'ResolveParcel', parcelId: 'PK3', action: 'HOLD' }, 'P1')).toBe('OK');
+    expect(st.run({ type: 'ResolveParcel', parcelId: 'PK1', action: 'HOLD' }, 'P1')).toBe('PARCEL_STATE');
+    expect([st.s.parcels.ZZZ?.status, st.s.parcels.PK3?.status]).toEqual(['RETURNED', 'HELD']);
+    expect(parcelTrips(st.s).flatMap((t) => t.parcels.map((p) => p.id))).toEqual(['PK4']);
     expect(replay(st.log, emptyState(), base)).toEqual(st.s);
   });
 });

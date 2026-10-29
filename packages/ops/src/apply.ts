@@ -2,8 +2,18 @@ import type { AnyOpsEvent } from './events';
 import { applyAiEvent } from './ai';
 import { applyStaffEvent } from './staff';
 import { applyNoteEvent } from './notes';
+import { applyAlertEvent } from './alerts';
 import { applyModuleEvent } from './modules';
-import { emptyState, type HandoffSession, type LiveCase, type LiveOrder, type OpsState, type PlanogramEntry, type ShelfState, type StoreStatic } from './types';
+import { applyAssistEvent } from './assist';
+import { applyNudgeEvent } from './nudges';
+import { applyRosterEvent } from './roster';
+import { applyMaintenanceEvent } from './maintenance';
+import { applyColdEvent } from './coldchain';
+import { applyCapacityEvent } from './capacity';
+import { applyExpiryEvent, consumeLots, trimLots } from './expiry';
+import { applyFieldEvent } from './fieldops';
+import { applySettingsEvent } from './settings';
+import { emptyState, type HandoffSession, type LiveCase, type LiveOrder, type OpsState, type PlanogramEntry, type ShelfLot, type ShelfState, type StoreStatic } from './types';
 
 /**
  * 把一条事件应用到状态上（原地修改，返回同一个对象）。
@@ -27,7 +37,7 @@ export function applyEvent(s: OpsState, e: AnyOpsEvent, st?: StoreStatic): OpsSt
       delete a.lastLocationId;
     }
   };
-  if (applyAiEvent(s, e) || applyStaffEvent(s, e, st) || applyNoteEvent(s, e) || applyModuleEvent(s, e, st)) return s;
+  if (applyAiEvent(s, e) || applyStaffEvent(s, e, st) || applyNoteEvent(s, e) || applyAlertEvent(s, e) || applyModuleEvent(s, e, st) || applyAssistEvent(s, e) || applyNudgeEvent(s, e) || applyRosterEvent(s, e) || applyMaintenanceEvent(s, e) || applyColdEvent(s, e) || applyCapacityEvent(s, e) || applyExpiryEvent(s, e) || applyFieldEvent(s, e, st) || applySettingsEvent(s, e)) return s;
   switch (e.type) {
     case 'OrderCreated': {
       const o = e.payload.order;
@@ -48,6 +58,12 @@ export function applyEvent(s: OpsState, e: AnyOpsEvent, st?: StoreStatic): OpsSt
         o.status = 'CANCELLED';
         o.cancelledAt = e.at;
         o.cancelReason = e.payload.reason;
+      }
+      // 准备中取消（流程梳理发现，决策记录 0025）：这一单的交付准备结束，员工不再「忙」；已取出的框进回收专区的列表。
+      // 行程里的订单全部取消或完成时，行程的准备也结束
+      for (const [key, ss] of Object.entries(s.sessions)) {
+        if (ss.status === 'COMPLETED' || !ss.orderIds.includes(e.payload.orderId)) continue;
+        if (ss.orderIds.every((id) => s.orders[id]?.status === 'CANCELLED' || s.orders[id]?.status === 'COMPLETED')) delete s.sessions[key];
       }
       break;
     }
@@ -118,6 +134,12 @@ export function applyEvent(s: OpsState, e: AnyOpsEvent, st?: StoreStatic): OpsSt
         w.status = 'OPEN';
         delete w.associateId;
         delete w.claimedAt;
+        // 解除绑定（决策记录 0026）：下一个人重新扫框
+        for (const id of w.bound) {
+          const t = s.totes[id];
+          if (t && t.status === 'BOUND') t.status = 'IN_WALK';
+        }
+        w.bound = [];
       }
       break;
     }
@@ -137,8 +159,10 @@ export function applyEvent(s: OpsState, e: AnyOpsEvent, st?: StoreStatic): OpsSt
       const o = t ? s.orders[t.orderId] : undefined;
       if (o) {
         const r = (o.lineResults[p.lineId] ??= { picked: 0, short: 0, substituted: 0 });
-        if (e.type === 'ItemPicked') r.picked += p.qty;
-        else if (e.payload.resolution === 'SHORT') r.short += p.qty;
+        if (e.type === 'ItemPicked') {
+          r.picked += p.qty;
+          r.pickedAt = e.at;
+        } else if (e.payload.resolution === 'SHORT') r.short += p.qty;
         else if (e.payload.resolution === 'EXCEPTION') {
           r.short += p.qty;
           r.exception = true;
@@ -146,6 +170,8 @@ export function applyEvent(s: OpsState, e: AnyOpsEvent, st?: StoreStatic): OpsSt
         if (o.status === 'LOCKED') o.status = 'PICKING';
       }
       const lineItem = o?.lines.find((l) => l.lineId === p.lineId)?.itemId;
+      // 线上拣货也按到期先后扣批次（决策记录 0024 · C4）
+      if (lineItem && e.type === 'ItemPicked') consumeLots(s, lineItem, p.qty);
       const sh = lineItem ? shelfOf(s, st, lineItem, e.at) : undefined;
       if (sh) {
         if (e.type === 'ItemPicked') {
@@ -171,6 +197,27 @@ export function applyEvent(s: OpsState, e: AnyOpsEvent, st?: StoreStatic): OpsSt
         const r = (o.lineResults[p.lineId] ??= { picked: 0, short: 0, substituted: 0 });
         r.substituted += p.qty;
         r.substituteName = p.itemName;
+        r.substituteGtin = p.gtin;
+        if (p.rank !== undefined) r.subRank = p.rank;
+        if (p.model) r.subModel = p.model;
+      }
+      break;
+    }
+    case 'SubstitutionRated': {
+      const o = s.orders[e.payload.orderId];
+      const r = o?.lineResults[e.payload.lineId];
+      if (r) {
+        const first = r.subAccepted === undefined;
+        r.subAccepted = e.payload.accepted;
+        if (first) {
+          const l = (s.subLabels ??= { n: 0, accepted: 0, top1: 0, top1Accepted: 0 });
+          l.n++;
+          if (e.payload.accepted) l.accepted++;
+          if (r.subRank === 1) {
+            l.top1++;
+            if (e.payload.accepted) l.top1Accepted++;
+          }
+        }
       }
       break;
     }
@@ -229,6 +276,7 @@ export function applyEvent(s: OpsState, e: AnyOpsEvent, st?: StoreStatic): OpsSt
         x.status = 'FOUND';
         x.caseId = p.caseId;
         x.foundAt = e.at;
+        x.units = p.units;
       }
       takeFromCase(s, p.caseId, p.units);
       touch();
@@ -238,7 +286,7 @@ export function applyEvent(s: OpsState, e: AnyOpsEvent, st?: StoreStatic): OpsSt
       const x = s.exceptions[e.payload.exceptionId];
       if (x) {
         x.status = 'NOT_FOUND';
-        s.suspect[x.itemId] = e.at;
+        if (!e.payload.binCode) s.suspect[x.itemId] = e.at;
       }
       touch();
       break;
@@ -253,7 +301,8 @@ export function applyEvent(s: OpsState, e: AnyOpsEvent, st?: StoreStatic): OpsSt
         const o = s.orders[x.orderId];
         const r = o?.lineResults[x.lineId];
         if (r) {
-          const n = Math.min(r.short, x.qty);
+          // 按实际取出的件数记（箱子里不够时比要的少）
+          const n = Math.min(r.short, x.units ?? x.qty);
           r.short -= n;
           r.picked += n;
           r.recovered = (r.recovered ?? 0) + n;
@@ -268,6 +317,28 @@ export function applyEvent(s: OpsState, e: AnyOpsEvent, st?: StoreStatic): OpsSt
       if (x) x.status = 'VOID';
       break;
     }
+    case 'ExceptionReleased': {
+      const x = s.exceptions[e.payload.exceptionId];
+      if (x) {
+        x.status = 'OPEN';
+        delete x.associateId;
+      }
+      break;
+    }
+    case 'ExceptionItemsReturned': {
+      const p = e.payload;
+      const x = s.exceptions[p.exceptionId];
+      if (x) x.status = 'VOID';
+      // 放回货架：货架估算加上这些件数
+      const sh = shelfOf(s, st, p.itemId, e.at);
+      if (sh && p.units > 0) {
+        const cap = st ? (planogramIndex(st).get(p.itemId)?.capacity ?? Number.POSITIVE_INFINITY) : Number.POSITIVE_INFINITY;
+        sh.est = Math.min(cap, sh.est + p.units);
+        sh.at = e.at;
+      }
+      touch();
+      break;
+    }
     // —— 后仓库存 ——
     case 'InventoryLoaded': {
       for (const c of e.payload.cases) {
@@ -279,8 +350,16 @@ export function applyEvent(s: OpsState, e: AnyOpsEvent, st?: StoreStatic): OpsSt
     }
     case 'AsnReceived': {
       const p = e.payload;
-      s.receipts[p.receiptId] = { id: p.receiptId, supplier: p.supplier, expected: p.expected, createdAt: e.at, received: {} };
+      s.receipts[p.receiptId] = { id: p.receiptId, supplier: p.supplier, expected: p.expected, createdAt: e.at, received: {}, ...(p.expectedAt !== undefined ? { expectedAt: p.expectedAt } : {}) };
       s.counters.receipts += 1;
+      break;
+    }
+    case 'AsnEtaUpdated': {
+      const r = s.receipts[e.payload.receiptId];
+      if (r) {
+        if (r.firstExpectedAt === undefined && r.expectedAt !== undefined) r.firstExpectedAt = r.expectedAt;
+        r.expectedAt = e.payload.expectedAt;
+      }
       break;
     }
     case 'TruckArrived': {
@@ -292,7 +371,7 @@ export function applyEvent(s: OpsState, e: AnyOpsEvent, st?: StoreStatic): OpsSt
       const p = e.payload;
       const r = s.receipts[p.receiptId];
       for (const id of p.caseIds) {
-        addCase(s, { id, itemId: p.itemId, gtin: p.gtin, name: p.name, packQty: p.packQty, units: p.packQty, status: p.damaged ? 'QA' : 'SELLABLE', state: 'RECEIVED', receiptId: p.receiptId, receivedAt: e.at, ...(p.damaged ? { damaged: true } : {}) });
+        addCase(s, { id, itemId: p.itemId, gtin: p.gtin, name: p.name, packQty: p.packQty, units: p.packQty, status: p.damaged ? 'QA' : 'SELLABLE', state: 'RECEIVED', receiptId: p.receiptId, receivedAt: e.at, ...(p.damaged ? { damaged: true } : {}), ...(p.lot ? { lot: p.lot } : {}), ...(p.expiry ? { expiry: p.expiry } : {}) });
       }
       s.counters.cases += p.caseIds.length;
       if (r) {
@@ -349,6 +428,14 @@ export function applyEvent(s: OpsState, e: AnyOpsEvent, st?: StoreStatic): OpsSt
       }
       break;
     }
+    case 'CycleCountReleased': {
+      const c = s.counts[e.payload.countId];
+      if (c) {
+        c.status = 'OPEN';
+        delete c.associateId;
+      }
+      break;
+    }
     case 'CycleCountCompleted': {
       const p = e.payload;
       const c = s.counts[p.countId];
@@ -376,6 +463,7 @@ export function applyEvent(s: OpsState, e: AnyOpsEvent, st?: StoreStatic): OpsSt
       for (const l of e.payload.lines) {
         const sh = shelfOf(s, st, l.itemId, e.at);
         if (sh) sell(sh, l.qty, e.at);
+        consumeLots(s, l.itemId, l.qty);
       }
       break;
     }
@@ -396,12 +484,39 @@ export function applyEvent(s: OpsState, e: AnyOpsEvent, st?: StoreStatic): OpsSt
     }
     case 'ShelfCheckRequested': {
       const p = e.payload;
-      s.checks[p.checkId] = { id: p.checkId, itemId: p.itemId, locationId: p.locationId, reason: p.reason, createdAt: e.at, status: 'OPEN', ...(p.recId ? { recId: p.recId } : {}) };
+      s.checks[p.checkId] = { id: p.checkId, itemId: p.itemId, locationId: p.locationId, reason: p.reason, createdAt: e.at, status: 'OPEN', ...(p.recId ? { recId: p.recId } : {}), ...(p.near?.length ? { near: p.near } : {}), ...(p.lot ? { lot: p.lot } : {}), ...(p.pct !== undefined ? { pct: p.pct } : {}), ...(p.expected !== undefined ? { expected: p.expected } : {}) };
       s.counters.checks += 1;
+      break;
+    }
+    case 'LotTaskDone': {
+      // 货架上的批次任务（决策记录 0026）：下架的从货架和批次里减掉；退货放回的加上（捐赠由 LotDonated 处理）
+      const p = e.payload;
+      const c = s.checks[p.checkId];
+      if (c) {
+        c.status = 'DONE';
+        c.doneAt = e.at;
+        c.units = p.units;
+        c.associateId = e.actor;
+      }
+      const sh = shelfOf(s, st, p.itemId, e.at);
+      if (p.kind === 'PULL') {
+        const lots = s.shelfLots?.[p.itemId];
+        if (lots && p.lot) (s.shelfLots as Record<string, ShelfLot[]>)[p.itemId] = lots.map((l) => (l.lot === p.lot ? { ...l, units: Math.max(0, l.units - p.units) } : l)).filter((l) => l.units > 0);
+        if (sh) {
+          sh.est = Math.max(0, sh.est - p.units);
+          sh.at = e.at;
+        }
+      } else if (p.kind === 'RETURN' && sh) {
+        const cap = st ? (planogramIndex(st).get(p.itemId)?.capacity ?? Number.POSITIVE_INFINITY) : Number.POSITIVE_INFINITY;
+        sh.est = Math.min(cap, sh.est + p.units);
+        sh.at = e.at;
+      }
+      touch(c?.locationId);
       break;
     }
     case 'ShelfCounted': {
       const p = e.payload;
+      trimLots(s, p.itemId, p.units);
       const sh = shelfOf(s, st, p.itemId, e.at);
       if (sh) {
         sh.est = p.units;
@@ -415,15 +530,45 @@ export function applyEvent(s: OpsState, e: AnyOpsEvent, st?: StoreStatic): OpsSt
         c.status = 'DONE';
         c.doneAt = e.at;
         c.units = p.units;
+        if (p.found) c.found = p.found;
         c.previousEst = p.previousEst;
         c.associateId = e.actor;
+      }
+      const wc = p.walkId ? s.walks[p.walkId]?.checks?.find((x) => x.itemId === p.itemId && x.status === 'OPEN') : undefined;
+      if (wc) {
+        wc.status = 'DONE';
+        wc.units = p.units;
       }
       touch(p.locationId);
       break;
     }
+    case 'WalkCheckAdded': {
+      const w = s.walks[e.payload.walkId];
+      if (w) (w.checks ??= []).push({ ...e.payload.check, status: 'OPEN' });
+      break;
+    }
+    case 'WalkCheckSkipped': {
+      const c = s.walks[e.payload.walkId]?.checks?.find((x) => x.itemId === e.payload.itemId && x.status === 'OPEN');
+      if (c) c.status = 'SKIPPED';
+      break;
+    }
     case 'ReplenishmentTaskCreated': {
       const p = e.payload;
-      s.repl[p.taskId] = { id: p.taskId, locationId: p.locationId, itemId: p.itemId, area: p.area, reason: p.reason, suggestedUnits: p.suggestedUnits, priority: p.priority, createdAt: e.at, status: 'OPEN' };
+      s.repl[p.taskId] = {
+        id: p.taskId,
+        locationId: p.locationId,
+        itemId: p.itemId,
+        area: p.area,
+        reason: p.reason,
+        suggestedUnits: p.suggestedUnits,
+        priority: p.priority,
+        createdAt: e.at,
+        status: 'OPEN',
+        ...(p.dueAt !== undefined ? { dueAt: p.dueAt } : {}),
+        ...(p.risk !== undefined ? { risk: p.risk } : {}),
+        ...(p.why ? { why: p.why } : {}),
+        ...(p.fromCaseId ? { fromCaseId: p.fromCaseId } : {}),
+      };
       s.counters.repl += 1;
       break;
     }
@@ -459,6 +604,9 @@ export function applyEvent(s: OpsState, e: AnyOpsEvent, st?: StoreStatic): OpsSt
         t.caseId = p.caseId;
         t.units = p.units;
       }
+      // 有批号或保质期的箱子：这一批上了货架（决策记录 0024 · C4）
+      const src = s.cases[p.caseId];
+      if (src && (src.lot || src.expiry) && p.units > 0) ((s.shelfLots ??= {})[p.itemId] ??= []).push({ lot: src.lot ?? src.id, ...(src.expiry ? { expiry: src.expiry } : {}), units: p.units, at: e.at, caseId: src.id });
       takeFromCase(s, p.caseId, p.units);
       const sh = shelfOf(s, st, p.itemId, e.at);
       if (sh) {
@@ -478,7 +626,8 @@ export function applyEvent(s: OpsState, e: AnyOpsEvent, st?: StoreStatic): OpsSt
       if (t) {
         t.status = 'CANCELLED';
         t.doneAt = e.at;
-        if (e.payload.reason === 'NOT_FOUND') s.suspect[t.itemId] = e.at;
+        // 说了找过哪个库位时只盘这个库位，不把整个商品标为可疑（决策记录 0026）
+        if (e.payload.reason === 'NOT_FOUND' && !e.payload.binCode) s.suspect[t.itemId] = e.at;
       }
       break;
     }
@@ -604,24 +753,37 @@ export function applyEvent(s: OpsState, e: AnyOpsEvent, st?: StoreStatic): OpsSt
       break;
     }
     case 'ReadyToLoad': {
+      // 先核验过的（决策记录 0026）：框取完就直接进入交付
       const ss = s.sessions[e.payload.key];
       if (ss) {
-        ss.status = 'READY';
+        ss.status = ss.verified ? 'HANDING_OFF' : 'READY';
         forOrders(s, ss.orderIds, (o) => {
-          o.status = 'READY';
+          o.status = ss.verified ? 'HANDING_OFF' : 'READY';
         });
       }
       break;
     }
     case 'CodeVerified': {
+      // 框还没取完时先核验（决策记录 0026）：记下核验，取完框再进入交付
       const ss = s.sessions[e.payload.key];
       if (ss) {
         ss.verified = e.payload.method;
-        ss.status = 'HANDING_OFF';
-        forOrders(s, ss.orderIds, (o) => {
-          o.status = 'HANDING_OFF';
-        });
+        if (ss.status === 'READY') {
+          ss.status = 'HANDING_OFF';
+          forOrders(s, ss.orderIds, (o) => {
+            o.status = 'HANDING_OFF';
+          });
+        }
       }
+      break;
+    }
+    case 'PrepAbandoned': {
+      // 退出交付准备（决策记录 0026）：订单回到已暂存，取出的框留在「待暂存」里放回
+      delete s.sessions[e.payload.key];
+      forOrders(s, e.payload.orderIds, (o) => {
+        if (o.status === 'PREPPING' || o.status === 'READY' || o.status === 'HANDING_OFF') o.status = 'STAGED';
+      });
+      touch();
       break;
     }
     case 'CodeFailed': {
@@ -648,6 +810,7 @@ export function applyEvent(s: OpsState, e: AnyOpsEvent, st?: StoreStatic): OpsSt
         o.status = 'COMPLETED';
         o.completedAt = e.at;
         o.ageItemsRemoved = e.payload.ageItemsRemoved;
+        if (e.payload.recallRemoved) o.recallRemoved = true;
         for (const id of o.toteIds) {
           const t = s.totes[id];
           if (t && t.status !== 'RECOVERY') t.status = 'HANDED_OFF';

@@ -11,7 +11,7 @@ import { no, yes, type OpsModule } from './framework';
  * - 暂存在大件区（区域级位置）。需要两人搬运的件在界面上标出。
  */
 
-const COMMANDS = new Set(['ClaimOversized', 'ReleaseOversized', 'ScanOversized', 'StageOversized'] as const);
+const COMMANDS = new Set(['ClaimOversized', 'ReleaseOversized', 'ScanOversized', 'StageOversized', 'PrintOversizedLabel'] as const);
 
 export const oversizedModule: OpsModule = {
   id: 'oversized',
@@ -45,11 +45,19 @@ export const oversizedModule: OpsModule = {
         if (!item || item.id !== p.itemId) return no('CASE_WRONG_ITEM');
         return yes([ev('OversizedLabeled', { pieceId: p.id, labelId: opaqueLabelId(p.id, 1) })]);
       }
+      case 'PrintOversizedLabel': {
+        const p = s.oversized[cmd.pieceId];
+        if (!p) return no('PIECE_NOT_FOUND');
+        if (p.status !== 'LABELED' && p.status !== 'STAGED') return no('PIECE_STATE', { status: p.status });
+        return yes([ev('OversizedLabelPrinted', { pieceId: p.id })]);
+      }
       case 'StageOversized': {
         const p = s.oversized[cmd.pieceId];
         if (!p) return no('PIECE_NOT_FOUND');
         if (p.status !== 'LABELED') return no('PIECE_STATE', { status: p.status });
         if (p.associateId !== actor) return no('PIECE_NOT_YOURS');
+        // 先打印这一件的标签再放（决策记录 0026）
+        if (p.printedAt === undefined) return no('LABEL_NOT_PRINTED');
         const area = cmd.area.trim().toUpperCase();
         if (ctx.statics.oversizedAreas?.length && !ctx.statics.oversizedAreas.includes(area)) return no('SLOT_NOT_FOUND');
         return yes([ev('OversizedStaged', { pieceId: p.id, area })]);
@@ -87,6 +95,11 @@ export const oversizedModule: OpsModule = {
           p.status = 'LABELED';
           p.labelId = e.payload.labelId;
         }
+        return true;
+      }
+      case 'OversizedLabelPrinted': {
+        const p = s.oversized[e.payload.pieceId];
+        if (p) p.printedAt = e.at;
         return true;
       }
       case 'OversizedStaged': {

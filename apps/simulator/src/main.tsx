@@ -35,12 +35,10 @@ if (q.get('live') === 'demo' && bridge) {
   useApp.getState().setTab('ops');
   // 「你的商店」的实时沙盒：先载入访客自己搭的门店（场景的布局要和实时门店一致），再连接
   const ready = project
-    ? import('./extensions').then(({ loadYourStore }) =>
-        loadYourStore().then((ext) =>
-          ext?.getProject(project).then((p) => {
-            if (p) useApp.getState().openProject(p, false);
-          }),
-        ),
+    ? import('./yourStore/projects').then(({ getProject }) =>
+        getProject(project).then((p) => {
+          if (p) useApp.getState().openProject(p, false);
+        }),
       )
     : Promise.resolve();
   void ready.then(() =>
@@ -53,9 +51,9 @@ if (q.get('live') === 'demo' && bridge) {
 }
 
 // 展示页的「全天仿真」（?template=…&autoplay=1）：换成对应模板，仿真算完后自动播放，
-// 虚拟顾客、员工和车辆按策略跑完一整天，和门店实况同时运行、互不影响
-// 「你的商店」：?project=<编号> 打开门店项目（&edit=1 进入搭建），?yours 打开项目页
-if (!bridge) void import('./extensions').then(({ loadYourStore }) => loadYourStore().then((ext) => ext?.loadFromUrl()));
+// 虚拟顾客、员工和车辆按策略跑完一整天，和运营孪生同时运行、互不影响
+// 「你的商店」：?project=<编号> 打开门店项目（&edit=1 进入搭建），?yours 打开项目页；地址里没有这两个参数时不下载这个模块
+if (!bridge && (q.has('project') || q.has('yours'))) void import('./yourStore').then((m) => m.loadProjectFromUrl());
 
 if (!bridge) {
   const tpl = q.get('template');

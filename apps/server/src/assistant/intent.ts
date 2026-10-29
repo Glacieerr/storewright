@@ -9,7 +9,7 @@ import { matchItem } from './tools';
  * 参数（商品、岗位、人数、时间段）仍由规则抽取；分类器只负责「该用哪个工具」。
  */
 
-export type Intent = 'store_status' | 'find_item' | 'forecast' | 'staff_status' | 'explain_recommendation' | 'wait_analysis' | 'whatif' | 'knowledge' | 'shift_summary';
+export type Intent = 'store_status' | 'find_item' | 'forecast' | 'staff_status' | 'explain_recommendation' | 'wait_analysis' | 'whatif' | 'knowledge' | 'shift_summary' | 'opening_brief';
 
 const HAN = /[一-鿿]/;
 
@@ -62,6 +62,8 @@ function corpus(): Array<[Intent, string]> {
   expand('knowledge', ['', 'what should i do: ', 'how do i handle this: '], ['the pickup code failed three times', 'do i need to check id for alcohol', 'can chemicals go with food', 'the order was cancelled', 'a case is damaged', 'the delivery was short', 'the cold chain limit passed', 'can i substitute this item'], ['', '?']);
   expand('shift_summary', ['', '帮我', '给我'], ['做个交接班摘要', '总结一下今天', '今天到现在的汇总', '写个日报', '交接一下'], ['', '吧']);
   expand('shift_summary', ['', 'please '], ['give me a handover summary', 'recap of today', 'wrap up the shift', 'shift summary', 'what happened today'], ['', '.']);
+  expand('opening_brief', ['', '给我', '来个'], ['开店简报', '班前会要讲什么', '今天要注意什么', '今天有什么需要我决定的', '早会说点什么', '开门前要准备什么'], ['', '？']);
+  expand('opening_brief', ['', 'give me the ', 'can i get the '], ['opening brief', 'morning brief', 'what should we watch out for today', 'what do i need to decide today', 'pre-shift huddle notes', 'what to prepare before we open'], ['', '?']);
   return out;
 }
 

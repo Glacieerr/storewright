@@ -867,6 +867,8 @@ export const EN: Record<string, string> = {
   '跟着做一遍（约 3 分钟）': 'Walk through it (about 3 minutes)',
   '重置演示门店': 'Reset demo store',
   '源代码 ↗': 'Source code ↗',
+  '门店模拟器 ↗': 'Store simulator ↗',
+  '完整的门店模拟器（规划孪生）：看一整天的运营、对比策略、编辑布局、搭自己的门店；新标签页打开': 'The full store simulator (planning twin): watch a whole day of operations, compare policies, edit the layout and build your own store; opens a new tab',
   '在 GitHub 上查看本项目的源代码（新标签页）': "View this project's source code on GitHub (opens a new tab)",
   '化学品': 'Chemical',
   '冷藏、冷冻、热食退回后一律不能回架': 'Returned chilled, frozen or hot food can never be restocked',

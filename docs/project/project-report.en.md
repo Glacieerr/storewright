@@ -6,7 +6,7 @@
 
 > This project is based on public information, common industry practice and the author's own design. **It is not affiliated with any retailer or company.** All data is synthetic, and every result is evidence level B (simulation under stated assumptions).
 >
-> Repository: [github.com/Glacieerr/storewright](https://github.com/Glacieerr/storewright) · Live demo: [glacieerr.github.io/storewright](https://glacieerr.github.io/storewright/)
+> Repository: [github.com/Glacieerr/storewright](https://github.com/Glacieerr/storewright) · Live demo: [showcase](https://glacieerr.github.io/storewright/) · [store simulator](https://glacieerr.github.io/storewright/sim/)
 
 ---
 

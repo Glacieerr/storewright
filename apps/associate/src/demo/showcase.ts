@@ -226,6 +226,15 @@ function render(): void {
     el('p', undefined, projectName ? t('这是你自己搭的门店的实时沙盒：控制台下单、两部员工手机作业，也可以在控制台打开「自动运营」，两条线同时跑在你的门店上。') : t('门店的数字孪生，整个系统都在你的浏览器里运行。左栏是演示控制台、三维数字孪生和全天仿真，右边是两部员工手机：在控制台创建订单，看它在手机上被拣货、暂存、交付，同时出现在孪生里；孪生还能回放过去、推演未来 3 小时，设备故障会变成告警推到手机上。')),
   );
   const actions = el('div', 'sc-actions');
+  // 完整的门店模拟器（规划孪生）放在最前面：访客常常找不到它（以前要先切到「全天仿真」，再点「在新标签页打开」）
+  if (!projectName) {
+    const simulator = el('a', 'primary', t('门店模拟器 ↗'));
+    simulator.href = store === 'hardware' ? `${simBase}${simBase.includes('?') ? '&' : '?'}template=hardware` : simBase;
+    simulator.target = '_blank';
+    simulator.rel = 'noopener';
+    simulator.title = t('完整的门店模拟器（规划孪生）：看一整天的运营、对比策略、编辑布局、搭自己的门店；新标签页打开');
+    actions.append(simulator);
+  }
   const switchStore = el('a', undefined, projectName ? t('返回你的商店') : store === 'demo' ? t('换成家居建材店') : t('换成中型超市'));
   switchStore.href = projectName ? `${simBase}${simBase.includes('?') ? '&' : '?'}yours` : `?store=${store === 'demo' ? 'hardware' : 'demo'}${q.get('sim') ? `&sim=${encodeURIComponent(simBase)}` : ''}`;
   const reset = el('button', undefined, t('重置演示门店'));

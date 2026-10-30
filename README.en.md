@@ -65,7 +65,16 @@ No profile wins on every metric: a store picks its priorities and sees the trade
 
 ## Try it
 
-**In the browser (no install):** open the [live demo](https://glacieerr.github.io/storewright/), or build the static site and open the showcase page locally. The 3D digital twin, a demo console and two associate phones run side by side, all connected to an in-browser store hub (a SharedWorker running the same code as the server).
+**Online (no install):**
+
+| Link | What it is |
+|---|---|
+| [Showcase](https://glacieerr.github.io/storewright/) | The 3D digital twin, a demo console and two associate phones side by side, all connected to an in-browser store hub (a SharedWorker running the same code as the server) |
+| [Store simulator](https://glacieerr.github.io/storewright/sim/) | The planning twin: a full day of operations in 2.5D / 3D, policy comparison, reports and the layout editor; a short tour on the first visit |
+| [Your Store](https://glacieerr.github.io/storewright/sim/?yours) | Build a store from an empty lot, check it is ready to open and run it live |
+| [Associate app](https://glacieerr.github.io/storewright/app/) | One associate phone: pick a role and work orders |
+
+**In the browser, built locally:** build the static site and open the showcase page.
 
 ```bash
 npm install

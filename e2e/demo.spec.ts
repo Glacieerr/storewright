@@ -39,6 +39,10 @@ test('展示页：模拟器经过桥接页面连到同一个中枢，员工手�
   // 数字孪生、控制台、全天仿真（第一次切换时才加载）、两部手机
   const frames = page.locator('iframe');
   await expect(frames).toHaveCount(5);
+  // 右上角最前面是完整的门店模拟器的入口（新标签页）
+  const simulator = page.getByRole('link', { name: /门店模拟器/ });
+  expect(await simulator.evaluate((a) => (a as HTMLAnchorElement).href)).toMatch(/\/sim\/$/);
+  await expect(simulator).toHaveAttribute('target', '_blank');
   // 右上角的源代码链接：在新标签页打开公开仓库
   const source = page.getByRole('link', { name: /源代码/ });
   await expect(source).toHaveAttribute('href', 'https://github.com/Glacieerr/storewright');

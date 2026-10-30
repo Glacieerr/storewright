@@ -6,7 +6,7 @@
 
 > 本项目基于公开资料、行业通用做法和作者的独立构想设计。**本项目与任何零售商、企业无隶属关系。** 所有数据都是合成的；结果都是证据等级 B（在列明的假设下仿真得到）。
 >
-> 仓库地址：[github.com/Glacieerr/storewright](https://github.com/Glacieerr/storewright) · 在线演示：[glacieerr.github.io/storewright](https://glacieerr.github.io/storewright/)
+> 仓库地址：[github.com/Glacieerr/storewright](https://github.com/Glacieerr/storewright) · 在线演示：[展示页](https://glacieerr.github.io/storewright/) · [门店模拟器](https://glacieerr.github.io/storewright/sim/)
 
 ---
 

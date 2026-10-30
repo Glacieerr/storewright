@@ -67,6 +67,11 @@ body {
   text-decoration: none;
   cursor: pointer;
 }
+.sc-actions a.primary {
+  background: var(--sc-brand);
+  border-color: var(--sc-brand);
+  color: var(--sc-brand-ink);
+}
 .sc-main {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

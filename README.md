@@ -4,7 +4,9 @@
 
 **面向超市的门店数字孪生。三维门店与现场作业实时同步，可以回放当天任意时刻、推演未来 3 小时；同一个孪生驱动员工手机上的履约、后仓作业和 AI。整个系统可以直接在浏览器里运行。**
 
-**[Live demo / 在线演示](https://glacieerr.github.io/storewright/)** · [Full English guide](README.en.md) · [完整中文说明](README.zh-CN.md) · [Technical overview (English)](docs/en/overview.md) · [数字孪生设计（中文）](docs/14-digital-twin.md)
+**Try it online / 在线体验：** [Showcase / 展示页](https://glacieerr.github.io/storewright/) · [Store simulator / 门店模拟器](https://glacieerr.github.io/storewright/sim/) · [Your Store / 你的商店](https://glacieerr.github.io/storewright/sim/?yours) · [Associate app / 员工手机端](https://glacieerr.github.io/storewright/app/)
+
+[Full English guide](README.en.md) · [完整中文说明](README.zh-CN.md) · [Technical overview (English)](docs/en/overview.md) · [数字孪生设计（中文）](docs/14-digital-twin.md)
 
 [Operation guide · 操作指南](docs/guide/operation-guide.en.md) ([中文](docs/guide/operation-guide.zh-CN.md)) · [Project report · 项目报告](docs/project/project-report.en.md) ([中文](docs/project/project-report.zh-CN.md)) · [Purpose and outlook · 目的与展望](docs/project/purpose-and-outlook.en.md) ([中文](docs/project/purpose-and-outlook.zh-CN.md)) · [Documentation map · 文档导航](docs/README.md)
 

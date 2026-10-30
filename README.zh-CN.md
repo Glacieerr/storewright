@@ -89,7 +89,16 @@
 
 ## 快速开始
 
-不想安装的话，直接打开[在线演示](https://glacieerr.github.io/storewright/)，和下面在本机构建的展示页相同。在本机运行需要 Node.js 20 或更高版本。
+不想安装的话直接在线体验，和下面在本机构建的版本相同：
+
+| 链接 | 内容 |
+|---|---|
+| [展示页](https://glacieerr.github.io/storewright/) | 三维数字孪生、演示控制台和两部员工手机并排，全部连到浏览器里的门店中枢 |
+| [门店模拟器](https://glacieerr.github.io/storewright/sim/) | 规划孪生：2.5D / 3D 看一整天的运营、对比策略、报告和布局编辑器；第一次打开有一分钟的导览 |
+| [你的商店](https://glacieerr.github.io/storewright/sim/?yours) | 从一块空地搭一家店，开业检查后实时运营 |
+| [员工手机端](https://glacieerr.github.io/storewright/app/) | 一部员工手机：选一个岗位，处理订单 |
+
+在本机运行需要 Node.js 20 或更高版本。
 
 ```bash
 npm install

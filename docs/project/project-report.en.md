@@ -6,7 +6,7 @@
 
 > This project is based on public information, common industry practice and the author's own design. **It is not affiliated with any retailer or company.** All data is synthetic, and every result is evidence level B (simulation under stated assumptions).
 >
-> Repository and live demo: *to be added after publishing*
+> Repository: [github.com/Glacieerr/storewright](https://github.com/Glacieerr/storewright) · Live demo: [glacieerr.github.io/storewright](https://glacieerr.github.io/storewright/)
 
 ---
 
@@ -116,7 +116,7 @@ No profile wins on every measure: the default profile spends a little more labor
 ## 9. Limits and next steps
 
 - No real store data and no field pilot; no real sign-in in the demo; no local language model downloaded; no real device integration; no operational A/B test yet.
-- Next: a public repository and live demo; calibration on public datasets; real device integration; the sign-in, roles and security review a production deployment needs. Checking results against reality would also need anonymized data from a real store, a small pilot of one workflow and A/B tests. See [Purpose, results and outlook](purpose-and-outlook.en.md) §4–5.
+- Next: calibration on public datasets; real device integration; the sign-in, roles and security review a production deployment needs. Checking results against reality would also need anonymized data from a real store, a small pilot of one workflow and A/B tests. See [Purpose, results and outlook](purpose-and-outlook.en.md) §4–5.
 
 ## 10. What I learned
 

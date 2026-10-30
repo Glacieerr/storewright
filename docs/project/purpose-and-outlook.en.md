@@ -73,14 +73,14 @@ Size: 4 apps and 9 shared packages, about 82,000 lines of TypeScript source; 383
 - **No local language, speech or vision model has been downloaded.** The interfaces and evaluations are ready; downloads need the author's consent ([docs/10 §10](../10-store-ai.md)).
 - **No real equipment integration.** Temperature and door readings in the demo are simulated ([docs/14 §11](../14-digital-twin.md)).
 - **No operational A/B test yet.** Open acceptance items of the second AI round are listed at the end of each decision record.
-- **Not published yet**: the GitHub repository, the live demo and the website project page are still to come.
+- **No website project page yet**: the [GitHub repository](https://github.com/Glacieerr/storewright) and the [live demo](https://glacieerr.github.io/storewright/) were published on 2026-10-29.
 
 ## 5. Outlook
 
 ### Near term: publish
 
-1. Commit locally by phase, and make the GitHub repository public after the author's review.
-2. Deploy the in-browser demo on GitHub Pages with a link to the source code, and add the demo address to the README.
+1. ✅ Commit locally by phase, and make the GitHub repository public after the author's review (2026-10-29).
+2. ✅ Deploy the in-browser demo on GitHub Pages and add the demo address to the README (2026-10-29); the demo pages do not link to the source code yet.
 3. Add a project page to the author's website with screenshots, a demo video and the project report.
 
 ### Mid term: validate

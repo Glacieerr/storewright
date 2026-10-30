@@ -2,7 +2,7 @@
 
 > 一套面向**中型区域连锁与独立超市**的**门店数字孪生**：三维门店与现场作业**实时同步**，可以**回放**当天任意时刻、**推演**未来 3 小时；设备遥测越线时，带着影响分析的**告警**推到员工手机上。孪生的作业层覆盖**线上订单履约（拣货 / 暂存 / 交付）**、**后仓库存管理**、**货架补货**与**人员调配**，每家店都有自己的**本地 AI**；改布局、排班、策略之前，先在**规划孪生**（像模拟经营游戏一样的 2.5D / 3D 仿真）里试。**门店定制化**是核心能力，整个系统也可以**直接在浏览器里运行**，不需要后端。
 
-[双语首页](README.md) · [English](README.en.md) · [英文技术概览](docs/en/overview.md) · [数字孪生设计](docs/14-digital-twin.md) · [操作指南](docs/guide/operation-guide.zh-CN.md) · [项目报告](docs/project/project-report.zh-CN.md) · [文档导航](docs/README.md)
+**[在线演示](https://glacieerr.github.io/storewright/)** · [双语首页](README.md) · [English](README.en.md) · [英文技术概览](docs/en/overview.md) · [数字孪生设计](docs/14-digital-twin.md) · [操作指南](docs/guide/operation-guide.zh-CN.md) · [项目报告](docs/project/project-report.zh-CN.md) · [文档导航](docs/README.md)
 
 本项目基于公开资料、行业通用做法和作者的独立构想设计。**本项目与任何零售商、企业无隶属关系。** 所有门店、商品、顾客和数字都是合成的。
 
@@ -89,7 +89,7 @@
 
 ## 快速开始
 
-需要 Node.js 20 或更高版本。
+不想安装的话，直接打开[在线演示](https://glacieerr.github.io/storewright/)，和下面在本机构建的展示页相同。在本机运行需要 Node.js 20 或更高版本。
 
 ```bash
 npm install

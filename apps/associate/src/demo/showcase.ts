@@ -21,6 +21,8 @@ const projectId = q.get('project') ?? undefined;
 let store = q.get('store') === 'hardware' ? 'hardware' : 'demo';
 let projectName: string | undefined;
 const simBase = q.get('sim') ?? '../sim/';
+/** 本项目的公开仓库：展示页右上角的「源代码」链接 */
+const SOURCE_URL = 'https://github.com/Glacieerr/storewright';
 // 不支持 SharedWorker 的浏览器：iframe 向本页要端口
 servePortRequests();
 
@@ -237,7 +239,12 @@ function render(): void {
     setLang(getLang() === 'zh' ? 'en' : 'zh');
     location.reload();
   };
-  actions.append(switchStore, reset, lang);
+  const source = el('a', undefined, t('源代码 ↗'));
+  source.href = SOURCE_URL;
+  source.target = '_blank';
+  source.rel = 'noopener';
+  source.title = t('在 GitHub 上查看本项目的源代码（新标签页）');
+  actions.append(switchStore, reset, source, lang);
   header.append(intro, actions);
   const g = guide();
 

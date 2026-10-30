@@ -214,6 +214,10 @@ body {
     flex-direction: column;
     padding: 12px 16px 6px;
   }
+  /* 按钮一行放不下时换到下一行，不把文字挤成两行（英文本来就挤，加了「源代码」以后中文也放不下） */
+  .sc-actions {
+    flex-wrap: wrap;
+  }
   .sc-main,
   .sc-foot {
     padding-left: 16px;

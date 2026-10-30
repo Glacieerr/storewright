@@ -866,6 +866,8 @@ export const EN: Record<string, string> = {
   '第二部手机（交付员）：打开这张订单，开始准备、逐框核对，输入控制台显示的验证码，完成交付。': 'Second phone (handoff): open the order, start prep, check each tote, enter the code shown in the console and complete the handoff.',
   '跟着做一遍（约 3 分钟）': 'Walk through it (about 3 minutes)',
   '重置演示门店': 'Reset demo store',
+  '源代码 ↗': 'Source code ↗',
+  '在 GitHub 上查看本项目的源代码（新标签页）': "View this project's source code on GitHub (opens a new tab)",
   '化学品': 'Chemical',
   '冷藏、冷冻、热食退回后一律不能回架': 'Returned chilled, frozen or hot food can never be restocked',
   '化学品不能按普通垃圾报废': 'Chemicals must not go in the regular trash',

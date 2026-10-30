@@ -80,7 +80,7 @@ Size: 4 apps and 9 shared packages, about 82,000 lines of TypeScript source; 383
 ### Near term: publish
 
 1. ✅ Commit locally by phase, and make the GitHub repository public after the author's review (2026-10-29).
-2. ✅ Deploy the in-browser demo on GitHub Pages and add the demo address to the README (2026-10-29); the demo pages do not link to the source code yet.
+2. ✅ Deploy the in-browser demo on GitHub Pages, add the demo address to the README and a source-code link at the top right of the demo page (2026-10-29).
 3. Add a project page to the author's website with screenshots, a demo video and the project report.
 
 ### Mid term: validate

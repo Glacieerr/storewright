@@ -53,7 +53,7 @@
 | 地址 | 作用 |
 |---|---|
 | `/` | 跳到展示页 |
-| `/app/showcase.html` | 展示页（引导、重置、窄屏标签）；`?store=hardware` 换成家居建材店 |
+| `/app/showcase.html` | 展示页（引导、重置、源代码链接、窄屏标签）；`?store=hardware` 换成家居建材店 |
 | `/app/` | 员工端；`?as=A01`（或 `console`）直接以某个身份打开，`?store=hardware` 选门店 |
 | `/sim/` | 运营模拟器；`?live=demo&bridge=…&store=…` 连到浏览器里的中枢（展示页自动带上） |
 | `/app/label.html#…` | 标签预览与打印 |

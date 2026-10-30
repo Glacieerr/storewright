@@ -39,6 +39,10 @@ test('展示页：模拟器经过桥接页面连到同一个中枢，员工手�
   // 数字孪生、控制台、全天仿真（第一次切换时才加载）、两部手机
   const frames = page.locator('iframe');
   await expect(frames).toHaveCount(5);
+  // 右上角的源代码链接：在新标签页打开公开仓库
+  const source = page.getByRole('link', { name: /源代码/ });
+  await expect(source).toHaveAttribute('href', 'https://github.com/Glacieerr/storewright');
+  await expect(source).toHaveAttribute('target', '_blank');
   const sim = page.frameLocator('iframe.sc-sim');
   await expect(sim.locator('.live-chip', { hasText: '已连接' })).toBeVisible({ timeout: 90_000 });
   const phone = page.frameLocator('.phone iframe').first();
@@ -178,6 +182,8 @@ test('窄屏的展示页一次显示一个画面，用标签切换', async ({ pa
   await expect(page.locator('.phone').first()).toBeVisible();
   await expect(page.locator('iframe.sc-console')).toBeHidden();
   await expect(page.frameLocator('.phone iframe').first().locator('.link-state.live')).toBeVisible({ timeout: 60_000 });
+  // 顶部的按钮放不下一行时换行，页面不横向滚动
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
 
 test('自动运营（双线并行）：虚拟员工领取自动运营的批次，员工手机上不显示它们', async ({ context }) => {

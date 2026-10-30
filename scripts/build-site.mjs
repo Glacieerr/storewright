@@ -29,7 +29,7 @@ writeFileSync(
 <meta http-equiv="refresh" content="0; url=./app/showcase.html" />
 </head>
 <body>
-<p><a href="./app/showcase.html">Open the live demo</a> · <a href="./sim/">Store simulator</a> · <a href="./app/">Associate app</a></p>
+<p><a href="./app/showcase.html">Open the live demo</a> · <a href="./sim/">Store simulator</a> · <a href="./app/">Associate app</a> · <a href="https://github.com/Glacieerr/storewright">Source code (GitHub)</a></p>
 <p><a href="./LICENSE">License (AGPL-3.0)</a> · <a href="./LICENSE-docs">Documentation license (CC BY 4.0)</a> · <a href="./THIRD_PARTY_NOTICES.md">Third-party notices</a></p>
 </body>
 </html>

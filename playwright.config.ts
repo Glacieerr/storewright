@@ -22,7 +22,8 @@ const dataDir = mkdtempSync(join(tmpdir(), 'storewright-e2e-'));
 export default defineConfig({
   testDir: './e2e',
   timeout: 120_000,
-  expect: { timeout: 15_000 },
+  // 持续集成的机器慢（没有显卡，4 核 CPU）：等待上限放宽到 30 秒
+  expect: { timeout: process.env.CI ? 30_000 : 15_000 },
   fullyParallel: false,
   workers: 1,
   // 持续集成的机器慢、波动大：失败的用例再跑一次，报告里标成 flaky（不稳定），方便以后查
@@ -31,7 +32,8 @@ export default defineConfig({
   use: {
     viewport: { width: 420, height: 860 },
     locale: 'zh-CN',
-    trace: 'retain-on-failure',
+    // 持续集成里只在失败重跑时录 trace：录屏和页面快照很耗 CPU
+    trace: process.env.CI ? 'on-first-retry' : 'retain-on-failure',
   },
   outputDir: 'experiments/results/e2e-artifacts',
   webServer: [

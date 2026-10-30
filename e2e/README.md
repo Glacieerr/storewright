@@ -51,7 +51,7 @@ npm run walkthrough
 ## Depends on · 依赖
 
 - **Uses · 依赖：** no `@storewright/*` imports. It drives the builds of `apps/associate` and `apps/simulator` and starts `apps/server/src/main.ts` with tsx; `@playwright/test` comes from the root, configured in `playwright.config.ts` and `playwright.walkthrough.config.ts`. · 不引用 `@storewright/*` 包。它操作员工端和模拟器的构建产物，用 tsx 启动后端；`@playwright/test` 来自根目录，配置在根目录的两个 Playwright 配置文件里。
-- **Used by · 使用它的地方：** `.github/workflows/ci.yml` runs `npm run e2e:browsers` after `npm run build:all`. · 持续集成在全部构建之后运行多浏览器测试。
+- **Used by · 使用它的地方：** `.github/workflows/ci.yml` runs the same projects in four parallel jobs (Chromium; no-SharedWorker and Android; WebKit and iPhone; Firefox) after `npm run build:all`. · 持续集成在全部构建之后，把同样的项目分成 4 个并行任务运行。
 
 ## Design docs · 设计文档
 

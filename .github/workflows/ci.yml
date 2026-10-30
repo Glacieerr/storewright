@@ -26,10 +26,28 @@ jobs:
       - name: Phase 1 comparison still runs
         run: npm run compare -- --template medium --reps 5 --seed 1 --profiles
 
+  # 端到端测试按浏览器分成 4 个并行任务（一个任务跑完全部要将近 1 小时）：每个任务只装自己用的浏览器，项目名见 playwright.config.ts
   e2e:
     needs: check
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 45
+    name: e2e (${{ matrix.group }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - group: chromium
+            browsers: chromium
+            projects: --project=live --project=demo --project=a11y
+          - group: no-sharedworker-android
+            browsers: chromium
+            projects: --project=demo-no-sharedworker --project=android
+          - group: webkit-iphone
+            browsers: webkit
+            projects: --project=live-webkit --project=demo-webkit --project=iphone
+          - group: firefox
+            browsers: firefox
+            projects: --project=live-firefox --project=demo-firefox
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -38,14 +56,15 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build:all
-      - run: npx playwright install --with-deps chromium webkit firefox
-      - name: End-to-end tests on Chromium, WebKit (Safari), Firefox, no-SharedWorker browsers, iPhone and Android (real backend + in-browser demo site)
-        run: npm run e2e:browsers
+      - run: npx playwright install --with-deps ${{ matrix.browsers }}
+      - name: End-to-end tests (${{ matrix.group }})
+        run: npx playwright test ${{ matrix.projects }}
         env:
           CI: 'true'
+          PW_ALL: '1'
           PW_CHANNEL: ''
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: e2e-report
+          name: e2e-report-${{ matrix.group }}
           path: experiments/results/e2e-report

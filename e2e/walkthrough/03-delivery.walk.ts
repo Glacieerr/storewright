@@ -101,6 +101,8 @@ test('03 配送行程', async ({ browser }) => {
     await expect(handoff.getByLabel('验证码')).toBeVisible();
     await handoff.getByLabel('验证码').fill(driverCode);
     await handoff.getByRole('button', { name: '核验', exact: true }).click();
+    // 先等「完成交付」出现（和年龄核验一起出现），再看要不要核验证件
+    await expect(handoff.getByRole('button', { name: '完成交付' })).toBeVisible();
     if (await handoff.getByRole('button', { name: '已核验证件' }).isVisible()) await handoff.getByRole('button', { name: '已核验证件' }).click();
     const groups = handoff.getByRole('radiogroup', { name: '车内位置' });
     await expect(groups.first()).toBeVisible();

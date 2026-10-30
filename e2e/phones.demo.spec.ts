@@ -9,6 +9,8 @@ import { expect, test, type FrameLocator, type Locator, type Page } from '@playw
 const phoneBox = (page: Page, i: number) => page.locator('.phone').nth(i);
 const phone = (page: Page, i: number): FrameLocator => phoneBox(page, i).frameLocator('iframe');
 const tab = (p: FrameLocator, name: string) => p.locator('.tabbar button').filter({ hasText: name }).click();
+/** 点一下以后等门店中枢处理完、手机上更新：持续集成的机器慢，偶尔超过默认的等待时间 */
+const settled = { timeout: 60_000 };
 
 async function open(page: Page): Promise<FrameLocator> {
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -36,7 +38,7 @@ async function clickEach(rows: Locator, max = 8): Promise<void> {
     const n = await rows.count();
     if (!n) return;
     await rows.first().click();
-    await expect.poll(() => rows.count()).toBeLessThan(n);
+    await expect.poll(() => rows.count(), settled).toBeLessThan(n);
   }
 }
 
@@ -52,7 +54,7 @@ async function pickOneWalk(p: FrameLocator): Promise<void> {
     const before = await picked();
     await p.getByRole('button', { name: /^已拣到/ }).click();
     // 等这一行记上了再点下一行（不然慢的机器上可能对同一行点两次）
-    await expect.poll(async () => (await done.isVisible()) || (await picked()) > before).toBe(true);
+    await expect.poll(async () => (await done.isVisible()) || (await picked()) > before, settled).toBe(true);
   }
   await done.click();
 }
@@ -69,7 +71,7 @@ async function stageAll(p: FrameLocator): Promise<void> {
     // 正在暂存的框：「下一步」不该把格位挤到屏幕外
     await expect(p.locator('.next-task')).toHaveCount(0);
     await p.locator('.chip.mono').first().click();
-    await expect.poll(() => totes.count()).toBeLessThan(n);
+    await expect.poll(() => totes.count(), settled).toBeLessThan(n);
   }
 }
 
@@ -135,12 +137,18 @@ test('手机：引导的整条流程（拣货 → 暂存 → 到店 → 交付�
   await tab(handoff, '交付');
   await handoff.locator('.board-row').first().click();
   await handoff.getByRole('button', { name: '开始准备' }).click();
+  // 等准备清单出来再逐框点：点完「开始准备」马上数是 0（清单还没渲染），一个框也不取，后面「完成交付」就一直不出现
+  await expect(handoff.locator('main .prep-list .row-btn').first()).toBeVisible();
   await clickEach(handoff.locator('main .prep-list .row-btn:not([disabled])'));
   await handoff.getByLabel('验证码').fill(code);
   await handoff.getByRole('button', { name: '核验', exact: true }).click();
+  // 核验通过后「完成交付」和年龄核验（订单里有年龄限制商品时）一起出现：先等「完成交付」出现再看要不要核验证件，
+  // 不然慢的机器上还没出现就判断成不用核验，「完成交付」一直不能点
+  const finish = handoff.getByRole('button', { name: '完成交付' });
+  await expect(finish).toBeVisible(settled);
   const age = handoff.getByRole('button', { name: /已核验证件/ });
-  if (await age.isVisible().catch(() => false)) await age.click();
-  await handoff.getByRole('button', { name: '完成交付' }).click();
+  if (await age.isVisible()) await age.click();
+  await finish.click();
   await expect(page.locator('.sc-steps li').nth(4)).toHaveClass(/done/);
 });
 
@@ -282,7 +290,7 @@ test('手机：准备中取消订单——交付员的页面列出已取出的�
   await expect(prep.first()).toBeVisible();
   const left = await prep.count();
   await prep.first().click();
-  await expect.poll(() => prep.count()).toBeLessThan(left);
+  await expect.poll(() => prep.count(), settled).toBeLessThan(left);
   // 控制台取消这张订单
   await con.locator('tr', { hasText: short }).getByRole('button', { name: '取消' }).click();
   const notice = handoff.getByText('订单已取消：把已经取出的框放进对应温区的回收专区，放好后点一下。');

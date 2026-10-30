@@ -82,12 +82,13 @@ test('数字孪生：设备故障变成告警，带班负责人在手机上确�
   await expect(banner).toBeVisible({ timeout: 60_000 });
   await banner.locator('.alert-banner-head').click();
   await lead.getByRole('button', { name: '确认，我来处理' }).click();
-  await expect(lead.getByText('已确认，正在处理')).toBeVisible();
+  // 看告警条顶部：都确认了告警条会收起，收起之前下面那行「Taylor 已确认，正在处理」也在，按文字找会找到两处
+  await expect(banner.locator('.alert-banner-head')).toContainText('已确认，正在处理');
   await expect(page.locator('.sc-steps li').nth(6)).toHaveClass(/done/);
   // 报修：这台设备管着的暂存格位暂停放新框
   await banner.locator('.alert-banner-head').click();
   await lead.getByRole('button', { name: '报修', exact: true }).click();
-  await expect(lead.getByText(/已报修/)).toBeVisible();
+  await expect(banner.getByText(/已报修/)).toBeVisible();
 
   // 孪生时间轴：回放到过去（场景上方说明回放到哪一刻），回到实时，推演未来
   await sim.getByRole('button', { name: '◀ 回放' }).click();

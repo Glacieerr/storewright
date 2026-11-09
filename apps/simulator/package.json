@@ -12,8 +12,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@react-three/drei": "9.117.3",
-    "@react-three/fiber": "8.17.10",
+    "@react-three/drei": "10.7.9",
+    "@react-three/fiber": "9.8.2",
     "@storewright/ai": "0.1.0",
     "@storewright/algorithms": "0.1.0",
     "@storewright/domain": "0.1.0",
@@ -24,13 +24,13 @@
     "@storewright/twin": "0.1.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "three": "0.170.0",
+    "three": "0.187.0",
     "zustand": "5.0.2"
   },
   "devDependencies": {
     "@types/react": "18.3.12",
     "@types/react-dom": "18.3.1",
-    "@types/three": "0.170.0",
+    "@types/three": "0.187.0",
     "@vitejs/plugin-react": "4.3.4",
     "vite": "5.4.21"
   }

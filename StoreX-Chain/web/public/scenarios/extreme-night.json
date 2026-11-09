@@ -1,0 +1,20 @@
+{
+  "$schema": "../../../docs/scenario.schema.json",
+  "format": "storex-chain/scenario",
+  "version": 1,
+  "id": "extreme-night",
+  "title": "极端负荷的夜里",
+  "titleEn": "Extreme load at night",
+  "description": "压力测试的最高档，晚上十点半：港口灯火通明、拖车排队进闸口，看整条链卡在哪一环。",
+  "descriptionEn": "The highest stress level at 22:30: the port is floodlit and trucks queue at the gate. Where is the chain stuck?",
+  "gen": "g3",
+  "seed": 1,
+  "load": "extreme",
+  "drill": "none",
+  "time": "22:30",
+  "speed": 300,
+  "play": true,
+  "camera": {
+    "preset": "port"
+  }
+}

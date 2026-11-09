@@ -1,0 +1,484 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Glacieerr/storewright/blob/main/StoreX-Chain/docs/scenario.schema.json",
+  "title": "StoreX Chain scenario",
+  "description": "A shareable, reproducible moment in the StoreX Chain regional twin. Every field is optional. See docs/07-scenarios.en.md.",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "format": {
+      "const": "storex-chain/scenario"
+    },
+    "version": {
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "maxLength": 80
+    },
+    "title": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "titleEn": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 2000
+    },
+    "descriptionEn": {
+      "type": "string",
+      "maxLength": 2000
+    },
+    "region": {
+      "type": "string",
+      "pattern": "^(default|random-\\d{1,6}|custom-\\d{1,6}(~[a-z]+\\.[A-Za-z0-9]+)*)$"
+    },
+    "gen": {
+      "enum": [
+        "g1",
+        "g2",
+        "g3"
+      ]
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9999
+    },
+    "load": {
+      "enum": [
+        "normal",
+        "peak",
+        "high",
+        "extreme"
+      ]
+    },
+    "drill": {
+      "enum": [
+        "none",
+        "portCongestion",
+        "airportClosed",
+        "highwayClosed",
+        "supplierOutage",
+        "demandSurge"
+      ]
+    },
+    "facilities": {
+      "type": "object",
+      "properties": {
+        "port": {
+          "type": "object",
+          "properties": {
+            "berths": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 4
+            },
+            "ownCranes": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 5
+            },
+            "otherCranes": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 4
+            },
+            "gang": {
+              "type": "integer",
+              "minimum": 3,
+              "maximum": 7
+            },
+            "gateLanes": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 3
+            },
+            "down": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 39
+              },
+              "description": "Equipment under maintenance, e.g. [\"QC1\"]"
+            },
+            "staff": {
+              "type": "array",
+              "description": "Crew changes per role; roles not listed stay unchanged",
+              "items": {
+                "type": "object",
+                "required": [
+                  "key",
+                  "crew"
+                ],
+                "properties": {
+                  "key": {
+                    "enum": [
+                      "qc",
+                      "rtg",
+                      "tt",
+                      "gate",
+                      "lash",
+                      "ctrl"
+                    ]
+                  },
+                  "crew": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "early": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 200
+                      },
+                      "late": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 200
+                      },
+                      "night": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 200
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "airport": {
+          "type": "object",
+          "properties": {
+            "stands": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 6
+            },
+            "dollySets": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3
+            },
+            "uldsPerFlight": {
+              "type": "integer",
+              "minimum": 14,
+              "maximum": 28
+            },
+            "down": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 39
+              },
+              "description": "Equipment under maintenance, e.g. [\"QC1\"]"
+            },
+            "staff": {
+              "type": "array",
+              "description": "Crew changes per role; roles not listed stay unchanged",
+              "items": {
+                "type": "object",
+                "required": [
+                  "key",
+                  "crew"
+                ],
+                "properties": {
+                  "key": {
+                    "enum": [
+                      "loader",
+                      "tug",
+                      "ramp",
+                      "build",
+                      "fuel",
+                      "ctrl"
+                    ]
+                  },
+                  "crew": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "early": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 200
+                      },
+                      "late": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 200
+                      },
+                      "night": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 200
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "dc": {
+          "type": "object",
+          "properties": {
+            "aisles": {
+              "type": "integer",
+              "minimum": 8,
+              "maximum": 20
+            },
+            "amrs": {
+              "type": "integer",
+              "minimum": 10,
+              "maximum": 40
+            },
+            "dryDoors": {
+              "type": "integer",
+              "minimum": 10,
+              "maximum": 26
+            },
+            "coldDoors": {
+              "type": "integer",
+              "minimum": 4,
+              "maximum": 12
+            },
+            "railTracks": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4
+            },
+            "down": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 39
+              },
+              "description": "Equipment under maintenance, e.g. [\"QC1\"]"
+            },
+            "staff": {
+              "type": "array",
+              "description": "Crew changes per role; roles not listed stay unchanged",
+              "items": {
+                "type": "object",
+                "required": [
+                  "key",
+                  "crew"
+                ],
+                "properties": {
+                  "key": {
+                    "enum": [
+                      "fork",
+                      "pick",
+                      "recv",
+                      "auto",
+                      "ctrl"
+                    ]
+                  },
+                  "crew": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "early": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 200
+                      },
+                      "late": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 200
+                      },
+                      "night": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 200
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "store": {
+          "type": "object",
+          "properties": {
+            "size": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 5
+            },
+            "docks": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 8
+            },
+            "gondolas": {
+              "type": "integer",
+              "minimum": 8,
+              "maximum": 16
+            },
+            "backroom": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 5
+            },
+            "down": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 39
+              },
+              "description": "Equipment under maintenance, e.g. [\"QC1\"]"
+            },
+            "staff": {
+              "type": "array",
+              "description": "Crew changes per role; roles not listed stay unchanged",
+              "items": {
+                "type": "object",
+                "required": [
+                  "key",
+                  "crew"
+                ],
+                "properties": {
+                  "key": {
+                    "enum": [
+                      "recv",
+                      "stock",
+                      "pick",
+                      "cash",
+                      "lead"
+                    ]
+                  },
+                  "crew": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "early": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 200
+                      },
+                      "late": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 200
+                      },
+                      "night": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 200
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "time": {
+      "oneOf": [
+        {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 86399
+        },
+        {
+          "type": "string",
+          "pattern": "^\\d{1,2}:\\d{2}(:\\d{2})?$"
+        }
+      ]
+    },
+    "speed": {
+      "enum": [
+        10,
+        60,
+        120,
+        300,
+        600,
+        1800
+      ]
+    },
+    "play": {
+      "type": "boolean"
+    },
+    "camera": {
+      "type": "object",
+      "properties": {
+        "preset": {
+          "enum": [
+            "overview",
+            "port",
+            "airport",
+            "dc",
+            "flagship"
+          ]
+        },
+        "position": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "target": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3
+        }
+      },
+      "dependentRequired": {
+        "position": [
+          "target"
+        ],
+        "target": [
+          "position"
+        ]
+      }
+    },
+    "follow": {
+      "type": "string",
+      "maxLength": 40
+    },
+    "weather": {
+      "enum": [
+        "auto",
+        "clear",
+        "cloudy",
+        "rain",
+        "fog",
+        "storm"
+      ]
+    },
+    "tab": {
+      "enum": [
+        "twin",
+        "report",
+        "network",
+        "about"
+      ]
+    },
+    "tour": {
+      "enum": [
+        "container"
+      ]
+    },
+    "exercise": {
+      "type": "string",
+      "pattern": "^ex\\d{2}$"
+    }
+  }
+}

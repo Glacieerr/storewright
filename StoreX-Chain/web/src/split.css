@@ -1,0 +1,111 @@
+/* —— 对比回放：三维画面分成左右两半 —— */
+.split-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.18);
+  z-index: 3;
+  pointer-events: none;
+}
+.split-bar {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: calc(100% - 20px);
+  padding: 4px 10px;
+  font-size: 12.5px;
+  color: var(--ink2);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.14);
+}
+.split-bar .split-title {
+  font-weight: 600;
+  color: var(--ink);
+}
+.split-bar select,
+.split-bar input[type='number'] {
+  font: inherit;
+  font-size: 12.5px;
+  padding: 2px 5px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+}
+.split-bar input[type='number'] {
+  width: 64px;
+}
+.split-bar label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.split-label {
+  position: absolute;
+  top: 52px;
+  z-index: 4;
+  max-width: calc(50% - 24px);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 5px 9px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #fff;
+  background: rgba(18, 22, 28, 0.72);
+  border-radius: 8px;
+  pointer-events: none;
+}
+.split-label b {
+  font-size: 12.5px;
+}
+.split-label span {
+  opacity: 0.9;
+  font-variant-numeric: tabular-nums;
+}
+.split-label .split-note {
+  font-size: 11px;
+  opacity: 0.72;
+}
+.split-label.left {
+  right: calc(50% + 10px);
+  text-align: right;
+}
+.split-label.right {
+  left: calc(50% + 10px);
+}
+/* 取消镜头联动时右半边的拖动区域：在画布上面、右边的标签层下面（标签还能点） */
+.split-pad {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 1;
+  cursor: grab;
+  touch-action: none;
+}
+/* 右半边自己的标签层（车头标签、停靠点标签）：和左边的一样压在两侧面板下面 */
+.world-wrap .view3d-labels.split-labels {
+  z-index: 2;
+}
+@media (max-width: 700px) {
+  .split-bar {
+    top: auto;
+    bottom: 50px;
+  }
+  .split-label {
+    top: 10px;
+    font-size: 11px;
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "format": "storex-chain/scenario-library",
+  "version": 1,
+  "scenarios": [
+    {
+      "id": "ship-to-shelf",
+      "title": "一个集装箱从船到货架（导览）",
+      "titleEn": "One container from ship to shelf (guided tour)",
+      "description": "一分钟的自动导览：镜头跟着一个集装箱，从班轮靠泊、卸船、堆场、拖车、配送中心，一直到门店货架。",
+      "descriptionEn": "A one-minute guided tour: the camera follows one container from berthing and discharge through the yard, a truck and the distribution centre to the store shelf."
+    },
+    {
+      "id": "normal-day",
+      "title": "平常的一天",
+      "titleEn": "An ordinary day",
+      "description": "默认区域、全链路方案、平常的负荷：早上七点半，配送车陆续出发，港口在卸船，物流园在收货。",
+      "descriptionEn": "Default region, full-chain scheme, normal load: 07:30, delivery trucks leave, the port is discharging and the logistics park is receiving."
+    },
+    {
+      "id": "port-congestion",
+      "title": "港口拥堵演练",
+      "titleEn": "Port congestion drill",
+      "description": "本周班轮晚到 6 天，之后堆场停留翻倍：看码头、堆场和闸口怎么排队，调度台上哪些车受影响。",
+      "descriptionEn": "This week's liner arrives 6 days late and yard dwell doubles afterwards: watch the quay, yard and gate queues and which trips on the dispatch board are hit."
+    },
+    {
+      "id": "airport-closed",
+      "title": "机场关闭（风暴）",
+      "titleEn": "Airport closed (storm)",
+      "description": "风暴让机场关闭 2 天：货机停飞，机场货站的进口板和冷链货怎么办，值班助手会给出哪些建议。",
+      "descriptionEn": "A storm closes the airport for 2 days: freighters are grounded; see what happens to import ULDs and cold-chain cargo and what the duty assistant recommends."
+    },
+    {
+      "id": "peak-load",
+      "title": "高峰负荷",
+      "titleEn": "Peak load",
+      "description": "需求放大、班轮和航班加密：物流园的月台门和配送车队还够不够，看调度台和分层看板的告警。",
+      "descriptionEn": "More demand, more liner calls and flights: are the logistics-park doors and the delivery fleet still enough? Watch the dispatch board and the KPI alerts."
+    },
+    {
+      "id": "extreme-night",
+      "title": "极端负荷的夜里",
+      "titleEn": "Extreme load at night",
+      "description": "压力测试的最高档，晚上十点半：港口灯火通明、拖车排队进闸口，看整条链卡在哪一环。",
+      "descriptionEn": "The highest stress level at 22:30: the port is floodlit and trucks queue at the gate. Where is the chain stuck?"
+    },
+    {
+      "id": "store-morning",
+      "title": "门店早上收货高峰",
+      "titleEn": "Store receiving, morning rush",
+      "description": "清早六点四十：配送车一辆接一辆倒进门店收货口，停车场里顾客的车也开始多起来。慢速播放看倒车靠台。",
+      "descriptionEn": "06:40: delivery trucks back into the store docks one after another while shoppers start to arrive. Slow playback shows the reversing."
+    },
+    {
+      "id": "cold-chain",
+      "title": "冷链门减半",
+      "titleEn": "Half the cold-chain doors",
+      "description": "配送中心的冷链门从 12 樘减到 6 樘：冷藏车在月台前排队多久，温控告警和调度台的冲突怎么变。",
+      "descriptionEn": "The distribution centre runs with 6 cold doors instead of 12: how long do reefers queue, and how do temperature alerts and door conflicts change?"
+    },
+    {
+      "id": "random-region",
+      "title": "随机生成的区域",
+      "titleEn": "A randomly generated region",
+      "description": "海、河、城市、港口、机场、物流园和门店的位置全部随机（编号 3）：同一套系统在另一个城市照样跑。",
+      "descriptionEn": "Sea, river, city, port, airport, logistics park and store all placed at random (seed 3): the same system runs in another city."
+    },
+    {
+      "id": "custom-coast-river",
+      "title": "自定义区域：河口和大城市",
+      "titleEn": "Custom region: estuary and a large city",
+      "description": "自定义的区域：海在南边、河口和岛屿、干流加一条支流、大城市。傍晚五点半的光线。",
+      "descriptionEn": "A custom region: sea to the south, an estuary with islands, a river with a tributary and a large city, in the 17:30 light."
+    }
+  ]
+}

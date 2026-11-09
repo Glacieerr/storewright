@@ -1,0 +1,8 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable", "WebWorker"]
+  },
+  "include": ["src/**/*.ts", "web/src/**/*.ts", "server/**/*.ts", "tests/**/*.ts", "vite.config.ts", "vitest.config.ts"]
+}

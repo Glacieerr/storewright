@@ -1,0 +1,20 @@
+{
+  "$schema": "../../../docs/scenario.schema.json",
+  "format": "storex-chain/scenario",
+  "version": 1,
+  "id": "store-morning",
+  "title": "门店早上收货高峰",
+  "titleEn": "Store receiving, morning rush",
+  "description": "清早六点四十：配送车一辆接一辆倒进门店收货口，停车场里顾客的车也开始多起来。慢速播放看倒车靠台。",
+  "descriptionEn": "06:40: delivery trucks back into the store docks one after another while shoppers start to arrive. Slow playback shows the reversing.",
+  "gen": "g3",
+  "seed": 1,
+  "load": "normal",
+  "drill": "none",
+  "time": "06:40",
+  "speed": 60,
+  "play": true,
+  "camera": {
+    "preset": "flagship"
+  }
+}

@@ -1,0 +1,429 @@
+{
+  "version": 1,
+  "quick": false,
+  "cvrp": [
+    {
+      "variant": "cvrp",
+      "n": 6,
+      "instances": 120,
+      "capacity": 20,
+      "maxStops": null,
+      "savingsOptimal": 90,
+      "savingsMeanGap": 0.421737,
+      "savingsP95Gap": 2.212389,
+      "savingsMaxGap": 11.111111,
+      "nearestMeanGap": 14.961929,
+      "nearestMaxGap": 60.427807,
+      "savingsVsNearest": 11.627586,
+      "exactMs": 52.468711,
+      "savingsMs": 87.278666
+    },
+    {
+      "variant": "cvrp",
+      "n": 8,
+      "instances": 120,
+      "capacity": 20,
+      "maxStops": null,
+      "savingsOptimal": 61.666667,
+      "savingsMeanGap": 1.546307,
+      "savingsP95Gap": 7.854985,
+      "savingsMaxGap": 12.540193,
+      "nearestMeanGap": 18.842589,
+      "nearestMaxGap": 66.567164,
+      "savingsVsNearest": 13.634343,
+      "exactMs": 333.015497,
+      "savingsMs": 30.036419
+    },
+    {
+      "variant": "cvrp",
+      "n": 10,
+      "instances": 120,
+      "capacity": 20,
+      "maxStops": null,
+      "savingsOptimal": 53.333333,
+      "savingsMeanGap": 1.40494,
+      "savingsP95Gap": 7.506702,
+      "savingsMaxGap": 10.878661,
+      "nearestMeanGap": 23.886536,
+      "nearestMaxGap": 62.337662,
+      "savingsVsNearest": 17.337845,
+      "exactMs": 591.125007,
+      "savingsMs": 148.716043
+    },
+    {
+      "variant": "cvrp",
+      "n": 12,
+      "instances": 60,
+      "capacity": 20,
+      "maxStops": null,
+      "savingsOptimal": 40,
+      "savingsMeanGap": 1.863838,
+      "savingsP95Gap": 5.753425,
+      "savingsMaxGap": 10.69869,
+      "nearestMeanGap": 24.37613,
+      "nearestMaxGap": 76.303318,
+      "savingsVsNearest": 16.888069,
+      "exactMs": 1829.576167,
+      "savingsMs": 125.461709
+    },
+    {
+      "variant": "maxstops",
+      "n": 6,
+      "instances": 120,
+      "capacity": 20,
+      "maxStops": 4,
+      "savingsOptimal": 77.5,
+      "savingsMeanGap": 0.669957,
+      "savingsP95Gap": 4.814815,
+      "savingsMaxGap": 9.051724,
+      "nearestMeanGap": 15.362222,
+      "nearestMaxGap": 58.450704,
+      "savingsVsNearest": 11.80694,
+      "exactMs": 32.723507,
+      "savingsMs": 39.985995
+    },
+    {
+      "variant": "maxstops",
+      "n": 8,
+      "instances": 120,
+      "capacity": 20,
+      "maxStops": 4,
+      "savingsOptimal": 67.5,
+      "savingsMeanGap": 1.434052,
+      "savingsP95Gap": 7.627119,
+      "savingsMaxGap": 11.331445,
+      "nearestMeanGap": 14.995479,
+      "nearestMaxGap": 53.481013,
+      "savingsVsNearest": 10.7003,
+      "exactMs": 74.159669,
+      "savingsMs": 53.111248
+    },
+    {
+      "variant": "maxstops",
+      "n": 10,
+      "instances": 120,
+      "capacity": 20,
+      "maxStops": 4,
+      "savingsOptimal": 44.166667,
+      "savingsMeanGap": 1.973334,
+      "savingsP95Gap": 7.425743,
+      "savingsMaxGap": 11.633663,
+      "nearestMeanGap": 19.775916,
+      "nearestMaxGap": 50.437318,
+      "savingsVsNearest": 14.201361,
+      "exactMs": 315.337374,
+      "savingsMs": 25.974581
+    },
+    {
+      "variant": "maxstops",
+      "n": 12,
+      "instances": 60,
+      "capacity": 20,
+      "maxStops": 4,
+      "savingsOptimal": 38.333333,
+      "savingsMeanGap": 2.111143,
+      "savingsP95Gap": 6.921241,
+      "savingsMaxGap": 8.029197,
+      "nearestMeanGap": 20.349506,
+      "nearestMaxGap": 59.465021,
+      "savingsVsNearest": 14.492889,
+      "exactMs": 913.465794,
+      "savingsMs": 69.839416
+    }
+  ],
+  "fill": {
+    "cases": [
+      {
+        "z": -1,
+        "cv": 0.2,
+        "formula": 0.783337,
+        "simulated": 0.783148,
+        "se": 0.000275
+      },
+      {
+        "z": -0.5,
+        "cv": 0.2,
+        "formula": 0.860441,
+        "simulated": 0.860255,
+        "se": 0.000235
+      },
+      {
+        "z": 0,
+        "cv": 0.2,
+        "formula": 0.920212,
+        "simulated": 0.920089,
+        "se": 0.000185
+      },
+      {
+        "z": 0.5,
+        "cv": 0.2,
+        "formula": 0.960441,
+        "simulated": 0.960425,
+        "se": 0.000131
+      },
+      {
+        "z": 1,
+        "cv": 0.2,
+        "formula": 0.983337,
+        "simulated": 0.983237,
+        "se": 0.000083
+      },
+      {
+        "z": 1.5,
+        "cv": 0.2,
+        "formula": 0.994139,
+        "simulated": 0.994169,
+        "se": 0.000047
+      },
+      {
+        "z": 2,
+        "cv": 0.2,
+        "formula": 0.998302,
+        "simulated": 0.998323,
+        "se": 0.000024
+      },
+      {
+        "z": 2.5,
+        "cv": 0.2,
+        "formula": 0.999599,
+        "simulated": 0.999588,
+        "se": 0.000011
+      },
+      {
+        "z": -1,
+        "cv": 0.5,
+        "formula": 0.458342,
+        "simulated": 0.459404,
+        "se": 0.000685
+      },
+      {
+        "z": -0.5,
+        "cv": 0.5,
+        "formula": 0.651102,
+        "simulated": 0.649722,
+        "se": 0.00059
+      },
+      {
+        "z": 0,
+        "cv": 0.5,
+        "formula": 0.800529,
+        "simulated": 0.799761,
+        "se": 0.000463
+      },
+      {
+        "z": 0.5,
+        "cv": 0.5,
+        "formula": 0.901102,
+        "simulated": 0.901152,
+        "se": 0.000326
+      },
+      {
+        "z": 1,
+        "cv": 0.5,
+        "formula": 0.958342,
+        "simulated": 0.958242,
+        "se": 0.000207
+      },
+      {
+        "z": 1.5,
+        "cv": 0.5,
+        "formula": 0.985347,
+        "simulated": 0.985311,
+        "se": 0.000118
+      },
+      {
+        "z": 2,
+        "cv": 0.5,
+        "formula": 0.995755,
+        "simulated": 0.995752,
+        "se": 0.00006
+      },
+      {
+        "z": 2.5,
+        "cv": 0.5,
+        "formula": 0.998998,
+        "simulated": 0.999006,
+        "se": 0.000027
+      }
+    ],
+    "samples": 400000,
+    "maxAbsDiff": 0.001379,
+    "maxSe": 2.338248,
+    "loss": [
+      {
+        "z": 0,
+        "table": 0.3989,
+        "ours": 0.398942
+      },
+      {
+        "z": 0.5,
+        "table": 0.1978,
+        "ours": 0.197797
+      },
+      {
+        "z": 1,
+        "table": 0.0833,
+        "ours": 0.083315
+      },
+      {
+        "z": 1.5,
+        "table": 0.0293,
+        "ours": 0.029307
+      },
+      {
+        "z": 2,
+        "table": 0.0085,
+        "ours": 0.008491
+      },
+      {
+        "z": 2.5,
+        "table": 0.002,
+        "ours": 0.002004
+      }
+    ]
+  },
+  "exact": [
+    {
+      "key": "doors-shift",
+      "label": "月台门：排队和提前装车最少（分支定界）",
+      "labelEn": "Dock doors: least queueing and pre-loading (branch and bound)",
+      "instances": 200,
+      "matched": 200,
+      "flagged": 0,
+      "wrong": 0,
+      "solverMs": 58.310581,
+      "bruteMs": 786.191033
+    },
+    {
+      "key": "doors-assign",
+      "label": "月台门：收发门错用和用门最少（带记忆的搜索）",
+      "labelEn": "Dock doors: fewest role mismatches and doors used (memoised search)",
+      "instances": 200,
+      "matched": 200,
+      "flagged": 0,
+      "wrong": 0,
+      "solverMs": 51.129968,
+      "bruteMs": 112.711911
+    },
+    {
+      "key": "fleet",
+      "label": "车辆接趟：用车、接力、空等最少（分支定界）",
+      "labelEn": "Vehicle chaining: fewest vehicles, relays, idle time (branch and bound)",
+      "instances": 150,
+      "matched": 150,
+      "flagged": 0,
+      "wrong": 0,
+      "solverMs": 187.282154,
+      "bruteMs": 290.378049
+    },
+    {
+      "key": "network",
+      "label": "多门店网络：开仓和分配（分支定界）",
+      "labelEn": "Multi-store network: site opening and assignment (branch and bound)",
+      "instances": 36,
+      "matched": 36,
+      "flagged": 0,
+      "wrong": 0,
+      "solverMs": 79.777249,
+      "bruteMs": 6340.559957
+    }
+  ],
+  "library": [
+    {
+      "name": "sx-cvrp-n6-001",
+      "n": 6,
+      "capacity": 20,
+      "optimal": 293,
+      "savings": 293,
+      "nearest": 293
+    },
+    {
+      "name": "sx-cvrp-n6-002",
+      "n": 6,
+      "capacity": 20,
+      "optimal": 235,
+      "savings": 237,
+      "nearest": 259
+    },
+    {
+      "name": "sx-cvrp-n6-003",
+      "n": 6,
+      "capacity": 20,
+      "optimal": 360,
+      "savings": 360,
+      "nearest": 370
+    },
+    {
+      "name": "sx-cvrp-n8-001",
+      "n": 8,
+      "capacity": 20,
+      "optimal": 382,
+      "savings": 382,
+      "nearest": 471
+    },
+    {
+      "name": "sx-cvrp-n8-002",
+      "n": 8,
+      "capacity": 20,
+      "optimal": 279,
+      "savings": 279,
+      "nearest": 319
+    },
+    {
+      "name": "sx-cvrp-n8-003",
+      "n": 8,
+      "capacity": 20,
+      "optimal": 341,
+      "savings": 341,
+      "nearest": 485
+    },
+    {
+      "name": "sx-cvrp-n10-001",
+      "n": 10,
+      "capacity": 20,
+      "optimal": 450,
+      "savings": 450,
+      "nearest": 471
+    },
+    {
+      "name": "sx-cvrp-n10-002",
+      "n": 10,
+      "capacity": 20,
+      "optimal": 322,
+      "savings": 322,
+      "nearest": 454
+    },
+    {
+      "name": "sx-cvrp-n10-003",
+      "n": 10,
+      "capacity": 20,
+      "optimal": 315,
+      "savings": 315,
+      "nearest": 392
+    },
+    {
+      "name": "sx-cvrp-n12-001",
+      "n": 12,
+      "capacity": 20,
+      "optimal": 468,
+      "savings": 468,
+      "nearest": 597
+    },
+    {
+      "name": "sx-cvrp-n12-002",
+      "n": 12,
+      "capacity": 20,
+      "optimal": 463,
+      "savings": 463,
+      "nearest": 550
+    },
+    {
+      "name": "sx-cvrp-n12-003",
+      "n": 12,
+      "capacity": 20,
+      "optimal": 401,
+      "savings": 414,
+      "nearest": 523
+    }
+  ]
+}

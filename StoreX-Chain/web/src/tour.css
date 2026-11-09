@@ -1,0 +1,250 @@
+/* 演示导览「一个集装箱从船到货架」：三维视图上的说明卡（左下角；手机上铺满底部） */
+.tour-card {
+  position: absolute;
+  left: 50%;
+  bottom: 64px;
+  transform: translateX(-50%);
+  z-index: 6;
+  width: min(460px, calc(100% - 24px));
+  max-height: calc(100% - 96px);
+  overflow: auto;
+  box-sizing: border-box;
+  padding: 12px 14px 10px;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.tour-card[hidden] {
+  display: none;
+}
+.tour-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.tour-kicker {
+  font-weight: 600;
+  color: var(--accent);
+}
+.tour-step {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+.tour-x {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1;
+  padding: 0 2px;
+  cursor: pointer;
+}
+.tour-x:hover {
+  color: var(--ink);
+}
+.tour-title {
+  margin: 2px 0 2px;
+  font-size: 16px;
+  line-height: 1.35;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.tour-clock {
+  margin: 0 0 4px;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.tour-summary {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.tour-facts,
+.tour-legend {
+  margin: 4px 0 6px;
+  padding-left: 18px;
+}
+.tour-facts li,
+.tour-legend li {
+  margin: 1px 0;
+}
+.tour-legend {
+  list-style: none;
+  padding-left: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.tour-legend .tour-src {
+  margin-right: 4px;
+}
+.tour-note {
+  margin: 4px 0 6px;
+  padding: 6px 8px;
+  border-left: 3px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 88%, var(--ink));
+  font-size: 12px;
+  color: var(--ink);
+}
+.tour-skip {
+  margin: 2px 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #b06a00;
+}
+/* 数据从哪来：记录（实心）、估算（虚线框）、今天的同类作业（斜纹） */
+.tour-src {
+  display: inline-block;
+  padding: 0 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+}
+.tour-src.src-record {
+  background: #2a78d6;
+  color: #fff;
+}
+.tour-src.src-estimate {
+  border: 1px dashed #b06a00;
+  color: #b06a00;
+  line-height: 16px;
+}
+.tour-src.src-proxy {
+  background: repeating-linear-gradient(135deg, rgba(120, 90, 200, 0.18) 0 4px, rgba(120, 90, 200, 0.06) 4px 8px);
+  color: #5b45a8;
+  border: 1px solid rgba(120, 90, 200, 0.45);
+  line-height: 16px;
+}
+.tour-dots {
+  display: flex;
+  gap: 5px;
+  margin: 6px 0 8px;
+  flex-wrap: wrap;
+}
+.tour-dot {
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  background: var(--surface);
+  cursor: pointer;
+}
+.tour-dot.done {
+  background: var(--line);
+}
+.tour-dot.on {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.tour-dot.src-estimate {
+  border-style: dashed;
+}
+.tour-ctl {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.tour-ctl .chip.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.tour-ctl .chip[disabled] {
+  opacity: 0.45;
+  cursor: default;
+}
+.tour-bar {
+  height: 3px;
+  margin-top: 8px;
+  background: var(--line);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.tour-bar i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transform-origin: left;
+  animation: tour-fill linear forwards;
+}
+.tour-bar.paused i {
+  animation-play-state: paused;
+}
+@keyframes tour-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+.tour-copied {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--good);
+}
+.tour-url {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  font: 12px ui-monospace, monospace;
+}
+/* 顶栏的按钮 */
+.chip.tour-chip {
+  font-weight: 600;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.chip.tour-chip::before {
+  content: '▶ ';
+}
+/* 宽屏：卡片放左下角，镜头对着的车和设施（画面中间）不被挡住 */
+@media (min-width: 900px) {
+  .tour-card {
+    left: 16px;
+    bottom: 58px;
+    transform: none;
+    width: min(430px, 44%);
+  }
+}
+@media (max-width: 640px) {
+  .tour-card {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    width: auto;
+    transform: none;
+    max-height: 58%;
+    font-size: 12.5px;
+    padding: 10px 12px 8px;
+  }
+  .tour-title {
+    font-size: 15px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tour-bar i {
+    animation: none;
+    transform: none;
+  }
+}
+/* 导览在三维里标的点（本店的箱、泊位、货架） */
+.lbl3d.lbl-tour {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  border-color: var(--accent);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}

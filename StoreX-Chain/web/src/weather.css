@@ -1,0 +1,48 @@
+/* —— 三维工具栏：天气、画质的下拉框（和别的按钮一样的样子） —— */
+.chip.chip-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: default;
+}
+.chip.chip-select select {
+  font: inherit;
+  font-size: inherit;
+  color: inherit;
+  background: transparent;
+  border: none;
+  padding: 0 2px;
+  cursor: pointer;
+}
+.chip.chip-select select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+.chip.chip-select select option {
+  color: var(--ink);
+  background: var(--surface);
+}
+/* 时钟旁边的天气 */
+.clock .clock-weather {
+  display: block;
+  margin-top: 2px;
+}
+/* ?debug=1 时的帧时间：工具栏上面正中（左右是跟踪、设施面板，上方正中是对比回放的对比条） */
+.view3d-debug {
+  position: absolute;
+  bottom: 58px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  width: max-content;
+  max-width: calc(100% - 20px);
+  white-space: pre;
+  text-align: center;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  pointer-events: none;
+}

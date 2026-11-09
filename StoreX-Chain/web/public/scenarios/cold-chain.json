@@ -1,0 +1,25 @@
+{
+  "$schema": "../../../docs/scenario.schema.json",
+  "format": "storex-chain/scenario",
+  "version": 1,
+  "id": "cold-chain",
+  "title": "冷链门减半",
+  "titleEn": "Half the cold-chain doors",
+  "description": "配送中心的冷链门从 12 樘减到 6 樘：冷藏车在月台前排队多久，温控告警和调度台的冲突怎么变。",
+  "descriptionEn": "The distribution centre runs with 6 cold doors instead of 12: how long do reefers queue, and how do temperature alerts and door conflicts change?",
+  "gen": "g3",
+  "seed": 1,
+  "load": "normal",
+  "drill": "none",
+  "facilities": {
+    "dc": {
+      "coldDoors": 6
+    }
+  },
+  "time": "05:30",
+  "speed": 300,
+  "play": true,
+  "camera": {
+    "preset": "dc"
+  }
+}

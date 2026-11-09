@@ -1,0 +1,464 @@
+[
+  {
+    "name": "get_overview",
+    "description": "Overall status now: vehicles by state, store deliveries so far, pending twin recommendations, active incidents, KPIs and the top things to watch.",
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    },
+    "kind": "read"
+  },
+  {
+    "name": "list_risks",
+    "description": "Ranked list of what needs attention now (pending recommendations, late or over-temperature vehicles, dispatch issues in the next two hours, incidents, stock running out, facility alarms), with proposals where something can be done.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 12
+        }
+      }
+    },
+    "kind": "read"
+  },
+  {
+    "name": "get_vehicle",
+    "description": "Where one vehicle is and what it is doing: next stop with planned and estimated arrival, delay, cargo temperature, load, related recommendations and dispatch issues.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "vid": {
+          "type": "integer",
+          "description": "Vehicle index"
+        },
+        "id": {
+          "type": "string",
+          "description": "Job or vehicle id such as M02 or DS-BEV-1"
+        }
+      }
+    },
+    "kind": "read"
+  },
+  {
+    "name": "list_late",
+    "description": "Vehicles running late now, recommendations about predicted late arrivals, and planned late arrivals from the dispatch board.",
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    },
+    "kind": "read"
+  },
+  {
+    "name": "get_stock",
+    "description": "Store stock per product family (twin estimate and actual), sales per hour, hours until sold out, and stock-out recommendations.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "fams": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Product family keys; empty = families at risk"
+        }
+      }
+    },
+    "kind": "read"
+  },
+  {
+    "name": "get_doors",
+    "description": "Distribution center dock doors: usage now and in the next hour, yard waits, door conflicts, or the bookings of one door.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "door": {
+          "type": "string",
+          "description": "Door id such as C05 or D12"
+        }
+      }
+    },
+    "kind": "read"
+  },
+  {
+    "name": "get_facility",
+    "description": "Status of one facility (port, airport, distribution center, store receiving) from the facility monitor, plus its upcoming jobs.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "facility": {
+          "type": "string",
+          "enum": [
+            "port",
+            "airport",
+            "dc",
+            "store"
+          ]
+        }
+      },
+      "required": [
+        "facility"
+      ]
+    },
+    "kind": "read"
+  },
+  {
+    "name": "list_cards",
+    "description": "Pending twin recommendation cards with the recommended option and its simulated outcome, and recently handled cards.",
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    },
+    "kind": "read"
+  },
+  {
+    "name": "explain_card",
+    "description": "Explain why the twin recommends an option: every option with its simulated late, over-temperature and stock-out minutes, extra cost and total score.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "key"
+      ]
+    },
+    "kind": "read"
+  },
+  {
+    "name": "what_if",
+    "description": "Simulated outcome of a different option for a recommendation card (default: doing nothing), the twin versus no twin comparison so far, or an ad-hoc disruption (a vehicle, liner, train or flight late by N minutes, a dock door closed for a period, a road closed) run through the field model against the same day without it: late, over-temperature, stock-out and door-wait minutes and cost; read-only.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "option": {
+          "type": "string"
+        }
+      }
+    },
+    "kind": "compute"
+  },
+  {
+    "name": "propose_decision",
+    "description": "Prepare approving (with an option) or rejecting one or more recommendation cards. Returns a proposal that a person must confirm; nothing is executed by this tool.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "keys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "approve",
+            "reject"
+          ]
+        },
+        "option": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "keys",
+        "action"
+      ]
+    },
+    "kind": "proposal"
+  },
+  {
+    "name": "get_kpi",
+    "description": "Planned KPIs from the dispatch board and field results so far with and without the twin.",
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    },
+    "kind": "read"
+  },
+  {
+    "name": "list_incidents",
+    "description": "Active road incidents, recent vehicle faults and pending breakdown or temperature recommendations.",
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    },
+    "kind": "read"
+  },
+  {
+    "name": "get_schedule",
+    "description": "Jobs departing or arriving in a time window (seconds since midnight).",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "from": {
+          "type": "number"
+        },
+        "to": {
+          "type": "number"
+        }
+      }
+    },
+    "kind": "read"
+  },
+  {
+    "name": "shift_handover",
+    "description": "Shift handover report: results, what happened, open items and what the next shift should watch.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "shift": {
+          "type": "string",
+          "enum": [
+            "dawn",
+            "day",
+            "mid",
+            "night"
+          ]
+        }
+      }
+    },
+    "kind": "read"
+  },
+  {
+    "name": "review_recommendations",
+    "description": "Review of handled recommendations: predicted versus actual outcome, adoption and hit rate by kind.",
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    },
+    "kind": "read"
+  },
+  {
+    "name": "get_forecast",
+    "description": "Forecasts from the selected models (rule versus learned, picked by validation error): store demand per product family, liner and train delays, road travel time.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "fams": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tomorrow": {
+          "type": "boolean"
+        },
+        "delays": {
+          "type": "boolean"
+        }
+      }
+    },
+    "kind": "compute"
+  },
+  {
+    "name": "plan_network",
+    "description": "Multi-store network plan for the current region: which distribution centers to open or expand, cost per year versus today, vehicles and km per day, with the reasons.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "stores": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 12
+        }
+      }
+    },
+    "kind": "compute"
+  },
+  {
+    "name": "get_crossborder",
+    "description": "Cross-border inbound flows: clearance time per mode consistent with the simulation, inspection rates, required documents, declarations per year and exchange-rate sensitivity of landed cost.",
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    },
+    "kind": "read"
+  },
+  {
+    "name": "optimize_dispatch",
+    "description": "Solve dock-door assignment and vehicle scheduling for the day (exact branch and bound or a proven bound) and propose applying the solution to the dispatch board.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "what": {
+          "type": "string",
+          "enum": [
+            "doors",
+            "fleet",
+            "both"
+          ]
+        }
+      }
+    },
+    "kind": "compute"
+  },
+  {
+    "name": "search_knowledge",
+    "description": "Search the procedures and design documents and return matching passages with their source.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "query"
+      ]
+    },
+    "kind": "read"
+  },
+  {
+    "name": "help",
+    "description": "What the assistant can do, with example questions.",
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    },
+    "kind": "read"
+  },
+  {
+    "name": "explain_delay",
+    "description": "Root cause of lateness: for one vehicle, how many minutes behind plan it is and why (departure, door wait at the distribution center, loading, breakdown, road incidents, slower traffic, dwell, store dock wait, dispatch holds, warehouse queues), minute by minute so the parts add up; without a vehicle, the store-level breakdown of late arrivals so far.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "vid": {
+          "type": "integer"
+        },
+        "id": {
+          "type": "string"
+        }
+      }
+    },
+    "kind": "read"
+  },
+  {
+    "name": "detect_anomalies",
+    "description": "Anomalies so far (only data up to now): 15-minute increments of late, over-temperature, stock-out, door-wait, dock-wait minutes and twin cost compared with the previous 3 hours (EWMA baseline, robust z-score), twin ETA error, warehouse zone occupancy over 85% or sudden jumps, and open KPI board alerts, each with a time window and likely cause.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "hub": {
+          "type": "string",
+          "enum": [
+            "port",
+            "airport",
+            "park",
+            "store"
+          ]
+        }
+      }
+    },
+    "kind": "read"
+  },
+  {
+    "name": "get_hub",
+    "description": "One warehousing hub now (port logistics center, airport cargo terminal, logistics park, store parking and receiving yard): every zone with occupancy versus capacity, queues, KPIs and our own cargo in it.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "hub": {
+          "type": "string",
+          "enum": [
+            "port",
+            "airport",
+            "park",
+            "store"
+          ]
+        }
+      },
+      "required": [
+        "hub"
+      ]
+    },
+    "kind": "read"
+  },
+  {
+    "name": "trace_own_cargo",
+    "description": "Where our own cargo (containers, ULDs, pallets) is across the hubs: steps done, current step, next step, and the onward job from the dispatch board.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Container, ULD or job id; empty = all of our cargo"
+        }
+      }
+    },
+    "kind": "read"
+  },
+  {
+    "name": "hub_bottlenecks",
+    "description": "Bottlenecks of one or all hubs over the day plan: fullest zones with the windows over 85% of capacity, longest dwell, queue peaks, and whether appointment smoothing would help.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "hub": {
+          "type": "string",
+          "enum": [
+            "port",
+            "airport",
+            "park",
+            "store"
+          ]
+        }
+      }
+    },
+    "kind": "read"
+  },
+  {
+    "name": "plan_appointments",
+    "description": "Appointment smoothing for a hub: shift arrival windows of trucks that arrive later than the lead time (reefer at most 30 minutes, others 60) to flatten the dock queue under door capacity and cold-chain limits; returns a proposal to notify carriers (a person confirms) with before/after queue peak and waiting minutes, computed with the yard scheduler when the site yard plan is available (store receiving yard), otherwise with the first-come-first-served queue model; the answer names the model.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "hub": {
+          "type": "string",
+          "enum": [
+            "port",
+            "airport",
+            "park",
+            "store"
+          ]
+        }
+      }
+    },
+    "kind": "compute"
+  },
+  {
+    "name": "daily_plan",
+    "description": "Today's plan for the morning meeting: store arrivals, vessels/flights/trains, busiest door and dock hours, staffing hint, risks with forecasts, and known open issues.",
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    },
+    "kind": "read"
+  },
+  {
+    "name": "get_data_quality",
+    "description": "Data channel quality now (drop rate, late messages, longest gap), twin ETA error, and what that means for the answers and proposals.",
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    },
+    "kind": "read"
+  },
+  {
+    "name": "get_policy",
+    "description": "The guardrails: who may execute or approve what (by role and cost), hard constraints (cold chain, batch size, appointments) and the human-confirmation rule.",
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    },
+    "kind": "read"
+  }
+]

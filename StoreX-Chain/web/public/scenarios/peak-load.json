@@ -1,0 +1,20 @@
+{
+  "$schema": "../../../docs/scenario.schema.json",
+  "format": "storex-chain/scenario",
+  "version": 1,
+  "id": "peak-load",
+  "title": "高峰负荷",
+  "titleEn": "Peak load",
+  "description": "需求放大、班轮和航班加密：物流园的月台门和配送车队还够不够，看调度台和分层看板的告警。",
+  "descriptionEn": "More demand, more liner calls and flights: are the logistics-park doors and the delivery fleet still enough? Watch the dispatch board and the KPI alerts.",
+  "gen": "g3",
+  "seed": 1,
+  "load": "peak",
+  "drill": "none",
+  "time": "10:00",
+  "speed": 300,
+  "play": true,
+  "camera": {
+    "preset": "dc"
+  }
+}

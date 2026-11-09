@@ -1,0 +1,21 @@
+{
+  "$schema": "../../../docs/scenario.schema.json",
+  "format": "storex-chain/scenario",
+  "version": 1,
+  "id": "custom-coast-river",
+  "title": "自定义区域：河口和大城市",
+  "titleEn": "Custom region: estuary and a large city",
+  "description": "自定义的区域：海在南边、河口和岛屿、干流加一条支流、大城市。傍晚五点半的光线。",
+  "descriptionEn": "A custom region: sea to the south, an estuary with islands, a river with a tributary and a large city, in the 17:30 light.",
+  "region": "custom-7~sea.S~river.1~size.L~coast.estuary~rform.branching",
+  "gen": "g3",
+  "seed": 1,
+  "load": "normal",
+  "drill": "none",
+  "time": "17:30",
+  "speed": 600,
+  "play": true,
+  "camera": {
+    "preset": "overview"
+  }
+}

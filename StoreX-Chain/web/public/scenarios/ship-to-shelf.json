@@ -1,0 +1,15 @@
+{
+  "$schema": "../../../docs/scenario.schema.json",
+  "format": "storex-chain/scenario",
+  "version": 1,
+  "id": "ship-to-shelf",
+  "title": "一个集装箱从船到货架（导览）",
+  "titleEn": "One container from ship to shelf (guided tour)",
+  "description": "一分钟的自动导览：镜头跟着一个集装箱，从班轮靠泊、卸船、堆场、拖车、配送中心，一直到门店货架。",
+  "descriptionEn": "A one-minute guided tour: the camera follows one container from berthing and discharge through the yard, a truck and the distribution centre to the store shelf.",
+  "gen": "g3",
+  "seed": 1,
+  "load": "normal",
+  "drill": "none",
+  "tour": "container"
+}

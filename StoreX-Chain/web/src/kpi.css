@@ -1,0 +1,153 @@
+/* —— 分层看板 —— */
+.kpiboard {
+  margin-top: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px 12px;
+  min-width: 0;
+  position: relative;
+}
+.kb-head {
+  display: flex;
+  align-items: center;
+  gap: 10px 14px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.kb-head h2 {
+  margin: 0;
+  font-size: 17px;
+}
+.kb-sub {
+  font-size: 12px;
+  color: var(--muted);
+  flex: 1 1 auto;
+}
+.kb-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+@media (max-width: 1100px) {
+  .kb-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 620px) {
+  .kb-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.kb-col h3 {
+  font-size: 13px;
+  margin: 0 0 6px;
+}
+.kb-col h3 small {
+  font-weight: 400;
+  color: var(--muted);
+  margin-left: 6px;
+}
+.kb-tile {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 8px;
+  align-items: baseline;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--good);
+  border-radius: 8px;
+  padding: 5px 9px;
+  margin-bottom: 6px;
+  font-size: 12.5px;
+}
+.kb-tile.st-warn {
+  border-left-color: var(--c4);
+  background: color-mix(in srgb, var(--c4) 8%, var(--surface));
+}
+.kb-tile.st-alarm {
+  border-left-color: var(--bad);
+  background: color-mix(in srgb, var(--bad) 9%, var(--surface));
+}
+.kb-tile.st-na {
+  border-left-color: var(--line);
+  color: var(--muted);
+}
+.kb-tile .v {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.kb-tile .v small {
+  font-weight: 400;
+  color: var(--muted);
+}
+.kb-tile .th {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  color: var(--muted);
+}
+.kb-alerts {
+  margin-top: 8px;
+}
+.kb-alerts h3 {
+  font-size: 13px;
+  margin: 4px 0 6px;
+}
+.kb-alerts ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.kb-alerts li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 5px 9px;
+}
+.kb-alerts .lv {
+  font-size: 11px;
+  border-radius: 10px;
+  padding: 0 7px;
+  color: #fff;
+  background: var(--c4);
+}
+.kb-alerts .lv.alarm {
+  background: var(--bad);
+}
+.kb-alerts .meta {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+.kb-edit {
+  margin-top: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+.kb-edit table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12.5px;
+}
+.kb-edit th,
+.kb-edit td {
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  padding: 3px 8px 3px 0;
+}
+.kb-edit input {
+  width: 72px;
+  font: inherit;
+  font-size: 12.5px;
+  padding: 2px 5px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--ink);
+}

@@ -1,0 +1,27 @@
+/* 顶栏的 中文 / EN 切换（沿用 .seg 的样式）和英文模式下的说明 */
+.top > .tabs {
+  margin-left: auto;
+}
+.lang-toggle button {
+  font-size: 12px;
+  padding: 4px 10px;
+}
+.lang-note {
+  margin: 10px 0 0;
+  color: var(--ink2);
+  font-size: 12px;
+}
+/* 英文的字更长：三维工具栏的按钮紧凑一点、保持一行，放不下时横向滚动（只影响英文） */
+:root[data-lang='en'] .toolbar3d {
+  flex-wrap: nowrap;
+  max-width: calc(100% - 20px);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+:root[data-lang='en'] .toolbar3d .chip,
+:root[data-lang='en'] .toolbar3d .seg button {
+  flex: none;
+  font-size: 11.5px;
+  padding-left: 6px;
+  padding-right: 6px;
+}

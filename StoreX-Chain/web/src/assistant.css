@@ -1,0 +1,455 @@
+/* —— 值班助手 —— */
+.assistant {
+  margin-top: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px 12px;
+  min-width: 0;
+  position: relative;
+}
+.as-head {
+  display: flex;
+  align-items: center;
+  gap: 10px 14px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.as-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.as-title h2 {
+  margin: 0;
+  font-size: 17px;
+}
+.as-sub {
+  font-size: 12px;
+  color: var(--muted);
+}
+.as-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+.as-tools label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink2);
+}
+.as-tools select {
+  font: inherit;
+  font-size: 13px;
+  padding: 3px 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+}
+.as-badge {
+  display: inline-block;
+  min-width: 16px;
+  padding: 0 5px;
+  margin-left: 4px;
+  border-radius: 8px;
+  background: var(--bad);
+  color: #fff;
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+}
+.as-badge:empty {
+  display: none;
+}
+.as-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: 14px;
+}
+@media (max-width: 980px) {
+  .as-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.as-chat {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.as-msgs {
+  list-style: none;
+  margin: 0;
+  padding: 2px 4px 2px 0;
+  height: 340px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.as-msg {
+  max-width: 94%;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.as-msg.me {
+  align-self: flex-end;
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-radius: 12px 12px 4px 12px;
+  padding: 6px 11px;
+}
+.as-msg.bot {
+  align-self: flex-start;
+  background: var(--surface-2);
+  border-radius: 12px 12px 12px 4px;
+  padding: 8px 11px;
+}
+.as-msg.note {
+  align-self: stretch;
+  max-width: none;
+  border-left: 3px solid var(--c4);
+  background: var(--surface-2);
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+.as-msg p {
+  margin: 0 0 4px;
+}
+.as-msg p:last-child {
+  margin-bottom: 0;
+}
+.as-msg ul,
+.as-msg ol {
+  margin: 2px 0 6px;
+  padding-left: 20px;
+}
+.as-meta {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.as-meta details summary {
+  cursor: pointer;
+}
+/* 回答的四段：结论醒目，依据 / 把握 / 下一步在下面一行一段 */
+.as-concl {
+  margin: 0 0 6px;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.as-concl b {
+  margin-right: 6px;
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 600;
+}
+.as-flag {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 7px;
+  border-radius: 10px;
+  font-size: 11px;
+  border: 1px solid var(--line);
+  color: var(--ink2);
+}
+.as-flag.refuse {
+  border-color: var(--c2);
+  color: var(--c2);
+}
+.as-flag.ask {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.as-meta > div {
+  margin-top: 3px;
+  line-height: 1.5;
+}
+.as-meta > div > b {
+  margin-right: 6px;
+  color: var(--ink2);
+  font-weight: 600;
+}
+.as-meta ul {
+  margin: 2px 0 0;
+  padding-left: 18px;
+}
+.as-meta .who {
+  margin-left: 6px;
+  color: var(--ink2);
+}
+.as-meta .who::before {
+  content: '· ';
+}
+.as-meta .lv-hi {
+  color: var(--good);
+}
+.as-meta .lv-mid {
+  color: var(--accent);
+}
+.as-meta .lv-lo,
+.as-meta .q-poor {
+  color: var(--c2);
+}
+.as-clarify {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-top: 6px;
+  padding: 6px 8px;
+  border: 1px dashed var(--accent);
+  border-radius: 8px;
+}
+.as-clarify span {
+  font-size: 12.5px;
+  margin-right: 4px;
+}
+.as-clarify .chip {
+  font-size: 12px;
+}
+.as-checks {
+  margin: 0 0 6px;
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--c2);
+}
+.as-checks b {
+  margin-right: 4px;
+}
+.as-links,
+.as-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.as-links .chip,
+.as-chips .chip {
+  font-size: 12px;
+}
+.as-prop {
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 7px 10px;
+}
+.as-prop.risk-high {
+  border-left-color: var(--c2);
+}
+.as-prop header {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  font-weight: 600;
+  font-size: 13px;
+}
+.as-prop .tag {
+  font-weight: 400;
+  font-size: 11px;
+  color: var(--ink2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0 7px;
+}
+.as-prop .tag.warn {
+  border-color: var(--c2);
+  color: var(--c2);
+}
+.as-prop p {
+  margin: 4px 0 6px;
+  font-size: 12.5px;
+  color: var(--ink2);
+}
+.as-prop footer {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--ink2);
+}
+.as-prop.st-done {
+  border-left-color: var(--good);
+}
+.as-prop.st-dismissed {
+  opacity: 0.6;
+}
+.as-ask {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.as-ask input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: inherit;
+  font-size: 14px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+}
+.as-ask input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+.as-watch h3 {
+  font-size: 13px;
+  margin: 2px 0 6px;
+}
+.as-watch h3 small {
+  font-weight: 400;
+  color: var(--muted);
+  margin-left: 6px;
+}
+.as-watch ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 392px;
+  overflow-y: auto;
+}
+.as-watch li {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr);
+  gap: 8px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.as-watch .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-top: 5px;
+  background: var(--muted);
+}
+.as-watch .lv-3 .dot {
+  background: var(--bad);
+}
+.as-watch .lv-2 .dot {
+  background: var(--c2);
+}
+.as-watch .lv-1 .dot {
+  background: var(--c4);
+}
+.as-watch .acts {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.as-watch .acts .chip {
+  font-size: 11.5px;
+  padding: 1px 8px;
+}
+.as-watch .empty {
+  display: block;
+  color: var(--muted);
+  border-style: dashed;
+}
+.as-drawer {
+  position: absolute;
+  inset: 52px 10px 10px 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  display: flex;
+  flex-direction: column;
+  z-index: 5;
+  min-height: 0;
+}
+.as-drawer > header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.as-drawer > header h3 {
+  margin: 0;
+  font-size: 15px;
+  flex: 1 1 auto;
+}
+.as-drawer .body {
+  overflow: auto;
+  padding: 10px 14px 14px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.as-drawer .body h4 {
+  margin: 10px 0 4px;
+  font-size: 13.5px;
+}
+.as-drawer .body ul {
+  margin: 0 0 6px;
+  padding-left: 18px;
+}
+.as-drawer table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12.5px;
+}
+.as-drawer th,
+.as-drawer td {
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  padding: 4px 8px 4px 0;
+  vertical-align: top;
+}
+.as-drawer td.num,
+.as-drawer th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.as-drawer .hit {
+  color: var(--good);
+}
+.as-drawer .miss {
+  color: var(--bad);
+}
+.as-drawer .tbl {
+  overflow-x: auto;
+}
+@media (max-width: 700px) {
+  .as-drawer {
+    position: fixed;
+    inset: 8px;
+    z-index: 50;
+  }
+  .as-msgs {
+    height: 300px;
+  }
+}
+
+/* 值班助手里点「看建议卡」时闪一下 */
+.lp-card.flash {
+  animation: as-flash 1.6s ease-out;
+}
+@keyframes as-flash {
+  0%,
+  40% {
+    box-shadow: 0 0 0 3px var(--accent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}

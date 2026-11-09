@@ -1,0 +1,21 @@
+{
+  "$schema": "../../../docs/scenario.schema.json",
+  "format": "storex-chain/scenario",
+  "version": 1,
+  "id": "random-region",
+  "title": "随机生成的区域",
+  "titleEn": "A randomly generated region",
+  "description": "海、河、城市、港口、机场、物流园和门店的位置全部随机（编号 3）：同一套系统在另一个城市照样跑。",
+  "descriptionEn": "Sea, river, city, port, airport, logistics park and store all placed at random (seed 3): the same system runs in another city.",
+  "region": "random-3",
+  "gen": "g3",
+  "seed": 1,
+  "load": "normal",
+  "drill": "none",
+  "time": "16:00",
+  "speed": 600,
+  "play": true,
+  "camera": {
+    "preset": "overview"
+  }
+}

@@ -1,0 +1,239 @@
+/* 教学沙盘的练习面板（右侧抽屉 #teach-body 里；容器和抽屉的样式在 ux.css） */
+.tp {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink);
+}
+.tp h3.tp-title {
+  margin: 6px 0 2px;
+  font-size: 16px;
+}
+.tp h4 {
+  margin: 14px 0 6px;
+  font-size: 13px;
+  color: var(--ink2);
+}
+.tp-intro,
+.tp-note,
+.tp-muted {
+  color: var(--ink2);
+}
+.tp-note {
+  font-size: 12px;
+  margin-top: 14px;
+}
+.tp-progress {
+  margin: 4px 0 8px;
+  font-weight: 600;
+}
+.tp-meta {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 0;
+}
+.tp-list {
+  display: grid;
+  gap: 8px;
+}
+.tp-card {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+.tp-card:hover,
+.tp-card:focus-visible {
+  border-color: var(--accent);
+}
+.tp-card-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: baseline;
+}
+.tp-badge {
+  flex: none;
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--ink2);
+  white-space: nowrap;
+}
+.tp-badge.ok {
+  background: color-mix(in srgb, var(--good) 14%, transparent);
+  color: var(--good);
+}
+.tp-badge.none {
+  color: var(--muted);
+}
+.tp-back {
+  border: 0;
+  background: none;
+  color: var(--accent);
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+}
+.tp-goal {
+  margin: 8px 0;
+  padding: 8px 10px;
+  background: var(--surface-2);
+  border-radius: 8px;
+}
+.tp-steps {
+  padding-left: 20px;
+  margin: 10px 0;
+}
+.tp-steps li {
+  margin: 4px 0;
+}
+.tp-primary,
+.tp-actions button {
+  font: inherit;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+.tp-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.tp-primary:disabled,
+.tp-actions button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+.tp-rgrid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.tp-rk {
+  color: var(--ink2);
+}
+.tp-rv {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.tp-rv small,
+.tp-input small {
+  color: var(--muted);
+  font-weight: 400;
+}
+.tp-tasks ul {
+  padding-left: 18px;
+  margin: 0;
+}
+.tp-q {
+  display: block;
+  margin: 10px 0;
+  border: 0;
+  padding: 0;
+}
+.tp-q legend,
+.tp-qlabel {
+  display: block;
+  margin-bottom: 4px;
+}
+.tp-qn {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  font-size: 11px;
+  font-weight: 700;
+}
+.tp-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.tp-input input {
+  width: 140px;
+  max-width: 60%;
+  font: inherit;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+}
+.tp-choice {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  margin: 3px 0;
+  cursor: pointer;
+}
+.tp-choice input {
+  margin-top: 4px;
+}
+.tp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.tp-score {
+  font-weight: 700;
+  margin: 12px 0 4px;
+}
+.tp-score.ok,
+.tp-items li.ok {
+  color: var(--good);
+}
+.tp-score.bad,
+.tp-items li.bad {
+  color: var(--bad);
+}
+.tp-items {
+  padding-left: 0;
+  list-style: none;
+  margin: 0;
+}
+.tp-items li {
+  margin: 4px 0;
+}
+.tp-items small {
+  color: var(--muted);
+}
+
+.tp-bg {
+  margin: 8px 0;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.tp-bg summary {
+  cursor: pointer;
+  color: var(--ink2);
+  font-weight: 600;
+}
+.tp-bg p,
+.tp-bg ul {
+  margin: 6px 0 2px;
+}
+.tp-bg ul {
+  padding-left: 18px;
+}

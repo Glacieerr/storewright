@@ -1,0 +1,20 @@
+{
+  "$schema": "../../../docs/scenario.schema.json",
+  "format": "storex-chain/scenario",
+  "version": 1,
+  "id": "airport-closed",
+  "title": "机场关闭（风暴）",
+  "titleEn": "Airport closed (storm)",
+  "description": "风暴让机场关闭 2 天：货机停飞，机场货站的进口板和冷链货怎么办，值班助手会给出哪些建议。",
+  "descriptionEn": "A storm closes the airport for 2 days: freighters are grounded; see what happens to import ULDs and cold-chain cargo and what the duty assistant recommends.",
+  "gen": "g3",
+  "seed": 1,
+  "load": "normal",
+  "drill": "airportClosed",
+  "time": "13:00",
+  "speed": 300,
+  "play": true,
+  "camera": {
+    "preset": "airport"
+  }
+}

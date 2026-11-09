@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title data-i18n>StoreX 全链路孪生</title>
+    <meta name="description" content="StoreX 全链路：从供应商、港口、机场、铁路和高速，到配送中心、门店和顾客的区域数字孪生。三维场景、全链路仿真、三代方案对比和商业分析。作品集项目，数据全部是合成的。" data-i18n/>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232a78d6'/%3E%3Cpath d='M6 22h20M9 22V14l7-4 7 4v8' fill='none' stroke='white' stroke-width='2.2' stroke-linejoin='round'/%3E%3Ccircle cx='9' cy='9' r='2.4' fill='white'/%3E%3Ccircle cx='23' cy='9' r='2.4' fill='white'/%3E%3Cpath d='M11 9h10' stroke='white' stroke-width='1.6'/%3E%3C/svg%3E" />
+  </head>
+  <body>
+    <header class="top">
+      <div class="brand">
+        <span class="logo" aria-hidden="true"></span>
+        <div>
+          <h1 data-i18n>StoreX 全链路</h1>
+          <p data-i18n>从港口、机场、公路到门店的区域数字孪生 · 作品集项目</p>
+        </div>
+      </div>
+      <nav class="tabs" role="tablist">
+        <button role="tab" data-tab="twin" aria-selected="true" data-i18n>孪生</button>
+        <button role="tab" data-tab="report" aria-selected="false" data-i18n>对比与报告</button>
+        <button role="tab" data-tab="network" aria-selected="false" data-i18n>网络规划</button>
+        <button role="tab" data-tab="about" aria-selected="false" data-i18n="说明（页签）">说明</button>
+      </nav>
+      <div class="top-actions" id="top-actions">
+        <button type="button" class="chip tour-chip" id="tour-btn" title="演示导览：跟着一个本店的集装箱，从班轮、港口堆场、物流园配送中心一路到门店货架（约 1 分钟，← → 翻页，Esc 退出）" data-i18n>一个集装箱从船到货架</button>
+        <button type="button" class="chip" id="share-btn" aria-haspopup="dialog" title="复制此刻的分享链接、导出或导入场景文件" data-i18n>分享</button>
+        <button type="button" class="chip" id="library-btn" aria-haspopup="dialog" title="精选场景：点一下就切到那个区域、负荷、演练、时刻和镜头" data-i18n>场景库</button>
+        <button type="button" class="chip" id="teach-btn" aria-controls="teach" aria-expanded="false" title="教学沙盘：10 道练习，自动批改" data-i18n>练习</button>
+        <button type="button" class="chip icon-chip" id="help-btn" title="界面导览（随时再看）" aria-label="界面导览" data-i18n>?</button>
+      </div>
+      <div class="seg lang-toggle" id="lang-toggle" role="group" aria-label="界面语言 / Language"><button type="button" data-lang="zh" lang="zh-CN" aria-pressed="true">中文</button><button type="button" data-lang="en" lang="en" aria-pressed="false">EN</button></div>
+    </header>
+
+    <main>
+      <section id="tab-twin" class="tab" role="tabpanel">
+        <div class="controls">
+          <div class="field">
+            <span class="label" data-i18n>方案</span>
+            <div class="seg" id="gen"></div>
+          </div>
+          <div class="field">
+            <span class="label" data-i18n>区域</span>
+            <span class="row"><select id="region-mode" title="默认区域：报告里的数字按它算；随机生成：海在哪一侧、河、城市大小、港口、机场、物流园、铁路、高速出口、门店的位置全部随机；自定义：每一项都可以指定" data-i18n><option value="default" data-i18n>默认区域</option><option value="random" data-i18n>随机生成</option><option value="custom" data-i18n>自定义</option></select><input id="region-seed" type="number" min="1" max="999999" value="1" style="width: 5.5em" title="编号：同一个编号每次生成的区域一样" data-i18n/><button id="region-dice" class="ghost" title="换一个随机编号" data-i18n>随机</button><button id="region-edit" class="ghost" title="指定海、河、城市规模、港口、机场、物流园、铁路、高速出口、门店的位置" data-i18n>自定义…</button><button id="region-go" class="ghost" title="按选好的区域重建整个场景（重新载入页面）" data-i18n>生成</button></span>
+          </div>
+          <label class="field">
+            <span class="label" data-i18n>负荷</span>
+            <select id="load" title="压力测试：放大需求、加密班轮航次、洲际班列和货运航班，港口、机场、道路上的别家流量也跟着变密" data-i18n></select>
+          </label>
+          <label class="field">
+            <span class="label" data-i18n>演练</span>
+            <select id="drill"></select>
+          </label>
+          <label class="field">
+            <span class="label" data-i18n>日子</span>
+            <span class="row"><input id="seed" type="number" min="1" max="9999" value="1" /><button id="dice" class="ghost" title="换一天（换一组随机的需求、船期和路况）" data-i18n>换一天</button></span>
+          </label>
+          <button id="run" class="primary" data-i18n>运行</button>
+          <p class="hint" id="hint"></p>
+        </div>
+
+        <div class="stage">
+          <div class="map-wrap world-wrap">
+            <div id="view" class="view3d world3d" aria-label="区域三维孪生：港口、机场、物流园和综合店，所有车船飞机实时跟踪" data-i18n></div>
+            <div id="toolbar" class="toolbar3d">
+              <div class="seg" id="presets" role="group" aria-label="视角" data-i18n></div>
+              <button class="chip" id="labels" aria-pressed="true" data-i18n>地名</button>
+              <button class="chip" id="planmap" aria-pressed="false" title="城市总体规划：用地（居住、商业、公共服务、工业、物流、绿地……）、货运通道和限行、15 分钟生活圈、机场噪声区，左上角是图例和用地结构" data-i18n>规划图</button>
+              <button class="chip" id="tags" aria-pressed="true" title="每辆车头顶显示编号和预计到达（实时跟踪）" data-i18n>车辆标签</button>
+              <button class="chip" id="monitors" aria-pressed="false" title="几个固定机位的小画面：门店收货区、配送中心月台、港口泊位（从三维孪生渲染；接真实摄像头时换成视频流）" data-i18n>监控画面</button>
+              <button class="chip" id="split" aria-pressed="false" title="三维分成左右两半：同一个世界、同一个时钟比两组车（现场用孪生 / 不用孪生、计划 / 现场、这一天 / 另一天）" data-i18n>对比回放</button>
+              <button class="chip" id="export" title="导出此刻的区域三维模型（glTF 二进制，可以用 Blender 打开）" data-i18n>导出 .glb</button>
+              <label class="chip chip-select" title="天气只改画面，不影响仿真：自动按当天的编号和钟点排（清早海雾、午后阵雨、阴雨），演练里的风暴是台风天" data-i18n>天气 <select id="weather" aria-label="天气" data-i18n></select></label>
+              <label class="chip chip-select" title="画质：自动按每一帧的用时升降档（像素密度、阴影、监控画面的帧率、标签、雨滴）；也可以手动选" data-i18n>画质 <select id="quality" aria-label="画质" data-i18n></select></label>
+            </div>
+            <div id="track" class="track" aria-label="实时跟踪：所有车辆的位置、状态和预计到达" data-i18n></div>
+            <div id="facility" class="track facility" aria-label="设施监控：港口、机场、物流园、综合店此刻的设备、在场车辆和作业进度" data-i18n></div>
+            <div id="follow" class="follow" hidden><span id="follow-text"></span><button class="chip" id="follow-stop" data-i18n>停止跟随</button></div>
+            <div id="tip" class="tip" hidden></div>
+            <div id="busy" class="busy" hidden><span class="spinner"></span><span id="busy-text" data-i18n>正在仿真 18 周的全链路…</span></div>
+          </div>
+          <aside class="side">
+            <div class="clock"><span id="clock">03:00</span><span id="clock-note" class="note"></span><span id="clock-weather" class="note clock-weather"></span></div>
+            <div class="vcard" id="vcard" hidden></div>
+            <div class="opcard" id="opcard" hidden></div>
+            <div class="live" id="live"></div>
+            <h3 data-i18n>这次运行（18 周平均）</h3>
+            <div class="summary" id="summary"></div>
+            <h3 data-i18n>图例</h3>
+            <div class="legend" id="legend"></div>
+            <h3 data-i18n>动态</h3>
+            <ol class="log" id="log"></ol>
+          </aside>
+        </div>
+
+        <div class="player">
+          <button id="play" class="primary icon" aria-label="播放" data-i18n>▶</button>
+          <input id="time" type="range" min="0" max="86340" step="60" value="10800" aria-label="时间" data-i18n/>
+          <span id="time-label" class="mono">03:00</span>
+          <label class="speed"><span data-i18n>速度</span>
+            <select id="speed">
+              <option value="10" data-i18n>10 秒 / 秒</option>
+              <option value="60" data-i18n>1 分钟 / 秒</option>
+              <option value="120" data-i18n>2 分钟 / 秒</option>
+              <option value="300" data-i18n>5 分钟 / 秒</option>
+              <option value="600" selected data-i18n>10 分钟 / 秒</option>
+              <option value="1800" data-i18n>30 分钟 / 秒</option>
+            </select>
+          </label>
+        </div>
+        <p class="lang-note" data-lang-only="en" hidden data-i18n>内置模式下值班助手用中文回答；可选的大模型模式用英文回答。</p>
+        <section class="assistant" id="assistant" aria-label="值班助手：问问题、看风险、一键处理" data-i18n></section>
+        <section class="kpiboard" id="kpiboard" aria-label="分层看板：集团、区域、设施、作业四层指标和告警" data-i18n></section>
+        <section class="loop" id="loop" aria-label="闭环孪生：现场、感知数据、孪生、决策、指令" data-i18n></section>
+        <section class="dispatch" id="dispatch" aria-label="调度台：当天的全部作业" data-i18n></section>
+        <div class="hourly" id="hourly"></div>
+      </section>
+
+      <section id="tab-report" class="tab" role="tabpanel" hidden></section>
+      <section id="tab-network" class="tab" role="tabpanel" hidden></section>
+      <section id="tab-about" class="tab" role="tabpanel" hidden></section>
+    </main>
+
+    <footer class="foot">
+      <p data-i18n>本项目基于公开资料、行业通用做法和作者的独立构想设计。<strong data-i18n>本项目与任何零售商、企业无隶属关系。</strong>区域、门店、商品、供应商、船期和所有数字都是合成的；设备和运价是公开资料里的常见区间，不是任何供应商的报价。</p>
+    </footer>
+    <script type="module" src="./src/main.ts"></script>
+      <div id="admin" class="admin" hidden></div>
+      <div id="region-dlg" class="admin" hidden></div>
+      <aside id="teach" class="teach-drawer" hidden aria-label="教学沙盘：练习" data-i18n>
+        <div class="teach-head"><b data-i18n>教学沙盘 · 练习</b><button type="button" class="chip" id="teach-close" aria-label="关闭练习面板" data-i18n>关闭</button></div>
+        <div id="teach-body" class="teach-body"></div>
+      </aside>
+</body>
+</html>

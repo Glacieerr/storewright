@@ -1,0 +1,15 @@
+{
+  "gen": "g3",
+  "seed": 4,
+  "level": "rough",
+  "policy": "auto",
+  "region": "default",
+  "load": "normal",
+  "day": 87,
+  "date": "2030-03-28",
+  "geoOrigin": {
+    "lat0": 0,
+    "lon0": 0
+  },
+  "note": "合成的样例数据：模拟一天的现场经过运输管理、仓储和门店、港口三个接口的格式；日期和经纬度原点都是合成的"
+}

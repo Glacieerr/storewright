@@ -1,0 +1,20 @@
+{
+  "$schema": "../../../docs/scenario.schema.json",
+  "format": "storex-chain/scenario",
+  "version": 1,
+  "id": "normal-day",
+  "title": "平常的一天",
+  "titleEn": "An ordinary day",
+  "description": "默认区域、全链路方案、平常的负荷：早上七点半，配送车陆续出发，港口在卸船，物流园在收货。",
+  "descriptionEn": "Default region, full-chain scheme, normal load: 07:30, delivery trucks leave, the port is discharging and the logistics park is receiving.",
+  "gen": "g3",
+  "seed": 1,
+  "load": "normal",
+  "drill": "none",
+  "time": "07:30",
+  "speed": 600,
+  "play": true,
+  "camera": {
+    "preset": "overview"
+  }
+}

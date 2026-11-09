@@ -1,0 +1,286 @@
+/* 调度台「求解」页、设施管理台「按作业量排班」 */
+.sv {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 13px;
+}
+.sv-intro {
+  margin: 0 0 6px;
+}
+.sv-top {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sv-status {
+  font-size: 12px;
+}
+.sv-opts {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 6px 10px;
+  background: var(--surface);
+}
+.sv-opts summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.sv-opt-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 6px 16px;
+  margin-top: 8px;
+}
+.sv-opt-grid label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.sv-opt-grid input[type='number'],
+.ad-solve input[type='number'] {
+  width: 4.6em;
+  font: inherit;
+  padding: 2px 4px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+}
+.sv-opt-grid .note {
+  grid-column: 1 / -1;
+  margin: 2px 0 0;
+}
+.sv-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+}
+.sv-tile {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: var(--surface);
+}
+.sv-tile .k {
+  font-size: 12px;
+  color: var(--muted);
+}
+.sv-tile .v {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 2px 0;
+}
+.sv-tile .s {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.sv-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--surface);
+}
+.sv-card header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sv-card h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.sv-card h4 {
+  margin: 10px 0 4px;
+  font-size: 13px;
+}
+.sv-goal {
+  margin: 6px 0 8px;
+  color: var(--ink2, var(--muted));
+  font-size: 12.5px;
+}
+.sv-badge {
+  font-size: 11.5px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+}
+.sv-badge.ok {
+  color: var(--good);
+}
+.sv-badge.gap {
+  color: #9a6700;
+}
+.sv-t {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.sv-t th,
+.sv-t td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  white-space: nowrap;
+}
+.sv-t th {
+  color: var(--muted);
+  font-weight: 500;
+}
+.sv-t td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.sv-t td.good {
+  color: var(--good);
+  font-weight: 600;
+}
+.sv-t td.bad {
+  color: var(--bad);
+}
+.sv-t tr.moved td:first-child {
+  font-weight: 600;
+}
+.sv-t tr.sum td {
+  font-weight: 600;
+  border-bottom: none;
+}
+.sv-curve {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin: 3px 0;
+}
+.sv-curve b {
+  min-width: 4em;
+}
+.sv-curve span {
+  font-size: 12px;
+  padding: 1px 8px;
+  border-radius: 6px;
+  background: var(--surface-2);
+}
+.sv-curve span.ok {
+  color: var(--good);
+}
+.sv-curve span.warn {
+  color: #9a6700;
+}
+.sv-why {
+  margin: 4px 0;
+  padding-left: 18px;
+  line-height: 1.55;
+}
+.sv-acts {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.sv-acts button[disabled] {
+  opacity: 0.5;
+  cursor: default;
+}
+.note.bad {
+  color: var(--bad);
+}
+
+/* 设施管理台：按作业量排班 */
+.ad-solve {
+  grid-column: 1 / -1;
+  border-top: 1px solid var(--line);
+  margin-top: 10px;
+  padding-top: 10px;
+  font-size: 13px;
+}
+.ad-solve h4 {
+  margin: 0 0 6px;
+}
+.ad-solve-opts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.ad-solve-opts label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.ad-solve .sv-t td.role {
+  white-space: normal;
+  min-width: 9em;
+}
+.ad-solve .sv-t td.basis {
+  white-space: normal;
+  color: var(--muted);
+  font-size: 11.5px;
+  max-width: 26em;
+}
+.ad-solve .sv-t tr.pick {
+  cursor: pointer;
+}
+.ad-solve .sv-t tr.sel td {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.ad-chart {
+  display: block;
+  width: 100%;
+  max-width: 760px;
+  height: auto;
+  margin: 6px 0;
+}
+.ad-chart .need {
+  fill: color-mix(in srgb, var(--muted) 35%, transparent);
+}
+.ad-chart .now {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+}
+.ad-chart .plan {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+.ad-chart text {
+  fill: var(--muted);
+  font-size: 10px;
+}
+.ad-legend {
+  display: flex;
+  gap: 14px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.ad-legend i {
+  display: inline-block;
+  width: 14px;
+  height: 8px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+.ad-legend i.need {
+  background: color-mix(in srgb, var(--muted) 35%, transparent);
+}
+.ad-legend i.now {
+  border-top: 2px dashed var(--muted);
+  height: 0;
+}
+.ad-legend i.plan {
+  border-top: 2px solid var(--accent);
+  height: 0;
+}
+.sv-card .sv-t.sv-kpi {
+  width: auto;
+  min-width: min(560px, 100%);
+}
+.sv-card .sv-t.sv-kpi td:first-child {
+  padding-right: 24px;
+}

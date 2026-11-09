@@ -1,0 +1,59 @@
+{
+  "name": "storex-chain",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "description": "StoreX Chain: an end-to-end digital twin of one comprehensive store's supply chain - long-haul (incl. cross-border) road, sea, intercontinental rail and air freight into a distribution center and onward to the store. Simulator, 3D regional twin, dispatch board, closed-loop twin (field, sensing, estimation, recommendations, commands), twin server for Unreal Engine and MATLAB, and planning, comparison and business reports.",
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Glacieerr/storewright.git",
+    "directory": "StoreX-Chain"
+  },
+  "homepage": "https://github.com/Glacieerr/storewright/tree/main/StoreX-Chain#readme",
+  "bugs": {
+    "url": "https://github.com/Glacieerr/storewright/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "vite --config vite.config.ts",
+    "build": "vite build --config vite.config.ts",
+    "preview": "vite preview --config vite.config.ts",
+    "sim": "tsx src/cli/main.ts",
+    "test": "vitest run --config vitest.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "check": "npm run typecheck && npm run test",
+    "reports": "tsx src/cli/main.ts all",
+    "docs:check": "tsx src/cli/docnums.ts",
+    "docs:sync": "tsx src/cli/docnums.ts --write",
+    "assistant": "tsx src/cli/assistant.ts",
+    "assistant:eval": "tsx src/cli/assistantEval.ts",
+    "teach": "tsx src/cli/teach.ts",
+    "bench": "tsx src/cli/bench.ts",
+    "twin-server": "tsx server/twinServer.ts",
+    "twin-client": "tsx server/client.ts",
+    "overlaps": "tsx scripts/overlaps.mjs",
+    "validate": "tsx src/cli/validate.ts",
+    "lint": "eslint .",
+    "format:check": "prettier --check \"src/**/*.ts\" \"web/src/**/*.{ts,css}\" \"server/**/*.ts\" \"tests/**/*.ts\" \"scripts/**/*.mjs\" \"engines/**/*.ts\" \"*.ts\""
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "1.6.0",
+    "@storewright/yard": "0.1.0",
+    "three": "0.170.0",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@storewright/overlap-audit": "0.1.0",
+    "@types/node": "22.10.2",
+    "@types/three": "0.170.0",
+    "playwright": "1.63.0",
+    "prettier": "3.9.10",
+    "tsx": "4.19.2",
+    "typescript": "5.7.2",
+    "vite": "5.4.21",
+    "vitest": "2.1.8"
+  }
+}

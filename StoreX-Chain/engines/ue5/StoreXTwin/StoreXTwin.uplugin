@@ -1,0 +1,14 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "0.1",
+  "FriendlyName": "StoreX Twin",
+  "Description": "Drives a regional digital twin scene from the StoreX-Chain twin server (WebSocket + REST): vehicle positions, field data and the twin's recommendations; approve / reject recommendations and send commands back.",
+  "Category": "Simulation",
+  "CreatedBy": "StoreX-Chain portfolio project",
+  "CanContainContent": true,
+  "IsBetaVersion": true,
+  "Modules": [
+    { "Name": "StoreXTwin", "Type": "Runtime", "LoadingPhase": "Default" }
+  ]
+}

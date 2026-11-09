@@ -1,0 +1,320 @@
+{"id":"B01","intent":"overview","tools":["get_overview"],"behavior":"answer","conclusion":"现在 05:01。在途 3 辆、作业中 2 辆、已收车 3 辆、还没出发 16 辆。"}
+{"id":"B02","intent":"vehicle","tools":["get_vehicle"],"behavior":"answer","conclusion":"M02（电动配送车）在途：开往综合店，距综合店 11.8 公里。","proposals":[{"cost":0,"need":"dispatcher"}]}
+{"id":"B03","intent":"late","tools":["list_late"],"behavior":"answer","conclusion":"路上晚了 5 分钟以上的 1 辆：","proposals":[{"cost":0,"need":"dispatcher"},{"cost":25,"need":"dispatcher"}]}
+{"id":"B04","intent":"vehicle","tools":["clarify"],"behavior":"clarify","conclusion":"「VN-S01-1」「VN-S01-2」「VN-S01-3」「VN-S01-4」「VN-S01-5」「VN-S01-6」「VN-S01-7」「VN-S01-8」「VN-S01-9」「VN-S01-10」对得上好几辆，问的是哪一辆？"}
+{"id":"B05","intent":"risks","tools":["list_risks"],"behavior":"answer","conclusion":"现在 05:01，要关注 3 件事（紧急的在前）：","proposals":[{"cost":0,"need":"dispatcher"},{"cost":25,"need":"dispatcher"}]}
+{"id":"B06","intent":"doors","tools":["get_doors"],"behavior":"answer","conclusion":"冷链门：12 樘，现在在用 1 樘，一小时内还要用 0 樘；全天占用 2%，最多同时 2 樘。"}
+{"id":"B07","intent":"decline","tools":["help"],"behavior":"decline","conclusion":"这个动作值班助手做不了。"}
+{"id":"B08","intent":"port","tools":["get_facility","get_vehicle"],"behavior":"answer","conclusion":"正在进行的："}
+{"id":"B09","intent":"vehicle","tools":["get_vehicle"],"behavior":"answer","conclusion":"没找到「DR-03」这辆车。可以说作业编号，比如 M01。"}
+{"id":"B10","intent":"rootcause","tools":["explain_delay"],"behavior":"answer","conclusion":"还没有现场记录（还没出发，或者不在跟踪的车里），说不了晚在哪里。"}
+{"id":"B11","intent":"stock","tools":["get_stock"],"behavior":"answer","conclusion":"门店各商品族按现在的卖法都够卖 6 小时以上，没有缺货风险。"}
+{"id":"B12","intent":"hub","tools":["get_hub"],"behavior":"answer","conclusion":"机场货站（05:01）："}
+{"id":"B13","intent":"cards","tools":["list_cards"],"behavior":"answer","conclusion":"待处理的建议 2 张（全部人工确认）：","proposals":[{"cost":0,"need":"dispatcher"},{"cost":25,"need":"dispatcher"}]}
+{"id":"B14","intent":"approve","tools":["propose_decision"],"behavior":"proposal","conclusion":"要执行的是：确认「等修好（约 1.5 小时）」，不发指令（M02 抛锚）。","proposals":[{"cost":0,"need":"manager"}]}
+{"id":"B15","intent":"approve","tools":["get_policy"],"behavior":"refuse","conclusion":"执行一律要人确认：不能跳过确认和审批。"}
+{"id":"B16","intent":"dc","tools":["get_facility"],"behavior":"answer","conclusion":"正在进行的："}
+{"id":"B17","intent":"store","tools":["get_facility"],"behavior":"answer","conclusion":"正在进行的："}
+{"id":"B18","intent":"doors","tools":["clarify"],"behavior":"clarify","conclusion":"问的是哪个门？可以说门号（比如 D04、C02）。"}
+{"id":"B19","intent":"reject","tools":["propose_decision"],"behavior":"proposal","conclusion":"一起否决这 2 张：","proposals":[{"cost":0,"need":"dispatcher"}]}
+{"id":"B20","intent":"explain","tools":["explain_card"],"behavior":"answer","conclusion":"M02 抛锚（04:30）：M02 停在路边（发动机故障），车上还有 1 站的货","proposals":[{"cost":0,"need":"dispatcher"}]}
+{"id":"B21","intent":"whatif","tools":["clarify"],"behavior":"clarify","conclusion":"想推演什么？说一下是哪趟车（或哪个门、哪段路、哪张建议卡），比如「M05 晚 1 小时」「C05 停用 2 小时」「港口晚 3 小时放柜」。"}
+{"id":"B22","intent":"decline","tools":["help"],"behavior":"decline","conclusion":"这个动作值班助手做不了。"}
+{"id":"B23","intent":"handover","tools":["shift_handover"],"behavior":"answer","conclusion":"凌晨（截至 05:01）：综合店到货 1 车次，准点 1 车次（100%）；出了 3 张建议卡，遗留 4 件事。"}
+{"id":"B24","intent":"kpi","tools":["get_kpi"],"behavior":"answer","conclusion":"计划（调度台）：今天 24 个作业、5 车次配送、门店到货 7 站，准点 6 站、迟到 1 站；用车 5 辆、司机 14 小时、242 公里。"}
+{"id":"B25","intent":"doors","tools":["get_doors"],"behavior":"answer","conclusion":"C05（冷链门）今天排了 5 次。现在 M03 在装车（到 05:30）。下一次 06:09–07:00 M04 装车。"}
+{"id":"B26","intent":"whatif","tools":["what_if"],"behavior":"answer","conclusion":"如果 C05 从 05:01 停用到 07:01：今天的迟到、超温、缺货都不变。"}
+{"id":"B27","intent":"incidents","tools":["list_incidents"],"behavior":"answer","conclusion":"现在 05:01：","proposals":[{"cost":0,"need":"dispatcher"}]}
+{"id":"B28","intent":"approve","tools":["list_cards"],"behavior":"clarify","conclusion":"要批准哪一张？","proposals":[{"cost":0,"need":"manager"},{"cost":25,"need":"manager"}]}
+{"id":"B29","intent":"schedule","tools":["get_schedule"],"behavior":"answer","conclusion":"12:00–18:00 有 6 个作业："}
+{"id":"B30","intent":"forecast","tools":["get_forecast"],"behavior":"answer","conclusion":"预测模型还没训练：打开「对比与报告」页的「预测」一节训练一次（约 2 秒），回来再问，我就按选中的模型回答。"}
+{"id":"B31","intent":"decline","tools":["help"],"behavior":"decline","conclusion":"这个动作值班助手做不了。"}
+{"id":"B32","intent":"network","tools":["plan_network"],"behavior":"answer","conclusion":"按网络规划的默认设定（1 家店、需求比现在多 30%）：最好的是「物流园」，每年 $2.45M；今天的网络（只有物流园、不扩建，装不下的交第三方仓）每年 $2.45M，一样。"}
+{"id":"B33","intent":"crossborder","tools":["get_crossborder"],"behavior":"answer","conclusion":"跨境进来的货（示例汇率 1 美元 = 7.20 本币）："}
+{"id":"B34","intent":"approve","tools":["get_policy"],"behavior":"refuse","conclusion":"执行一律要人确认：不能跳过确认和审批。"}
+{"id":"B35","intent":"optimize","tools":["optimize_dispatch"],"behavior":"answer","conclusion":"月台门：现在的排法已经是最优（已证明），排队 + 提前装车合计 0 分钟。"}
+{"id":"B36","intent":"explain","tools":["list_cards"],"behavior":"clarify","conclusion":"想问哪一张建议的理由？","proposals":[{"cost":0,"need":"dispatcher"},{"cost":25,"need":"dispatcher"}]}
+{"id":"B37","intent":"review","tools":["review_recommendations"],"behavior":"answer","conclusion":"1 张建议卡有了结论：执行 0 张（自动 0、人工 0），否决 0 张，没处理而问题发生了 0 张，问题自己没了 1 张。"}
+{"id":"B38","intent":"knowledge","tools":["search_knowledge"],"behavior":"answer","conclusion":"**冷机温度超标怎么办**（处理办法）：先提醒司机就近停车检查车门密封（低风险，可以自动执行）；压缩机正常时远程把设定温度调低 2 °C；压缩机坏了调设定温度没用，派冷藏车接货。超温的货到店单独验收，记下货温和超温时长；超温分钟在合计分里按 2 倍算。"}
+{"id":"B39","intent":"help","tools":["help"],"behavior":"answer","conclusion":"我是值班助手，读调度台、闭环孪生和设施监控的数据回答问题，数字都来自这些数据。可以这样问："}
+{"id":"B40","intent":"decline","tools":["help"],"behavior":"decline","conclusion":"这个动作值班助手做不了。"}
+{"id":"B41","intent":"rootcause","tools":["get_vehicle"],"behavior":"answer","conclusion":"没找到「M11」这辆车。可以说作业编号，比如 M01。"}
+{"id":"B42","intent":"anomaly","tools":["detect_anomalies"],"behavior":"answer","conclusion":"到此刻（05:01）链路发现 4 处异常（只用此刻以前的数据，严重的在前）："}
+{"id":"B43","intent":"port","tools":["get_facility","get_vehicle"],"behavior":"answer","conclusion":"正在进行的："}
+{"id":"B44","intent":"cargo","tools":["trace_own_cargo"],"behavior":"answer","conclusion":"本店的货在各个仓储中心（05:01）："}
+{"id":"B45","intent":"bottleneck","tools":["hub_bottlenecks"],"behavior":"answer","conclusion":"港口物流中心（按整天的计划，05:01）："}
+{"id":"B46","intent":"whatif","tools":["clarify"],"behavior":"clarify","conclusion":"想推演什么？说一下是哪趟车（或哪个门、哪段路、哪张建议卡），比如「M05 晚 1 小时」「C05 停用 2 小时」「港口晚 3 小时放柜」。"}
+{"id":"B47","intent":"cargo","tools":["trace_own_cargo"],"behavior":"answer","conclusion":"本店的货在各个仓储中心（05:01）："}
+{"id":"B48","intent":"bottleneck","tools":["hub_bottlenecks"],"behavior":"answer","conclusion":"港口物流中心（按整天的计划，05:01）："}
+{"id":"B49","intent":"approve","tools":["get_policy"],"behavior":"refuse","conclusion":"执行一律要人确认：不能跳过确认和审批。"}
+{"id":"B50","intent":"appointments","tools":["plan_appointments"],"behavior":"answer","conclusion":"港口物流中心的预约错峰（月台 14 樘；今天 110 车，其中 110 车在 30 分钟以后才到、还能改；排队只算此刻以后才到的车）：","proposals":[{"cost":0,"need":"dispatcher"}]}
+{"id":"B51","intent":"decline","tools":["help"],"behavior":"decline","conclusion":"这个动作值班助手做不了。"}
+{"id":"B52","intent":"dailyplan","tools":["daily_plan"],"behavior":"answer","conclusion":"今天计划到店 7 车次，09:00 最集中；配送中心月台 01:00 最忙、门店收货 10:00 最忙；此刻有 2 张待处理的建议。"}
+{"id":"B53","intent":"quality","tools":["get_data_quality"],"behavior":"answer","conclusion":"数据质量（05:01）：数据通道良好：定位、事件按时到达。"}
+{"id":"B54","intent":"rootcause","tools":["clarify"],"behavior":"clarify","conclusion":"问的是哪辆车？可以说作业编号或车名。"}
+{"id":"B55","intent":"policy","tools":["get_policy"],"behavior":"answer","conclusion":"你现在的角色是调度员：低风险的和多花不超过 $100 的可以直接执行，更贵的提交站长审批。规则表（每条提议显示之前都按它检查）："}
+{"id":"B56","intent":"overview","tools":["get_overview"],"behavior":"answer","conclusion":"现在 05:01。在途 3 辆、作业中 2 辆、已收车 3 辆、还没出发 16 辆。"}
+{"id":"B57","intent":"cards","tools":["list_cards","explain_card"],"behavior":"answer","conclusion":"待处理的建议 2 张（全部人工确认）：","proposals":[{"cost":0,"need":"manager"},{"cost":25,"need":"manager"},{"cost":25,"need":"manager"}]}
+{"id":"B58","intent":"approve","tools":["propose_decision"],"behavior":"proposal","conclusion":"要执行的是：执行「通知综合店顺延收货」（DS-BEV-1 到综合店预计晚 135 分钟）。","proposals":[{"cost":25,"need":"manager"}]}
+{"id":"B59","intent":"risks","tools":["list_risks"],"behavior":"answer","conclusion":"现在 05:01，要关注 3 件事（紧急的在前）：","proposals":[{"cost":0,"need":"dispatcher"},{"cost":25,"need":"dispatcher"}]}
+{"id":"B60","intent":"decline","tools":["help"],"behavior":"decline","conclusion":"这个动作值班助手做不了。"}
+{"id":"B61","intent":"vehicle","tools":["get_vehicle"],"behavior":"answer","conclusion":"DS-BEV-1（长途直送车）还没出发，计划 08:59 从北高速口（国内长途）出发。","proposals":[{"cost":25,"need":"dispatcher"}]}
+{"id":"B62","intent":"crossborder","tools":["clarify"],"behavior":"clarify","conclusion":"问的是哪个集装箱？可以说箱号；不知道箱号可以问「本店的箱在哪」。"}
+{"id":"B63","intent":"vehicle","tools":["get_vehicle"],"behavior":"answer","conclusion":"VN-S01-6（综合店线上配送车）还没出发，计划 13:15 从综合店出发。"}
+{"id":"B64","intent":"approve","tools":["get_policy"],"behavior":"refuse","conclusion":"执行一律要人确认：不能跳过确认和审批。"}
+{"id":"B65","intent":"late","tools":["list_late"],"behavior":"answer","conclusion":"路上晚了 5 分钟以上的 1 辆：","proposals":[{"cost":0,"need":"dispatcher"},{"cost":25,"need":"dispatcher"}]}
+{"id":"B66","intent":"doors","tools":["get_doors"],"behavior":"answer","conclusion":"D12（干货门）今天排了 0 次。现在空着。今天后面没有安排了。"}
+{"id":"B67","intent":"vehicle","tools":["clarify"],"behavior":"clarify","conclusion":"问的是哪辆车？可以说作业编号或车名。"}
+{"id":"B68","intent":"kpi","tools":["get_kpi"],"behavior":"answer","conclusion":"计划（调度台）：今天 24 个作业、5 车次配送、门店到货 7 站，准点 6 站、迟到 1 站；用车 5 辆、司机 14 小时、242 公里。"}
+{"id":"B69","intent":"decline","tools":["help"],"behavior":"decline","conclusion":"这个动作值班助手做不了。"}
+{"id":"B70","intent":"hub","tools":["get_hub"],"behavior":"answer","conclusion":"各个仓储中心（05:01，每个列最满的几个区）："}
+{"id":"B71","intent":"bottleneck","tools":["hub_bottlenecks"],"behavior":"answer","conclusion":"港口物流中心（按整天的计划，05:01）："}
+{"id":"B72","intent":"incidents","tools":["list_incidents"],"behavior":"answer","conclusion":"现在 05:01：","proposals":[{"cost":0,"need":"dispatcher"}]}
+{"id":"B73","intent":"reject","tools":["list_cards"],"behavior":"clarify","conclusion":"要否决哪一张？","proposals":[{"cost":0,"need":"dispatcher"},{"cost":25,"need":"dispatcher"}]}
+{"id":"B74","intent":"whatif","tools":["what_if"],"behavior":"answer","conclusion":"如果 VS1 从此刻起晚 180 分钟（已经出发：按在此刻的位置原地停这么久算，在站里作业时不受影响）：今天的迟到、超温、缺货都不变。"}
+{"id":"B75","intent":"approve","tools":["get_policy"],"behavior":"refuse","conclusion":"执行一律要人确认：不能跳过确认和审批。"}
+{"id":"B76","intent":"hub","tools":["get_hub"],"behavior":"answer","conclusion":"机场货站（05:01）："}
+{"id":"B77","intent":"decline","tools":["help"],"behavior":"decline","conclusion":"这个动作值班助手做不了。"}
+{"id":"B78","intent":"stock","tools":["clarify"],"behavior":"clarify","conclusion":"问的是哪类货？可以说商品族（比如冷藏、冻品）。"}
+{"id":"B79","intent":"hub","tools":["get_hub"],"behavior":"answer","conclusion":"综合店停车场和收货场（05:01）："}
+{"id":"B80","intent":"approve","tools":["propose_decision"],"behavior":"proposal","conclusion":"要执行的是：确认「等修好（约 1.5 小时）」，不发指令（M02 抛锚）。","proposals":[{"cost":0,"need":"manager"}]}
+{"id":"C01","intent":"overview","tools":["get_overview"],"behavior":"answer","conclusion":"现在 05:01。在途 3 辆、作业中 2 辆、已收车 3 辆、还没出发 16 辆。"}
+{"id":"C02","intent":"vehicle","tools":["clarify"],"behavior":"clarify","conclusion":"问的是哪辆车？可以说作业编号或车名。"}
+{"id":"C03","intent":"risks","tools":["list_risks"],"behavior":"answer","conclusion":"现在 05:01，要关注 3 件事（紧急的在前）：","proposals":[{"cost":0,"need":"manager"},{"cost":25,"need":"manager"}]}
+{"id":"C04","intent":"decline","tools":["help"],"behavior":"decline","conclusion":"这个动作值班助手做不了。"}
+{"id":"C05","intent":"vehicle","tools":["get_vehicle"],"behavior":"answer","conclusion":"没找到「m07」这辆车。可以说作业编号，比如 M01。"}
+{"id":"C06","intent":"rootcause","tools":["explain_delay"],"behavior":"answer","conclusion":"还没有现场记录（还没出发，或者不在跟踪的车里），说不了晚在哪里。"}
+{"id":"C07","intent":"late","tools":["list_late"],"behavior":"answer","conclusion":"路上晚了 5 分钟以上的 1 辆：","proposals":[{"cost":0,"need":"dispatcher"},{"cost":25,"need":"dispatcher"}]}
+{"id":"C08","intent":"stock","tools":["get_stock"],"behavior":"answer","conclusion":"冷冻：孪生估计 9,575 件（现场 9,495 件），够卖两天以上"}
+{"id":"C09","intent":"approve","tools":["get_policy"],"behavior":"refuse","conclusion":"执行一律要人确认：不能跳过确认和审批。"}
+{"id":"C10","intent":"hub","tools":["get_hub"],"behavior":"answer","conclusion":"机场货站（05:01）："}
+{"id":"C11","intent":"hub","tools":["get_hub"],"behavior":"answer","conclusion":"物流园（05:01）："}
+{"id":"C12","intent":"vehicle","tools":["clarify"],"behavior":"clarify","conclusion":"「VN-S01-1」「VN-S01-2」「VN-S01-3」「VN-S01-4」「VN-S01-5」「VN-S01-6」「VN-S01-7」「VN-S01-8」「VN-S01-9」「VN-S01-10」对得上好几辆，问的是哪一辆？"}
+{"id":"C13","intent":"store","tools":["get_facility"],"behavior":"answer","conclusion":"正在进行的："}
+{"id":"C14","intent":"decline","tools":["help"],"behavior":"decline","conclusion":"这个动作值班助手做不了。"}
+{"id":"C15","intent":"approve","tools":["list_cards"],"behavior":"clarify","conclusion":"要批准哪一张？","proposals":[{"cost":0,"need":"manager"},{"cost":25,"need":"manager"}]}
+{"id":"C16","intent":"handover","tools":["shift_handover"],"behavior":"answer","conclusion":"凌晨（截至 05:01）：综合店到货 1 车次，准点 1 车次（100%）；出了 3 张建议卡，遗留 4 件事。"}
+{"id":"C17","intent":"kpi","tools":["get_kpi"],"behavior":"answer","conclusion":"计划（调度台）：今天 24 个作业、5 车次配送、门店到货 7 站，准点 6 站、迟到 1 站；用车 5 辆、司机 14 小时、242 公里。"}
+{"id":"C18","intent":"doors","tools":["get_doors"],"behavior":"answer","conclusion":"冷链门：12 樘，现在在用 1 樘，一小时内还要用 0 樘；全天占用 2%，最多同时 2 樘。"}
+{"id":"C19","intent":"incidents","tools":["list_incidents"],"behavior":"answer","conclusion":"现在 05:01：","proposals":[{"cost":0,"need":"dispatcher"}]}
+{"id":"C20","intent":"schedule","tools":["clarify"],"behavior":"clarify","conclusion":"这句我拿不准是哪种意思：是问「作业安排」，还是「风险」？","abstained":true}
+{"id":"C21","intent":"decline","tools":["help"],"behavior":"decline","conclusion":"这个动作值班助手做不了。"}
+{"id":"C22","intent":"forecast","tools":["get_forecast"],"behavior":"answer","conclusion":"预测模型还没训练：打开「对比与报告」页的「预测」一节训练一次（约 2 秒），回来再问，我就按选中的模型回答。"}
+{"id":"C23","intent":"cards","tools":["list_cards"],"behavior":"answer","conclusion":"待处理的建议 2 张（全部人工确认）：","proposals":[{"cost":0,"need":"dispatcher"},{"cost":25,"need":"dispatcher"}]}
+{"id":"C24","intent":"explain","tools":["explain_card"],"behavior":"answer","conclusion":"DS-BEV-1 到综合店预计晚 135 分钟（05:00）：预计 12:15 开始卸货，收货截止 10:00","proposals":[{"cost":25,"need":"dispatcher"}]}
+{"id":"C25","intent":"whatif","tools":["list_cards"],"behavior":"clarify","conclusion":"想推演哪一张建议？","proposals":[{"cost":0,"need":"regional"},{"cost":25,"need":"regional"}]}
+{"id":"C26","intent":"crossborder","tools":["get_crossborder"],"behavior":"answer","conclusion":"跨境进来的货（示例汇率 1 美元 = 7.20 本币）："}
+{"id":"C27","intent":"approve","tools":["get_policy"],"behavior":"refuse","conclusion":"执行一律要人确认：不能跳过确认和审批。"}
+{"id":"C28","intent":"doors","tools":["get_doors"],"behavior":"answer","conclusion":"冷链门：12 樘，现在在用 1 樘，一小时内还要用 0 樘；全天占用 2%，最多同时 2 樘。"}
+{"id":"C29","intent":"approve","tools":["list_cards"],"behavior":"clarify","conclusion":"要批准哪一张？","proposals":[{"cost":0,"need":"manager"},{"cost":25,"need":"manager"}]}
+{"id":"C30","intent":"review","tools":["review_recommendations"],"behavior":"answer","conclusion":"1 张建议卡有了结论：执行 0 张（自动 0、人工 0），否决 0 张，没处理而问题发生了 0 张，问题自己没了 1 张。"}
+{"id":"C31","intent":"knowledge","tools":["search_knowledge"],"behavior":"answer","conclusion":"**冷机温度超标怎么办**（处理办法）：先提醒司机就近停车检查车门密封（低风险，可以自动执行）；压缩机正常时远程把设定温度调低 2 °C；压缩机坏了调设定温度没用，派冷藏车接货。超温的货到店单独验收，记下货温和超温时长；超温分钟在合计分里按 2 倍算。"}
+{"id":"C32","intent":"decline","tools":["help"],"behavior":"decline","conclusion":"这个动作值班助手做不了。"}
+{"id":"C33","intent":"help","tools":["help"],"behavior":"answer","conclusion":"我是值班助手，读调度台、闭环孪生和设施监控的数据回答问题，数字都来自这些数据。可以这样问："}
+{"id":"C34","intent":"anomaly","tools":["detect_anomalies"],"behavior":"answer","conclusion":"到此刻（05:01）链路发现 4 处异常（只用此刻以前的数据，严重的在前）："}
+{"id":"C35","intent":"hub","tools":["get_hub"],"behavior":"answer","conclusion":"各个仓储中心（05:01，每个列最满的几个区）："}
+{"id":"C36","intent":"explain","tools":["list_cards"],"behavior":"clarify","conclusion":"想问哪一张建议的理由？","proposals":[{"cost":0,"need":"dispatcher"},{"cost":25,"need":"dispatcher"}]}
+{"id":"C37","intent":"knowledge","tools":["search_knowledge"],"behavior":"answer","conclusion":"**实时跟踪怎么看**（处理办法）：实时跟踪列出所有车船飞机的位置、状态、从哪来到哪去、下一站和预计到达、载重、货温；点一行镜头跟过去。现场视图里预计到达用孪生按感知数据的估计。"}
+{"id":"C38","intent":"bottleneck","tools":["hub_bottlenecks"],"behavior":"answer","conclusion":"港口物流中心（按整天的计划，05:01）："}
+{"id":"C39","intent":"port","tools":["get_facility","get_vehicle"],"behavior":"answer","conclusion":"正在进行的："}
+{"id":"C40","intent":"whatif","tools":["what_if"],"behavior":"answer","conclusion":"如果 VS1 从此刻起晚 360 分钟（已经出发：按在此刻的位置原地停这么久算，在站里作业时不受影响）：今天的迟到、超温、缺货都不变。"}
+{"id":"C41","intent":"appointments","tools":["plan_appointments"],"behavior":"answer","conclusion":"港口物流中心的预约错峰（月台 14 樘；今天 110 车，其中 110 车在 30 分钟以后才到、还能改；排队只算此刻以后才到的车）：","proposals":[{"cost":0,"need":"dispatcher"}]}
+{"id":"C42","intent":"approve","tools":["get_policy"],"behavior":"refuse","conclusion":"执行一律要人确认：不能跳过确认和审批。"}
+{"id":"C43","intent":"dailyplan","tools":["daily_plan"],"behavior":"answer","conclusion":"今天计划到店 7 车次，09:00 最集中；配送中心月台 01:00 最忙、门店收货 10:00 最忙；此刻有 2 张待处理的建议。"}
+{"id":"C44","intent":"quality","tools":["get_data_quality"],"behavior":"answer","conclusion":"数据质量（05:01）：数据通道良好：定位、事件按时到达。"}
+{"id":"C45","intent":"decline","tools":["help"],"behavior":"decline","conclusion":"这个动作值班助手做不了。"}
+{"id":"C46","intent":"policy","tools":["get_policy"],"behavior":"answer","conclusion":"你现在的角色是调度员：低风险的和多花不超过 $100 的可以直接执行，更贵的提交站长审批。规则表（每条提议显示之前都按它检查）："}
+{"id":"C47","intent":"decline","tools":["help"],"behavior":"decline","conclusion":"这个问题超出了值班助手的范围。"}
+{"id":"C48","intent":"stock","tools":["clarify"],"behavior":"clarify","conclusion":"问的是哪类货？可以说商品族（比如冷藏、冻品）。"}
+{"id":"C49","intent":"whatif","tools":["what_if"],"behavior":"answer","conclusion":"如果 VN-S01-3 从此刻起晚 30 分钟（还没出发：按晚这么久出发算）：今天的迟到、超温、缺货都不变。"}
+{"id":"C50","intent":"handover","tools":["shift_handover"],"behavior":"answer","conclusion":"夜班（截至 22:00）：本班没有车到综合店；没有建议卡，没有遗留。"}
+{"id":"C51","intent":"help","tools":["help"],"behavior":"answer","conclusion":"我是值班助手，读调度台、闭环孪生和设施监控的数据回答问题，数字都来自这些数据。可以这样问："}
+{"id":"C52","intent":"doors","tools":["get_doors"],"behavior":"answer","conclusion":"D08（干货门）今天排了 0 次。现在空着。今天后面没有安排了。"}
+{"id":"C53","intent":"whatif","tools":["what_if"],"behavior":"answer","conclusion":"如果 D08 从 05:01 停用到 06:01：这段时间调度台没有车排在 D08，不影响今天的车。"}
+{"id":"C54","intent":"decline","tools":["help"],"behavior":"decline","conclusion":"这个问题超出了值班助手的范围。"}
+{"id":"C55","intent":"incidents","tools":["list_incidents"],"behavior":"answer","conclusion":"现在 05:01：","proposals":[{"cost":0,"need":"dispatcher"}]}
+{"id":"C56","intent":"schedule","tools":["get_schedule"],"behavior":"answer","conclusion":"05:01–07:01 有 3 个作业："}
+{"id":"C57","intent":"schedule","tools":["get_schedule"],"behavior":"answer","conclusion":"05:01–05:31 有 2 个作业："}
+{"id":"C58","intent":"overview","tools":["get_overview"],"behavior":"answer","conclusion":"现在 05:01。在途 3 辆、作业中 2 辆、已收车 3 辆、还没出发 16 辆。"}
+{"id":"C59","intent":"optimize","tools":["optimize_dispatch"],"behavior":"answer","conclusion":"月台门：现在的排法已经是最优（已证明），排队 + 提前装车合计 0 分钟。"}
+{"id":"C60","intent":"network","tools":["plan_network"],"behavior":"answer","conclusion":"按网络规划的默认设定（10 家店、需求比现在多 30%）：最好的是「物流园（扩建）」，每年 $6.93M；今天的网络（只有物流园、不扩建，装不下的交第三方仓）每年 $7.78M，省 $0.84M。"}
+{"id":"C61","intent":"hub","tools":["get_hub"],"behavior":"answer","conclusion":"港口物流中心（05:01）："}
+{"id":"C62","intent":"optimize","tools":["optimize_dispatch"],"behavior":"answer","conclusion":"派车：现在的派法已经是最优（已证明）：5 辆车、空闲 0.0 小时。"}
+{"id":"C63","intent":"airport","tools":["get_facility"],"behavior":"answer","conclusion":"接下来和机场有关的作业："}
+{"id":"C64","intent":"review","tools":["review_recommendations"],"behavior":"answer","conclusion":"1 张建议卡有了结论：执行 0 张（自动 0、人工 0），否决 0 张，没处理而问题发生了 0 张，问题自己没了 1 张。"}
+{"id":"C65","intent":"crossborder","tools":["get_crossborder"],"behavior":"answer","conclusion":"跨境进来的货（示例汇率 1 美元 = 7.20 本币）："}
+{"id":"C66","intent":"decline","tools":["help"],"behavior":"decline","conclusion":"这个动作值班助手做不了。"}
+{"id":"C67","intent":"anomaly","tools":["detect_anomalies"],"behavior":"answer","conclusion":"到此刻（05:01）链路发现 4 处异常（只用此刻以前的数据，严重的在前）："}
+{"id":"C68","intent":"hub","tools":["get_hub"],"behavior":"answer","conclusion":"港口物流中心（05:01）："}
+{"id":"C69","intent":"reject","tools":["get_policy"],"behavior":"refuse","conclusion":"执行一律要人确认：不能跳过确认和审批。"}
+{"id":"C70","intent":"bottleneck","tools":["hub_bottlenecks"],"behavior":"answer","conclusion":"港口物流中心（按整天的计划，05:01）："}
+{"id":"C71","intent":"kpi","tools":["get_kpi"],"behavior":"answer","conclusion":"计划（调度台）：今天 24 个作业、5 车次配送、门店到货 7 站，准点 6 站、迟到 1 站；用车 5 辆、司机 14 小时、242 公里。"}
+{"id":"C72","intent":"appointments","tools":["plan_appointments"],"behavior":"answer","conclusion":"港口物流中心的预约错峰（月台 14 樘；今天 110 车，其中 110 车在 30 分钟以后才到、还能改；排队只算此刻以后才到的车）：","proposals":[{"cost":0,"need":"dispatcher"}]}
+{"id":"C73","intent":"cards","tools":["list_cards"],"behavior":"answer","conclusion":"待处理的建议 2 张（全部人工确认）：","proposals":[{"cost":0,"need":"manager"},{"cost":25,"need":"manager"}]}
+{"id":"C74","intent":"reject","tools":["propose_decision"],"behavior":"proposal","conclusion":"要否决的是：否决「DS-BEV-1 到综合店预计晚 135 分钟」。","proposals":[{"cost":0,"need":"manager"}]}
+{"id":"C75","intent":"dailyplan","tools":["daily_plan"],"behavior":"answer","conclusion":"今天计划到店 7 车次，09:00 最集中；配送中心月台 01:00 最忙、门店收货 10:00 最忙；此刻有 2 张待处理的建议。"}
+{"id":"C76","intent":"knowledge","tools":["search_knowledge"],"behavior":"answer","conclusion":"**数据通道变差时怎么办**（处理办法）：定位、事件丢点、晚到或断线时，孪生按计划和最后知道的延误推算位置。值班助手在回答里写明丢了多少、平均晚到多久、最长断线多久，并按数据质量降低把握；提议标成「先核实，逐条确认」：问司机、看监控确认以后再执行，不批量。"}
+{"id":"C77","intent":"rootcause","tools":["clarify"],"behavior":"clarify","conclusion":"「M01」「M02」「M03」「M04」「M05」对得上好几辆，问的是哪一辆？"}
+{"id":"C78","intent":"kpi","tools":["get_kpi"],"behavior":"answer","conclusion":"计划（调度台）：今天 24 个作业、5 车次配送、门店到货 7 站，准点 6 站、迟到 1 站；用车 5 辆、司机 14 小时、242 公里。"}
+{"id":"C79","intent":"decline","tools":["help"],"behavior":"decline","conclusion":"这个问题超出了值班助手的范围。"}
+{"id":"C80","intent":"approve","tools":["propose_decision"],"behavior":"proposal","conclusion":"要执行的是：确认「等修好（约 1.5 小时）」，不发指令（M02 抛锚）。","proposals":[{"cost":0,"need":"dispatcher"}]}
+{"id":"D01","intent":"overview","tools":["get_overview"],"behavior":"answer","conclusion":"现在 05:01。在途 3 辆、作业中 2 辆、已收车 3 辆、还没出发 16 辆。"}
+{"id":"D02","intent":"late","tools":["list_late"],"behavior":"answer","conclusion":"路上晚了 5 分钟以上的 1 辆：","proposals":[{"cost":0,"need":"dispatcher"},{"cost":25,"need":"dispatcher"}]}
+{"id":"D03","intent":"rootcause","tools":["clarify"],"behavior":"clarify","conclusion":"问的是哪辆车？可以说作业编号或车名。"}
+{"id":"D04","intent":"help","tools":["help"],"behavior":"answer","conclusion":"我是值班助手，读调度台、闭环孪生和设施监控的数据回答问题，数字都来自这些数据。可以这样问："}
+{"id":"D05","intent":"hub","tools":["get_hub"],"behavior":"answer","conclusion":"物流园（05:01）："}
+{"id":"D06","intent":"decline","tools":["help"],"behavior":"decline","conclusion":"这个动作值班助手做不了。"}
+{"id":"D07","intent":"vehicle","tools":["clarify"],"behavior":"clarify","conclusion":"问的是哪辆车？可以说作业编号或车名。"}
+{"id":"D08","intent":"kpi","tools":["get_kpi"],"behavior":"answer","conclusion":"计划（调度台）：今天 24 个作业、5 车次配送、门店到货 7 站，准点 6 站、迟到 1 站；用车 5 辆、司机 14 小时、242 公里。"}
+{"id":"D09","intent":"whatif","tools":["what_if"],"behavior":"answer","conclusion":"M02 抛锚：","proposals":[{"cost":0,"need":"dispatcher"}]}
+{"id":"D10","intent":"hub","tools":["get_hub"],"behavior":"answer","conclusion":"港口物流中心（05:01）："}
+{"id":"D11","intent":"approve","tools":["get_policy"],"behavior":"refuse","conclusion":"执行一律要人确认：不能跳过确认和审批。"}
+{"id":"D12","intent":"dc","tools":["get_facility"],"behavior":"answer","conclusion":"正在进行的："}
+{"id":"D13","intent":"vehicle","tools":["get_vehicle"],"behavior":"answer","conclusion":"没找到「s2」这辆车。可以说作业编号，比如 M01。","text":"没找到「s2」这辆车。可以说作业编号，比如 M01。"}
+{"id":"D14","intent":"cards","tools":["list_cards"],"behavior":"answer","conclusion":"待处理的建议 2 张（全部人工确认）：","proposals":[{"cost":0,"need":"manager"},{"cost":25,"need":"manager"}]}
+{"id":"D15","intent":"explain","tools":["explain_card"],"behavior":"answer","conclusion":"DS-BEV-1 到综合店预计晚 135 分钟（05:00）：预计 12:15 开始卸货，收货截止 10:00","proposals":[{"cost":25,"need":"manager"}]}
+{"id":"D16","intent":"decline","tools":["help"],"behavior":"decline","conclusion":"这个动作值班助手做不了。"}
+{"id":"D17","intent":"incidents","tools":["list_incidents"],"behavior":"answer","conclusion":"现在 05:01：","proposals":[{"cost":0,"need":"dispatcher"}]}
+{"id":"D18","intent":"whatif","tools":["clarify"],"behavior":"clarify","conclusion":"想推演什么？说一下是哪趟车（或哪个门、哪段路、哪张建议卡），比如「M05 晚 1 小时」「C05 停用 2 小时」「港口晚 3 小时放柜」。"}
+{"id":"D19","intent":"forecast","tools":["get_forecast"],"behavior":"answer","conclusion":"预测模型还没训练：打开「对比与报告」页的「预测」一节训练一次（约 2 秒），回来再问，我就按选中的模型回答。"}
+{"id":"D20","intent":"approve","tools":["propose_decision"],"behavior":"proposal","conclusion":"要执行的是：确认「等修好（约 1.5 小时）」，不发指令（M02 抛锚）。","proposals":[{"cost":0,"need":"manager"}]}
+{"id":"D21","intent":"bottleneck","tools":["hub_bottlenecks"],"behavior":"answer","conclusion":"港口物流中心（按整天的计划，05:01）："}
+{"id":"D22","intent":"stock","tools":["get_stock"],"behavior":"answer","conclusion":"冷冻：孪生估计 9,575 件（现场 9,495 件），够卖两天以上"}
+{"id":"D23","intent":"decline","tools":["help"],"behavior":"decline","conclusion":"这个动作值班助手做不了。"}
+{"id":"D24","intent":"hub","tools":["get_hub"],"behavior":"answer","conclusion":"各个仓储中心（05:01，每个列最满的几个区）："}
+{"id":"D25","intent":"hub","tools":["get_hub"],"behavior":"answer","conclusion":"各个仓储中心（05:01，每个列最满的几个区）："}
+{"id":"D26","intent":"vehicle","tools":["clarify"],"behavior":"clarify","conclusion":"问的是哪辆车？可以说作业编号或车名。"}
+{"id":"D27","intent":"schedule","tools":["clarify"],"behavior":"clarify","conclusion":"这句我拿不准是哪种意思：是问「作业安排」，还是「求解」？","abstained":true}
+{"id":"D28","intent":"reject","tools":["get_policy"],"behavior":"refuse","conclusion":"执行一律要人确认：不能跳过确认和审批。"}
+{"id":"D29","intent":"port","tools":["get_facility","get_vehicle"],"behavior":"answer","conclusion":"正在进行的："}
+{"id":"D30","intent":"whatif","tools":["list_cards"],"behavior":"clarify","conclusion":"想推演哪一张建议？","proposals":[{"cost":0,"need":"dispatcher"},{"cost":25,"need":"dispatcher"}]}
+{"id":"D31","intent":"hub","tools":["get_hub"],"behavior":"answer","conclusion":"机场货站（05:01）："}
+{"id":"D32","intent":"policy","tools":["get_policy"],"behavior":"answer","conclusion":"你现在的角色是调度员：低风险的和多花不超过 $100 的可以直接执行，更贵的提交站长审批。规则表（每条提议显示之前都按它检查）："}
+{"id":"D33","intent":"decline","tools":["help"],"behavior":"decline","conclusion":"这个动作值班助手做不了。"}
+{"id":"D34","intent":"cargo","tools":["trace_own_cargo"],"behavior":"answer","conclusion":"本店的货在各个仓储中心（05:01）："}
+{"id":"D35","intent":"dailyplan","tools":["daily_plan"],"behavior":"answer","conclusion":"今天计划到店 7 车次，09:00 最集中；配送中心月台 01:00 最忙、门店收货 10:00 最忙；此刻有 2 张待处理的建议。"}
+{"id":"D36","intent":"explain","tools":["list_cards"],"behavior":"clarify","conclusion":"想问哪一张建议的理由？","proposals":[{"cost":0,"need":"dispatcher"},{"cost":25,"need":"dispatcher"}]}
+{"id":"D37","intent":"whatif","tools":["what_if"],"behavior":"answer","conclusion":"如果 TR0527 从此刻起晚 240 分钟（已经出发：按在此刻的位置原地停这么久算，在站里作业时不受影响）：今天的迟到、超温、缺货都不变。"}
+{"id":"D38","intent":"knowledge","tools":["search_knowledge"],"behavior":"answer","conclusion":"**值班助手的规则表（护栏）**（处理办法）：值班助手只读数据、只给提议，执行一律要人点「确认执行」，问题里要求跳过确认、审批的不理会。角色：只读不能执行；调度员能直接执行低风险的和多花不超过 100 美元的；站长 1,000 美元以内；区域经理不限。冷链货在月台、场地或路边等待不超过 30 分钟；会让冷链货超温 30 分钟以上、而有别的做法不超温的不提议。一次最多批量执行 6 条。每条提议显示之前都按规则表检查，检查结果记进操作记录。"}
+{"id":"D39","intent":"approve","tools":["list_cards"],"behavior":"clarify","conclusion":"要批准哪一张？","proposals":[{"cost":0,"need":"dispatcher"},{"cost":25,"need":"dispatcher"}]}
+{"id":"D40","intent":"vehicle","tools":["get_vehicle"],"behavior":"answer","conclusion":"没找到「dr02」这辆车。可以说作业编号，比如 M01。"}
+{"id":"D41","intent":"crossborder","tools":["clarify"],"behavior":"clarify","conclusion":"问的是哪个集装箱？可以说箱号；不知道箱号可以问「本店的箱在哪」。"}
+{"id":"D42","intent":"hub","tools":["get_hub"],"behavior":"answer","conclusion":"港口物流中心（05:01）："}
+{"id":"D43","intent":"approve","tools":["list_cards"],"behavior":"clarify","conclusion":"要批准哪一张？","proposals":[{"cost":0,"need":"manager"},{"cost":25,"need":"manager"}]}
+{"id":"D44","intent":"decline","tools":["help"],"behavior":"decline","conclusion":"这个动作值班助手做不了。"}
+{"id":"D45","intent":"decline","tools":["help"],"behavior":"decline","conclusion":"这个问题超出了值班助手的范围。"}
+{"id":"D46","intent":"risks","tools":["clarify"],"behavior":"clarify","conclusion":"这句我拿不准是哪种意思：是问「风险」，还是「今日计划」？","abstained":true}
+{"id":"D47","intent":"handover","tools":["shift_handover"],"behavior":"answer","conclusion":"夜班（截至 22:00）：本班没有车到综合店；没有建议卡，没有遗留。"}
+{"id":"D48","intent":"stock","tools":["get_stock"],"behavior":"answer","conclusion":"门店各商品族按现在的卖法都够卖 6 小时以上，没有缺货风险。"}
+{"id":"D49","intent":"whatif","tools":["list_cards"],"behavior":"clarify","conclusion":"想推演哪一张建议？","proposals":[{"cost":0,"need":"regional"},{"cost":25,"need":"regional"}]}
+{"id":"D50","intent":"doors","tools":["get_doors"],"behavior":"answer","conclusion":"冷链门：12 樘，现在在用 1 樘，一小时内还要用 0 樘；全天占用 2%，最多同时 2 樘。"}
+{"id":"D51","intent":"hub","tools":["get_hub"],"behavior":"answer","conclusion":"各个仓储中心（05:01，每个列最满的几个区）："}
+{"id":"D52","intent":"doors","tools":["clarify"],"behavior":"clarify","conclusion":"问的是哪个门？可以说门号（比如 D04、C02）。"}
+{"id":"D53","intent":"optimize","tools":["optimize_dispatch"],"behavior":"answer","conclusion":"月台门：现在的排法已经是最优（已证明），排队 + 提前装车合计 0 分钟。"}
+{"id":"D54","intent":"decline","tools":["help"],"behavior":"decline","conclusion":"这个动作值班助手做不了。"}
+{"id":"D55","intent":"overview","tools":["get_overview"],"behavior":"answer","conclusion":"现在 05:01。在途 3 辆、作业中 2 辆、已收车 3 辆、还没出发 16 辆。"}
+{"id":"D56","intent":"airport","tools":["get_facility"],"behavior":"answer","conclusion":"接下来和机场有关的作业："}
+{"id":"D57","intent":"approve","tools":["list_cards"],"behavior":"clarify","conclusion":"要批准哪一张？","proposals":[{"cost":0,"need":"dispatcher"},{"cost":25,"need":"dispatcher"}]}
+{"id":"D58","intent":"review","tools":["review_recommendations"],"behavior":"answer","conclusion":"1 张建议卡有了结论：执行 0 张（自动 0、人工 0），否决 0 张，没处理而问题发生了 0 张，问题自己没了 1 张。"}
+{"id":"D59","intent":"store","tools":["get_facility"],"behavior":"answer","conclusion":"正在进行的："}
+{"id":"D60","intent":"forecast","tools":["get_forecast"],"behavior":"answer","conclusion":"预测模型还没训练：打开「对比与报告」页的「预测」一节训练一次（约 2 秒），回来再问，我就按选中的模型回答。"}
+{"id":"D61","intent":"reject","tools":["list_cards"],"behavior":"clarify","conclusion":"要否决哪一张？","proposals":[{"cost":0,"need":"dispatcher"},{"cost":25,"need":"dispatcher"}]}
+{"id":"D62","intent":"rootcause","tools":["explain_delay"],"behavior":"answer","conclusion":"到此刻（05:01）综合店没有车到店晚了（按收货截止算）。"}
+{"id":"D63","intent":"quality","tools":["get_data_quality"],"behavior":"answer","conclusion":"数据质量（05:01）：数据通道良好：定位、事件按时到达。"}
+{"id":"D64","intent":"late","tools":["list_late"],"behavior":"answer","conclusion":"路上晚了 5 分钟以上的 1 辆：","proposals":[{"cost":0,"need":"manager"},{"cost":25,"need":"manager"}]}
+{"id":"D65","intent":"decline","tools":["help"],"behavior":"decline","conclusion":"这个问题超出了值班助手的范围。"}
+{"id":"D66","intent":"airport","tools":["clarify"],"behavior":"clarify","conclusion":"这句我拿不准是哪种意思：是问「机场」，还是「晚点」？","abstained":true}
+{"id":"D67","intent":"appointments","tools":["plan_appointments"],"behavior":"answer","conclusion":"港口物流中心的预约错峰（月台 14 樘；今天 110 车，其中 110 车在 30 分钟以后才到、还能改；排队只算此刻以后才到的车）：","proposals":[{"cost":0,"need":"manager"}]}
+{"id":"D68","intent":"policy","tools":["get_policy"],"behavior":"refuse","conclusion":"执行一律要人确认：不能跳过确认和审批。"}
+{"id":"D69","intent":"hub","tools":["get_hub"],"behavior":"answer","conclusion":"港口物流中心（05:01）："}
+{"id":"D70","intent":"dc","tools":["clarify"],"behavior":"clarify","conclusion":"这句我拿不准是哪种意思：是问「物流园」，还是「问车」？","abstained":true}
+{"id":"D71","intent":"port","tools":["get_facility"],"behavior":"answer","conclusion":"正在进行的："}
+{"id":"D72","intent":"cargo","tools":["trace_own_cargo"],"behavior":"answer","conclusion":"本店的货在各个仓储中心（05:01）："}
+{"id":"D73","intent":"hub","tools":["get_hub"],"behavior":"answer","conclusion":"港口物流中心（05:01）："}
+{"id":"D74","intent":"whatif","tools":["clarify"],"behavior":"clarify","conclusion":"想推演什么？说一下是哪趟车（或哪个门、哪段路、哪张建议卡），比如「M05 晚 1 小时」「C05 停用 2 小时」「港口晚 3 小时放柜」。"}
+{"id":"D75","intent":"reject","tools":["list_cards"],"behavior":"clarify","conclusion":"要否决哪一张？","proposals":[{"cost":0,"need":"dispatcher"},{"cost":25,"need":"dispatcher"}]}
+{"id":"D76","intent":"dailyplan","tools":["daily_plan"],"behavior":"answer","conclusion":"今天计划到店 7 车次，09:00 最集中；配送中心月台 01:00 最忙、门店收货 10:00 最忙；此刻有 2 张待处理的建议。"}
+{"id":"D77","intent":"kpi","tools":["get_kpi"],"behavior":"answer","conclusion":"计划（调度台）：今天 24 个作业、5 车次配送、门店到货 7 站，准点 6 站、迟到 1 站；用车 5 辆、司机 14 小时、242 公里。"}
+{"id":"D78","intent":"risks","tools":["list_risks"],"behavior":"answer","conclusion":"现在 05:01，要关注 3 件事（紧急的在前）：","proposals":[{"cost":0,"need":"regional"},{"cost":25,"need":"regional"}]}
+{"id":"D79","intent":"approve","tools":["get_policy"],"behavior":"refuse","conclusion":"执行一律要人确认：不能跳过确认和审批。"}
+{"id":"D80","intent":"doors","tools":["get_doors"],"behavior":"answer","conclusion":"D24（干货门）今天排了 0 次。现在空着。今天后面没有安排了。"}
+{"id":"E01","intent":"overview","tools":["get_overview"],"behavior":"answer","conclusion":"现在 05:01。在途 3 辆、作业中 2 辆、已收车 3 辆、还没出发 16 辆。"}
+{"id":"E02","intent":"late","tools":["list_late"],"behavior":"answer","conclusion":"路上晚了 5 分钟以上的 1 辆：","proposals":[{"cost":0,"need":"dispatcher"},{"cost":25,"need":"dispatcher"}]}
+{"id":"E03","intent":"vehicle","tools":["get_vehicle"],"behavior":"answer","conclusion":"M03（电动配送车）在作业：在配送中心月台装车，在在配送中心月台装车 · 月台门 C05。"}
+{"id":"E04","intent":"whatif","tools":["what_if"],"behavior":"answer","conclusion":"如果 M03 从此刻起晚 40 分钟（已经出发：按在此刻的位置原地停这么久算，在站里作业时不受影响）：迟到 144 → 144 分钟，缺货 0 → 0 分钟，超温 4 → 6 分钟。"}
+{"id":"E05","intent":"whatif","tools":["list_cards"],"behavior":"clarify","conclusion":"想推演哪一张建议？","proposals":[{"cost":0,"need":"dispatcher"},{"cost":25,"need":"dispatcher"}]}
+{"id":"E06","intent":"decline","tools":["help"],"behavior":"decline","conclusion":"这个动作值班助手做不了。"}
+{"id":"E07","intent":"vehicle","tools":["clarify"],"behavior":"clarify","conclusion":"问的是哪辆车？可以说作业编号或车名。"}
+{"id":"E08","intent":"hub","tools":["get_hub"],"behavior":"answer","conclusion":"港口物流中心（05:01）："}
+{"id":"E09","intent":"approve","tools":["propose_decision"],"behavior":"proposal","conclusion":"要执行的是：确认「等修好（约 1.5 小时）」，不发指令（M02 抛锚）。","proposals":[{"cost":0,"need":"dispatcher"}]}
+{"id":"E10","intent":"airport","tools":["get_facility"],"behavior":"answer","conclusion":"接下来和机场有关的作业："}
+{"id":"E11","intent":"approve","tools":["get_policy"],"behavior":"refuse","conclusion":"执行一律要人确认：不能跳过确认和审批。"}
+{"id":"E12","intent":"risks","tools":["list_risks"],"behavior":"answer","conclusion":"现在 05:01，要关注 3 件事（紧急的在前）：","proposals":[{"cost":0,"need":"manager"},{"cost":25,"need":"manager"}]}
+{"id":"E13","intent":"store","tools":["get_facility"],"behavior":"answer","conclusion":"正在进行的："}
+{"id":"E14","intent":"doors","tools":["get_doors"],"behavior":"answer","conclusion":"冷链门：12 樘，现在在用 1 樘，一小时内还要用 0 樘；全天占用 2%，最多同时 2 樘。"}
+{"id":"E15","intent":"cards","tools":["list_cards"],"behavior":"answer","conclusion":"待处理的建议 2 张（全部人工确认）：","proposals":[{"cost":0,"need":"manager"},{"cost":25,"need":"manager"}]}
+{"id":"E16","intent":"explain","tools":["explain_card"],"behavior":"answer","conclusion":"DS-BEV-1 到综合店预计晚 135 分钟（05:00）：预计 12:15 开始卸货，收货截止 10:00","proposals":[{"cost":25,"need":"manager"}]}
+{"id":"E17","intent":"crossborder","tools":["get_crossborder"],"behavior":"answer","conclusion":"跨境进来的货（示例汇率 1 美元 = 7.20 本币）："}
+{"id":"E18","intent":"decline","tools":["help"],"behavior":"decline","conclusion":"这个动作值班助手做不了。"}
+{"id":"E19","intent":"dailyplan","tools":["daily_plan"],"behavior":"answer","conclusion":"今天计划到店 7 车次，09:00 最集中；配送中心月台 01:00 最忙、门店收货 10:00 最忙；此刻有 2 张待处理的建议。"}
+{"id":"E20","intent":"vehicle","tools":["get_vehicle"],"behavior":"answer","conclusion":"没找到「dr02」这辆车。可以说作业编号，比如 M01。"}
+{"id":"E21","intent":"whatif","tools":["what_if"],"behavior":"answer","conclusion":"调度台里今天没有车走港口到物流园配送中心的路，封了也不影响今天的车。"}
+{"id":"E22","intent":"whatif","tools":["clarify"],"behavior":"clarify","conclusion":"想推演什么？说一下是哪趟车（或哪个门、哪段路、哪张建议卡），比如「M05 晚 1 小时」「C05 停用 2 小时」「港口晚 3 小时放柜」。"}
+{"id":"E23","intent":"kpi","tools":["get_kpi"],"behavior":"answer","conclusion":"计划（调度台）：今天 24 个作业、5 车次配送、门店到货 7 站，准点 6 站、迟到 1 站；用车 5 辆、司机 14 小时、242 公里。"}
+{"id":"E24","intent":"approve","tools":["get_policy"],"behavior":"refuse","conclusion":"执行一律要人确认：不能跳过确认和审批。"}
+{"id":"E25","intent":"dc","tools":["get_facility"],"behavior":"answer","conclusion":"正在进行的："}
+{"id":"E26","intent":"decline","tools":["help"],"behavior":"decline","conclusion":"这个动作值班助手做不了。"}
+{"id":"E27","intent":"decline","tools":["help"],"behavior":"decline","conclusion":"这个动作值班助手做不了。"}
+{"id":"E28","intent":"vehicle","tools":["get_vehicle"],"behavior":"answer","conclusion":"VS1（集装箱船）在作业：靠泊装卸。"}
+{"id":"E29","intent":"whatif","tools":["what_if"],"behavior":"answer","conclusion":"如果 VS1 从此刻起晚 60 分钟（已经出发：按在此刻的位置原地停这么久算，在站里作业时不受影响）：今天的迟到、超温、缺货都不变。"}
+{"id":"E30","intent":"cargo","tools":["trace_own_cargo"],"behavior":"answer","conclusion":"本店的货在各个仓储中心（05:01）："}
+{"id":"E31","intent":"approve","tools":["list_cards"],"behavior":"clarify","conclusion":"要批准哪一张？","proposals":[{"cost":0,"need":"dispatcher"},{"cost":25,"need":"dispatcher"}]}
+{"id":"E32","intent":"bottleneck","tools":["hub_bottlenecks"],"behavior":"answer","conclusion":"港口物流中心（按整天的计划，05:01）："}
+{"id":"E33","intent":"quality","tools":["get_data_quality"],"behavior":"answer","conclusion":"数据质量（05:01）：数据通道良好：定位、事件按时到达。"}
+{"id":"E34","intent":"reject","tools":["list_cards"],"behavior":"clarify","conclusion":"要否决哪一张？","proposals":[{"cost":0,"need":"manager"},{"cost":25,"need":"manager"}]}
+{"id":"E35","intent":"handover","tools":["shift_handover"],"behavior":"answer","conclusion":"夜班（截至 22:00）：本班没有车到综合店；没有建议卡，没有遗留。"}
+{"id":"E36","intent":"decline","tools":["help"],"behavior":"decline","conclusion":"这个动作值班助手做不了。"}
+{"id":"E37","intent":"vehicle","tools":["get_vehicle"],"behavior":"answer","conclusion":"没找到「M6」这辆车。可以说作业编号，比如 M01。"}
+{"id":"E38","intent":"stock","tools":["get_stock"],"behavior":"answer","conclusion":"门店各商品族按现在的卖法都够卖 6 小时以上，没有缺货风险。"}
+{"id":"E39","intent":"help","tools":["help"],"behavior":"answer","conclusion":"我是值班助手，读调度台、闭环孪生和设施监控的数据回答问题，数字都来自这些数据。可以这样问："}
+{"id":"E40","intent":"approve","tools":["get_policy"],"behavior":"refuse","conclusion":"执行一律要人确认：不能跳过确认和审批。"}
+{"id":"E41","intent":"hub","tools":["get_hub"],"behavior":"answer","conclusion":"港口物流中心（05:01）："}
+{"id":"E42","intent":"help","tools":["help"],"behavior":"answer","conclusion":"我是值班助手，读调度台、闭环孪生和设施监控的数据回答问题，数字都来自这些数据。可以这样问："}
+{"id":"E43","intent":"late","tools":["list_late"],"behavior":"answer","conclusion":"路上晚了 5 分钟以上的 1 辆：","proposals":[{"cost":0,"need":"dispatcher"},{"cost":25,"need":"dispatcher"}]}
+{"id":"E44","intent":"rootcause","tools":["clarify"],"behavior":"clarify","conclusion":"问的是哪辆车？可以说作业编号或车名。"}
+{"id":"E45","intent":"rootcause","tools":["explain_delay"],"behavior":"answer","conclusion":"M02 比计划晚 47 分钟，主要是车辆故障停车（32 分钟）。"}
+{"id":"E46","intent":"stock","tools":["get_stock"],"behavior":"answer","conclusion":"门店各商品族按现在的卖法都够卖 6 小时以上，没有缺货风险。"}
+{"id":"E47","intent":"whatif","tools":["list_cards"],"behavior":"clarify","conclusion":"想推演哪一张建议？","proposals":[{"cost":0,"need":"regional"},{"cost":25,"need":"regional"}]}
+{"id":"E48","intent":"decline","tools":["help"],"behavior":"decline","conclusion":"这个动作值班助手做不了。"}
+{"id":"E49","intent":"vehicle","tools":["get_vehicle"],"behavior":"answer","conclusion":"没找到「S3」这辆车。可以说作业编号，比如 M01。"}
+{"id":"E50","intent":"anomaly","tools":["detect_anomalies"],"behavior":"answer","conclusion":"到此刻（05:01）链路发现 4 处异常（只用此刻以前的数据，严重的在前）："}
+{"id":"E51","intent":"explain","tools":["explain_card"],"behavior":"answer","conclusion":"M02 抛锚（04:30）：M02 停在路边（发动机故障），车上还有 1 站的货","proposals":[{"cost":0,"need":"dispatcher"}]}
+{"id":"E52","intent":"approve","tools":["propose_decision"],"behavior":"proposal","conclusion":"要执行的是：执行「通知综合店顺延收货」（DS-BEV-1 到综合店预计晚 135 分钟）。","proposals":[{"cost":25,"need":"dispatcher"}]}
+{"id":"E53","intent":"vehicle","tools":["clarify"],"behavior":"clarify","conclusion":"问的是哪辆车？可以说作业编号或车名。"}
+{"id":"E54","intent":"airport","tools":["get_facility"],"behavior":"answer","conclusion":"接下来和机场有关的作业："}
+{"id":"E55","intent":"forecast","tools":["get_forecast"],"behavior":"answer","conclusion":"预测模型还没训练：打开「对比与报告」页的「预测」一节训练一次（约 2 秒），回来再问，我就按选中的模型回答。"}
+{"id":"E56","intent":"decline","tools":["help"],"behavior":"decline","conclusion":"这个动作值班助手做不了。"}
+{"id":"E57","intent":"doors","tools":["get_doors"],"behavior":"answer","conclusion":"冷链门：12 樘，现在在用 1 樘，一小时内还要用 0 樘；全天占用 2%，最多同时 2 樘。"}
+{"id":"E58","intent":"doors","tools":["clarify"],"behavior":"clarify","conclusion":"问的是哪个门？可以说门号（比如 D04、C02）。"}
+{"id":"E59","intent":"review","tools":["review_recommendations"],"behavior":"answer","conclusion":"1 张建议卡有了结论：执行 0 张（自动 0、人工 0），否决 0 张，没处理而问题发生了 0 张，问题自己没了 1 张。"}
+{"id":"E60","intent":"schedule","tools":["get_schedule"],"behavior":"answer","conclusion":"14:00–16:00 没有作业。"}
+{"id":"E61","intent":"rootcause","tools":["explain_delay"],"behavior":"answer","conclusion":"到此刻（05:01）综合店没有车到店晚了（按收货截止算）。"}
+{"id":"E62","intent":"hub","tools":["get_hub"],"behavior":"answer","conclusion":"港口物流中心（05:01）："}
+{"id":"E63","intent":"approve","tools":["propose_decision"],"behavior":"proposal","conclusion":"要执行的是：执行「通知综合店顺延收货」（DS-BEV-1 到综合店预计晚 135 分钟）。","proposals":[{"cost":25,"need":"regional"}]}
+{"id":"E64","intent":"approve","tools":["list_cards"],"behavior":"clarify","conclusion":"要批准哪一张？","proposals":[{"cost":0,"need":"dispatcher"},{"cost":25,"need":"dispatcher"}]}
+{"id":"E65","intent":"risks","tools":["list_risks"],"behavior":"answer","conclusion":"现在 05:01，要关注 3 件事（紧急的在前）：","proposals":[{"cost":0,"need":"manager"},{"cost":25,"need":"manager"}]}
+{"id":"E66","intent":"incidents","tools":["list_incidents"],"behavior":"answer","conclusion":"现在 05:01：","proposals":[{"cost":0,"need":"dispatcher"}]}
+{"id":"E67","intent":"hub","tools":["get_hub"],"behavior":"answer","conclusion":"港口物流中心（05:01）："}
+{"id":"E68","intent":"doors","tools":["get_doors"],"behavior":"answer","conclusion":"冷链门：12 樘，现在在用 1 樘，一小时内还要用 0 樘；全天占用 2%，最多同时 2 樘。"}
+{"id":"E69","intent":"optimize","tools":["optimize_dispatch"],"behavior":"answer","conclusion":"月台门：现在的排法已经是最优（已证明），排队 + 提前装车合计 0 分钟。"}
+{"id":"E70","intent":"forecast","tools":["get_forecast"],"behavior":"answer","conclusion":"预测模型还没训练：打开「对比与报告」页的「预测」一节训练一次（约 2 秒），回来再问，我就按选中的模型回答。"}
+{"id":"E71","intent":"knowledge","tools":["search_knowledge"],"behavior":"answer","conclusion":"**仓储中心有哪些区**（处理办法）：港口物流中心：集装箱堆场、闸口排队车道、拆装箱库（拼箱货拆箱、装箱）、保税库、查验场、拆装箱月台。机场货站：ULD 立体库、拆组板区、冷库（2–8 °C）、散货库、陆侧月台和排队车道。物流园：铁路堆场、转运仓、月台、园区闸口排队、甩挂区。门店：顾客车位、线上取货车位、收货排队车道、收货口。货从船、飞机、火车卸下来先进这些区，再装上公路的车；问「港口物流中心怎么样」「本店的货在哪」「哪里是瓶颈」。"}
+{"id":"E72","intent":"policy","tools":["get_policy"],"behavior":"answer","conclusion":"你现在的角色是调度员：低风险的和多花不超过 $100 的可以直接执行，更贵的提交站长审批。规则表（每条提议显示之前都按它检查）："}
+{"id":"E73","intent":"whatif","tools":["what_if"],"behavior":"answer","conclusion":"M02 抛锚：","proposals":[{"cost":0,"need":"manager"}]}
+{"id":"E74","intent":"approve","tools":["get_policy"],"behavior":"refuse","conclusion":"执行一律要人确认：不能跳过确认和审批。"}
+{"id":"E75","intent":"dc","tools":["get_facility"],"behavior":"answer","conclusion":"正在进行的："}
+{"id":"E76","intent":"schedule","tools":["get_schedule"],"behavior":"answer","conclusion":"05:01–06:01 有 2 个作业："}
+{"id":"E77","intent":"reject","tools":["propose_decision"],"behavior":"proposal","conclusion":"要否决的是：否决「M02 抛锚」。","proposals":[{"cost":0,"need":"dispatcher"}]}
+{"id":"E78","intent":"cards","tools":["list_cards"],"behavior":"answer","conclusion":"待处理的建议 2 张（全部人工确认）：","proposals":[{"cost":0,"need":"dispatcher"},{"cost":25,"need":"dispatcher"}]}
+{"id":"E79","intent":"airport","tools":["get_facility"],"behavior":"answer","conclusion":"接下来和机场有关的作业："}
+{"id":"E80","intent":"overview","tools":["get_overview"],"behavior":"answer","conclusion":"现在 05:01。在途 3 辆、作业中 2 辆、已收车 3 辆、还没出发 16 辆。"}

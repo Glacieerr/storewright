@@ -1,0 +1,26 @@
+NAME : sx-cvrp-n6-002
+COMMENT : StoreX Chain validation instance; optimal 235 (Held-Karp + set partitioning DP); Clarke-Wright savings 237
+TYPE : CVRP
+DIMENSION : 7
+EDGE_WEIGHT_TYPE : EUC_2D
+CAPACITY : 20
+NODE_COORD_SECTION
+1 50 50
+2 80 41
+3 35 61
+4 79 10
+5 74 16
+6 23 8
+7 66 23
+DEMAND_SECTION
+1 0
+2 4
+3 2
+4 7
+5 2
+6 8
+7 1
+DEPOT_SECTION
+1
+-1
+EOF

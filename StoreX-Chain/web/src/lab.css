@@ -1,0 +1,426 @@
+/* 「对比与报告」页的预测、演练和预案库（颜色沿用页面的变量，跟着浅色 / 深色切换） */
+.lab-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0 12px;
+  color: var(--ink2);
+  font-size: 13px;
+}
+.lab-bar {
+  flex: 0 0 160px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.lab-bar > i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+  transition: width 0.15s;
+}
+.lab-btn {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.lab-btn:hover {
+  border-color: var(--accent);
+}
+.lab-btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.lab-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.lab-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+@media (max-width: 900px) {
+  .lab-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.lab-card {
+  background: var(--surface-2);
+  border-radius: 10px;
+  padding: 12px 14px;
+  min-width: 0;
+}
+.lab-card .k {
+  font-size: 12px;
+  color: var(--ink2);
+}
+.lab-card .v {
+  font-size: 22px;
+  font-weight: 600;
+  margin: 2px 0;
+}
+.lab-card .m {
+  font-size: 12px;
+  color: var(--muted);
+}
+.lab-tag {
+  display: inline-block;
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  color: var(--ink2);
+  margin-top: 4px;
+}
+.lab-tag.learned {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+.lab-pick {
+  font-weight: 600;
+}
+.lab-pick::before {
+  content: '✓ ';
+}
+.lab-note {
+  font-size: 12px;
+  color: var(--ink2);
+  margin: 8px 0 0;
+  max-width: 900px;
+}
+.lab-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  gap: 16px;
+  margin-top: 14px;
+}
+.lab-grid > * {
+  min-width: 0;
+}
+.lab h3 {
+  font-size: 14px;
+  margin: 16px 0 6px;
+}
+.lab select,
+.lab textarea {
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+.lab textarea {
+  width: 100%;
+  min-height: 64px;
+  resize: vertical;
+  box-sizing: border-box;
+}
+.lab-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+.lab-chips button {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 13px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink2);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.lab-chips button:hover {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+.lab-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.lab-parse {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  font-size: 13px;
+  color: var(--ink2);
+}
+.lab-parse ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+.lab-parse .bad {
+  color: var(--bad);
+}
+.lab-scores {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 12px 0;
+}
+.lab-score {
+  background: var(--surface-2);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.lab-score .k {
+  font-size: 12px;
+  color: var(--ink2);
+}
+.lab-score .v {
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.lab-score .v small {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.lab-parts {
+  margin-top: 6px;
+  display: grid;
+  gap: 3px;
+}
+.lab-parts div {
+  display: grid;
+  grid-template-columns: 7.5em 1fr 3.2em;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink2);
+}
+.lab-parts .lab-track {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line);
+  overflow: hidden;
+}
+.lab-parts .lab-track i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+}
+.lab-parts span:last-child {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.lab-text {
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--ink);
+  max-width: 900px;
+}
+.lab-steps {
+  margin: 4px 0 0;
+  padding-left: 20px;
+  font-size: 13px;
+  color: var(--ink2);
+}
+.lab-steps li {
+  margin: 3px 0;
+}
+.lab-steps b {
+  color: var(--ink);
+  font-weight: 600;
+}
+.lab-library {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: 12px;
+}
+.lab-book {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.lab-book h4 {
+  font-size: 14px;
+  margin: 0;
+}
+.lab-book .meta {
+  font-size: 12px;
+  color: var(--ink2);
+}
+.lab-book .last {
+  font-size: 12px;
+  color: var(--muted);
+}
+.lab-book .last b {
+  color: var(--ink);
+  font-size: 15px;
+}
+.lab-book .lab-btn {
+  align-self: flex-start;
+}
+
+/* 折线图 */
+.lc {
+  min-width: 0;
+}
+.lc h4 {
+  font-size: 14px;
+  margin: 0;
+}
+.lc-sub {
+  font-size: 12px;
+  color: var(--ink2);
+  margin: 2px 0 6px;
+}
+.lc-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 12px;
+  color: var(--ink2);
+  margin-bottom: 4px;
+}
+.lc-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.lc-legend i,
+.lc-tip-row i {
+  display: inline-block;
+  width: 14px;
+  height: 2px;
+  border-radius: 1px;
+}
+.lc-plot {
+  position: relative;
+  width: 100%;
+}
+.lc-plot svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  outline: none;
+}
+.lc-plot svg:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.lc-plot text {
+  font-family: inherit;
+}
+.lc-grid {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+.lc-base {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+.lc-ax {
+  fill: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.lc-end {
+  fill: var(--ink2);
+  font-size: 11px;
+  dominant-baseline: middle;
+}
+.lc-lead {
+  stroke: var(--muted);
+  stroke-width: 1;
+  fill: none;
+}
+.lc-line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.lc-dot {
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+.lc-band {
+  fill: var(--surface-2);
+}
+.lc-band-t {
+  fill: var(--muted);
+  font-size: 11px;
+}
+.lc-cross {
+  stroke: var(--muted);
+  stroke-width: 1;
+}
+.lc-tip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 9px;
+  font-size: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  min-width: 120px;
+  z-index: 2;
+}
+.lc-tip-x {
+  color: var(--muted);
+  margin-bottom: 3px;
+}
+.lc-tip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.lc-tip-row b {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.lc-tip-row span {
+  color: var(--ink2);
+}
+.lc-table {
+  margin-top: 4px;
+  font-size: 12px;
+}
+.lc-table summary {
+  cursor: pointer;
+  color: var(--ink2);
+}
+.lc-table table {
+  margin-top: 6px;
+}
+/* 窄屏：得分卡一列一个；表格第一列留出宽度（表格整体可以横向滑动） */
+.lab table td:first-child,
+.lab table th:first-child {
+  min-width: 10em;
+}
+@media (max-width: 560px) {
+  .lab-scores {
+    grid-template-columns: 1fr;
+  }
+}

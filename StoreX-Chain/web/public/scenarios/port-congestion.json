@@ -1,0 +1,20 @@
+{
+  "$schema": "../../../docs/scenario.schema.json",
+  "format": "storex-chain/scenario",
+  "version": 1,
+  "id": "port-congestion",
+  "title": "港口拥堵演练",
+  "titleEn": "Port congestion drill",
+  "description": "本周班轮晚到 6 天，之后堆场停留翻倍：看码头、堆场和闸口怎么排队，调度台上哪些车受影响。",
+  "descriptionEn": "This week's liner arrives 6 days late and yard dwell doubles afterwards: watch the quay, yard and gate queues and which trips on the dispatch board are hit.",
+  "gen": "g3",
+  "seed": 1,
+  "load": "normal",
+  "drill": "portCongestion",
+  "time": "10:30",
+  "speed": 300,
+  "play": true,
+  "camera": {
+    "preset": "port"
+  }
+}

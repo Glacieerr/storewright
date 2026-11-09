@@ -1,0 +1,459 @@
+/* 第一次接触：顶栏的分享 / 场景库 / 练习 / 导览按钮、提示条、分享框、场景库、欢迎卡、新手导览、练习抽屉 */
+
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+.top-actions .chip {
+  height: 28px;
+  font-size: 13px;
+  box-shadow: none;
+  white-space: nowrap;
+}
+/* 顶栏挤的时候：按钮折到第二行，语言切换不被压成竖排 */
+.top .lang-toggle {
+  flex-shrink: 0;
+}
+.top .lang-toggle button {
+  white-space: nowrap;
+}
+.top-actions .chip[aria-expanded='true'] {
+  color: var(--ink);
+  border-color: var(--accent);
+}
+.icon-chip {
+  width: 28px;
+  padding: 0;
+  font-weight: 600;
+}
+
+/* —— 提示条（不打扰：右下角，几秒后自己消失） —— */
+.ux-toasts {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: min(420px, calc(100vw - 32px));
+  pointer-events: none;
+}
+.ux-toast {
+  pointer-events: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--accent);
+  border-radius: 10px;
+  padding: 10px 12px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.16);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.ux-toast.warn {
+  border-left-color: #c98500;
+}
+.ux-toast.error {
+  border-left-color: var(--bad);
+}
+.ux-toast ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+.ux-toast button {
+  float: right;
+  margin: -4px -6px 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 15px;
+}
+
+/* —— 分享框 —— */
+.ux-pop {
+  position: fixed;
+  z-index: 55;
+  width: min(440px, calc(100vw - 24px));
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+  padding: 14px;
+}
+.ux-pop h4 {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+.ux-pop p {
+  margin: 0 0 10px;
+  color: var(--ink2);
+  font-size: 12px;
+}
+.ux-link {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.ux-link input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+  font-size: 12px;
+}
+.ux-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ux-btn {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  cursor: pointer;
+  color: var(--ink);
+}
+.ux-btn:hover {
+  border-color: var(--accent);
+}
+.ux-btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.ux-btn:focus-visible,
+.ux-card:focus-visible,
+.ux-big:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* —— 对话框（场景库） —— */
+.ux-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 56;
+  background: rgba(10, 10, 10, 0.42);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.ux-dialog {
+  width: min(980px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  background: var(--page);
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  padding: 18px 18px 20px;
+}
+.ux-dialog-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+.ux-dialog-head h3 {
+  font-size: 17px;
+}
+.ux-dialog > p {
+  margin: 0 0 14px;
+  color: var(--ink2);
+  font-size: 13px;
+}
+.ux-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+.ux-card {
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 12px 12px 10px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--ink);
+  min-height: 120px;
+}
+.ux-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+.ux-card b {
+  font-size: 14px;
+}
+.ux-card span {
+  color: var(--ink2);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.ux-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: auto;
+}
+.ux-tags i {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--ink2);
+  background: var(--surface-2);
+  border-radius: 6px;
+  padding: 1px 6px;
+}
+.ux-tags i.hot {
+  color: var(--accent);
+}
+
+/* —— 欢迎卡（盖在三维画面上） —— */
+.ux-welcome {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: linear-gradient(180deg, rgba(8, 12, 20, 0.35), rgba(8, 12, 20, 0.55));
+}
+.ux-welcome-card {
+  width: min(560px, 100%);
+  background: var(--surface);
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  padding: 22px 22px 16px;
+}
+.ux-welcome-card h2 {
+  font-size: 20px;
+  margin-bottom: 6px;
+}
+.ux-welcome-card > p {
+  margin: 0 0 16px;
+  color: var(--ink2);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+.ux-bigs {
+  display: grid;
+  gap: 8px;
+}
+/* button.ux-big：和全局的 button.primary 一样具体、写在后面，才能盖过它的 32 像素高度和内边距 */
+button.ux-big {
+  height: auto;
+  min-height: 56px;
+  font-weight: 400;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 12px 14px;
+  cursor: pointer;
+  color: var(--ink);
+}
+.ux-big:hover {
+  border-color: var(--accent);
+}
+.ux-big.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.ux-big .ico {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  color: var(--accent);
+  font-size: 17px;
+}
+.ux-big.primary .ico {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+.ux-big b {
+  display: block;
+  font-size: 14.5px;
+}
+.ux-big small {
+  display: block;
+  font-size: 12px;
+  opacity: 0.8;
+}
+.ux-welcome-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--ink2);
+}
+.ux-welcome-foot label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.ux-welcome-foot a,
+.ux-linkish {
+  color: var(--accent);
+  cursor: pointer;
+  background: none;
+  border: 0;
+  padding: 0;
+  font-size: 12px;
+}
+
+/* —— 新手导览：高亮框 + 说明卡 —— */
+.ux-spot {
+  position: fixed;
+  z-index: 57;
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 3px var(--accent),
+    0 0 0 9999px rgba(8, 12, 20, 0.55);
+  pointer-events: none;
+  transition:
+    left 0.25s,
+    top 0.25s,
+    width 0.25s,
+    height 0.25s;
+}
+.ux-step {
+  position: fixed;
+  z-index: 58;
+  width: min(360px, calc(100vw - 24px));
+  background: var(--surface);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+  padding: 14px 14px 12px;
+}
+.ux-step h4 {
+  margin: 0 0 6px;
+  font-size: 15px;
+}
+.ux-step p {
+  margin: 0 0 12px;
+  color: var(--ink2);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.ux-step-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ux-dots {
+  display: flex;
+  gap: 4px;
+}
+.ux-dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line);
+}
+.ux-dots i.on {
+  background: var(--accent);
+  width: 14px;
+}
+
+/* —— 练习抽屉（右侧） —— */
+.teach-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  width: min(440px, 100vw);
+  background: var(--page);
+  border-left: 1px solid var(--line);
+  box-shadow: -12px 0 40px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+}
+.teach-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+.teach-head .chip {
+  height: 28px;
+  box-shadow: none;
+}
+.teach-body {
+  flex: 1;
+  overflow: auto;
+  padding: 12px 14px 24px;
+}
+.teach-body:empty::before {
+  content: attr(data-loading);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+@media (max-width: 640px) {
+  .top-actions {
+    margin-left: 0;
+    order: 3;
+  }
+  /* 手机上顶部控件不把页面撑宽：一行放不下就折行，下拉框（负荷的选项文字很长）缩到屏幕宽度 */
+  .controls > .field {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .controls .row {
+    flex-wrap: wrap;
+  }
+  .controls select {
+    max-width: 100%;
+    min-width: 0;
+  }
+  /* 手机上三维画面在控件下面：欢迎卡改成盖住整个屏幕，打开就看得到 */
+  .ux-welcome {
+    position: fixed;
+    z-index: 54;
+    padding: 10px;
+    overflow: auto;
+  }
+  .ux-welcome-card {
+    padding: 16px 14px 12px;
+  }
+  .ux-welcome-card h2 {
+    font-size: 17px;
+  }
+  .ux-big {
+    padding: 10px 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ux-spot {
+    transition: none;
+  }
+}

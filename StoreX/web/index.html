@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StoreX 门店模拟器</title>
+    <meta name="description" content="StoreX：面向 2030 年的数字孪生门店。全天离散事件仿真，员工和机器人怎么配合、与上一代流程对比、商业分析。作品集项目，数据全部是合成的。" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232a78d6'/%3E%3Cpath d='M8 22V12l8-4 8 4v10' fill='none' stroke='white' stroke-width='2.4' stroke-linejoin='round'/%3E%3Crect x='13' y='16' width='6' height='6' rx='1' fill='white'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <header class="top">
+      <div class="brand">
+        <span class="logo" aria-hidden="true"></span>
+        <div>
+          <h1>StoreX</h1>
+          <p>面向 2030 年的数字孪生门店 · 作品集项目</p>
+        </div>
+      </div>
+      <nav class="tabs" role="tablist">
+        <button role="tab" data-tab="twin" aria-selected="true">孪生</button>
+        <button role="tab" data-tab="report" aria-selected="false">对比与报告</button>
+        <button role="tab" data-tab="about" aria-selected="false">说明</button>
+      </nav>
+    </header>
+
+    <main>
+      <section id="tab-twin" class="tab" role="tabpanel">
+        <div class="controls">
+          <div class="field">
+            <span class="label">方案</span>
+            <div class="seg" id="preset"></div>
+          </div>
+          <label class="field">
+            <span class="label">日子</span>
+            <span class="row"><input id="seed" type="number" min="1" max="9999" value="1" /><button id="dice" class="ghost" title="换一天">换一天</button></span>
+          </label>
+          <label class="field">
+            <span class="label">线上订单 / 天</span>
+            <select id="orders"></select>
+          </label>
+          <details class="field more" id="more">
+            <summary>设备与演练</summary>
+            <div class="more-grid">
+              <label><span>货格机器人</span><input id="bots" type="number" min="0" max="40" /></label>
+              <label><span>补货机器人</span><input id="amr" type="number" min="0" max="8" /></label>
+              <label><span>送框小车</span><input id="carts" type="number" min="0" max="6" /></label>
+              <label><span>免排队通道</span><input id="gates" type="number" min="0" max="8" /></label>
+              <label class="check"><input id="outage" type="checkbox" /><span>货格仓 15–17 点停机</span></label>
+              <label class="check"><input id="fallback" type="checkbox" /><span>停机时降级到卖场拣</span></label>
+              <label class="check"><input id="surge" type="checkbox" /><span>订单比预测多 25%</span></label>
+            </div>
+          </details>
+          <button id="run" class="primary">运行这一天</button>
+        </div>
+
+        <div class="stage">
+          <div class="map-wrap">
+            <div class="seg view-switch" id="view-switch" role="group" aria-label="视图">
+              <button data-view="2d" aria-pressed="true">二维</button>
+              <button data-view="3d" aria-pressed="false">三维</button>
+            </div>
+            <canvas id="map" aria-label="门店俯视图：员工、机器人、顾客和车辆的位置"></canvas>
+            <div id="view3d" class="view3d" hidden aria-label="门店三维孪生：员工、机器人、顾客和车辆按仿真结果移动"></div>
+            <div id="toolbar3d" class="toolbar3d" hidden>
+              <div class="seg" id="presets3d" role="group" aria-label="视角"></div>
+              <button class="chip" id="mode3d" aria-pressed="false" title="显示完整外墙和屋顶">外观</button>
+              <button class="chip" id="labels3d" aria-pressed="true">区域名</button>
+              <button class="chip" id="export3d" title="导出此刻的门店三维模型（glTF 二进制，可以用 Blender 打开）">导出 .glb</button>
+            </div>
+            <div id="tip" class="tip" hidden></div>
+            <div id="busy" class="busy" hidden><span class="spinner"></span><span id="busy-text">正在仿真这一天…</span></div>
+          </div>
+          <aside class="side">
+            <div class="clock"><span id="clock">07:00</span><span id="clock-note" class="note"></span></div>
+            <div class="live" id="live"></div>
+            <h3>这一天</h3>
+            <div class="summary" id="summary"></div>
+            <h3>图例</h3>
+            <div class="legend" id="legend"></div>
+            <h3>动态</h3>
+            <ol class="log" id="log"></ol>
+          </aside>
+        </div>
+
+        <div class="player">
+          <button id="play" class="primary icon" aria-label="播放">▶</button>
+          <input id="time" type="range" min="18000" max="82800" step="60" value="25200" aria-label="时间" />
+          <span id="time-label" class="mono">07:00</span>
+          <label class="speed"><span>速度</span>
+            <select id="speed">
+              <option value="60">1 分钟 / 秒</option>
+              <option value="300" selected>5 分钟 / 秒</option>
+              <option value="900">15 分钟 / 秒</option>
+              <option value="1800">30 分钟 / 秒</option>
+            </select>
+          </label>
+        </div>
+        <div class="hourly" id="hourly"></div>
+      </section>
+
+      <section id="tab-report" class="tab" role="tabpanel" hidden></section>
+      <section id="tab-about" class="tab" role="tabpanel" hidden></section>
+    </main>
+
+    <footer class="foot">
+      <p>本项目基于公开资料、行业通用做法和作者的独立构想设计。<strong>本项目与任何零售商、企业无隶属关系。</strong>门店、商品、顾客和所有数字都是合成的；设备价格是公开资料里的常见区间，不是任何供应商的报价。</p>
+    </footer>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

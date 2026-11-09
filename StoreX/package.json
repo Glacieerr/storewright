@@ -1,0 +1,44 @@
+{
+  "name": "storex",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "description": "StoreX: a digital-twin grocery store for 2030. End-to-end process design, a runnable simulator, and planning, comparison and business reports.",
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Glacieerr/storewright.git",
+    "directory": "StoreX"
+  },
+  "homepage": "https://github.com/Glacieerr/storewright/tree/main/StoreX#readme",
+  "bugs": {
+    "url": "https://github.com/Glacieerr/storewright/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "vite --config vite.config.ts",
+    "build": "vite build --config vite.config.ts",
+    "preview": "vite preview --config vite.config.ts",
+    "sim": "tsx src/cli/main.ts",
+    "test": "vitest run --config vitest.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "check": "npm run typecheck && npm run test",
+    "reports": "tsx src/cli/main.ts all",
+    "lint": "eslint .",
+    "format:check": "prettier --check \"src/**/*.ts\" \"web/src/**/*.{ts,css}\" \"tests/**/*.ts\" \"*.ts\""
+  },
+  "dependencies": {
+    "three": "0.170.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.2",
+    "@types/three": "0.170.0",
+    "prettier": "3.9.10",
+    "tsx": "4.19.2",
+    "typescript": "5.7.2",
+    "vite": "5.4.21",
+    "vitest": "2.1.8"
+  }
+}

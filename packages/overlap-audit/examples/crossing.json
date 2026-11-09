@@ -1,0 +1,18 @@
+{
+  "format": "overlap-audit/trajectories",
+  "version": 1,
+  "heading": "atan2",
+  "vehicles": [
+    { "id": "north-1", "type": "box truck", "length": 10, "width": 2.5, "frames": [ { "t": 0, "x": 0, "z": -60, "heading": 0 }, { "t": 20, "x": 0, "z": 60, "heading": 0 } ] },
+    { "id": "east-1", "type": "van", "length": 6, "width": 2.1, "frames": [ { "t": 0, "x": -60, "z": 0, "heading": 1.5707963 }, { "t": 20, "x": 60, "z": 0, "heading": 1.5707963 } ] },
+    { "id": "rig-7 tractor", "type": "tractor", "length": 6, "width": 2.5, "group": "rig-7", "frames": [ { "t": 0, "x": 20, "z": 30, "heading": 0 }, { "t": 20, "x": 20, "z": 30, "heading": 0 } ] },
+    { "id": "rig-7 trailer", "type": "trailer", "length": 13.6, "width": 2.5, "group": "rig-7", "frames": [ { "t": 0, "x": 20, "z": 22, "heading": 0 }, { "t": 20, "x": 20, "z": 22, "heading": 0 } ] }
+  ],
+  "snapshots": [
+    { "t": 0, "bodies": [ { "id": "parked-A", "type": "trailer", "x": 22.3, "z": 20, "heading": 0, "length": 13.6, "width": 2.5 } ] }
+  ],
+  "areas": [
+    { "name": "junction", "polygon": [ [-15, -15], [15, -15], [15, 15], [-15, 15] ] },
+    { "name": "yard", "polygon": [ [15, 0], [40, 0], [40, 45], [15, 45] ] }
+  ]
+}

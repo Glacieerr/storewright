@@ -1,0 +1,59 @@
+{
+  "name": "@storewright/overlap-audit",
+  "version": "0.1.0",
+  "description": "Vehicle-footprint overlap audit for simulations, games and digital twins: oriented-rectangle (SAT) tests, a uniform-grid broad phase, pair-seconds by area, vehicle-type pair and static/moving, ignore and area hooks, limits with a non-zero exit code, and a CLI for JSON trajectories from any engine. Pure TypeScript, zero dependencies.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "examples",
+    "README.md",
+    "README.en.md",
+    "CHANGELOG.md"
+  ],
+  "keywords": [
+    "collision",
+    "overlap",
+    "oriented-bounding-box",
+    "separating-axis-theorem",
+    "audit",
+    "regression",
+    "traffic",
+    "simulation",
+    "digital-twin",
+    "game"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Glacieerr/storewright.git",
+    "directory": "packages/overlap-audit"
+  },
+  "homepage": "https://github.com/Glacieerr/storewright/tree/main/packages/overlap-audit#readme",
+  "bugs": {
+    "url": "https://github.com/Glacieerr/storewright/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "vitest run --config vitest.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "cli": "tsx src/cli.ts",
+    "audit:example": "tsx src/cli.ts examples/crossing.json --step 0.5 --limits examples/limits.json"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "22.10.2",
+    "eslint": "10.14.0",
+    "globals": "17.14.0",
+    "tsx": "4.19.2",
+    "typescript": "5.7.2",
+    "typescript-eslint": "8.72.1",
+    "vitest": "2.1.8"
+  }
+}

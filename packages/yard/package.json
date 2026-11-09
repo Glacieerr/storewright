@@ -1,0 +1,62 @@
+{
+  "name": "@storewright/yard",
+  "version": "0.1.0",
+  "description": "Truck-yard and loading-dock motion engine: one-way lane layout, driver-side reversing onto docks with articulated trailers, drop-and-hook with a yard shunter, and one deterministic schedule you can sample at any moment. Pure TypeScript, zero dependencies.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "README.en.md",
+    "CHANGELOG.md"
+  ],
+  "keywords": [
+    "truck",
+    "yard",
+    "loading-dock",
+    "trailer",
+    "articulated-vehicle",
+    "reversing",
+    "drop-and-hook",
+    "logistics",
+    "simulation",
+    "digital-twin"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Glacieerr/storewright.git",
+    "directory": "packages/yard"
+  },
+  "homepage": "https://github.com/Glacieerr/storewright/tree/main/packages/yard#readme",
+  "bugs": {
+    "url": "https://github.com/Glacieerr/storewright/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "vitest run --config vitest.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "example": "tsx examples/basic.ts",
+    "bench": "node --expose-gc --import tsx bench/bench.ts",
+    "demo": "vite --config demo/vite.config.ts",
+    "build:demo": "vite build --config demo/vite.config.ts"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@storewright/overlap-audit": "0.1.0",
+    "@types/node": "22.10.2",
+    "eslint": "10.14.0",
+    "globals": "17.14.0",
+    "tsx": "4.19.2",
+    "typescript": "5.7.2",
+    "typescript-eslint": "8.72.1",
+    "vite": "5.4.21",
+    "vitest": "2.1.8"
+  }
+}

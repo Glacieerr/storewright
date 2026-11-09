@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Yard engine demo · @storewright/yard</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Crect width=%2716%27 height=%2716%27 rx=%273%27 fill=%27%232b7d52%27/%3E%3Crect x=%273%27 y=%276%27 width=%2710%27 height=%274%27 fill=%27white%27/%3E%3C/svg%3E" />
+    <meta name="description" content="A truck yard in your browser: one-way lanes, driver-side reversing with articulated trailers, drop-and-hook, one deterministic schedule — and a live overlap audit that stays at zero." />
+    <style>
+      :root {
+        --bg: #f4f5f2;
+        --panel: #ffffff;
+        --text: #22272b;
+        --muted: #626b72;
+        --border: #e3e3dc;
+        --accent: #2b7d52;
+        --accent-ink: #ffffff;
+        --ok: #2b7d52;
+        --bad: #b91c1c;
+        --shadow: 0 1px 2px rgba(20, 24, 28, 0.06), 0 4px 16px rgba(20, 24, 28, 0.06);
+        color-scheme: light;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #15181b;
+          --panel: #1d2125;
+          --text: #e8eaec;
+          --muted: #9aa3ab;
+          --border: #30363c;
+          --accent: #52b981;
+          --accent-ink: #0b1a12;
+          --ok: #52b981;
+          --bad: #f87171;
+          --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.25);
+          color-scheme: dark;
+        }
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; }
+      body { display: flex; flex-direction: column; }
+      header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--panel); }
+      header h1 { margin: 0; font-size: 17px; }
+      header p { margin: 0; color: var(--muted); flex: 1 1 320px; }
+      header nav { display: flex; gap: 12px; }
+      a { color: var(--accent); }
+      main { flex: 1; display: flex; min-height: 0; }
+      #stage { position: relative; flex: 1; min-width: 0; min-height: 320px; }
+      canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+      #hud { position: absolute; left: 12px; top: 12px; display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 10px; background: color-mix(in srgb, var(--panel) 88%, transparent); box-shadow: var(--shadow); font-variant-numeric: tabular-nums; }
+      #clock { font-size: 22px; font-weight: 600; }
+      #audit { position: absolute; right: 12px; top: 12px; max-width: 260px; padding: 8px 10px; border-radius: 10px; background: color-mix(in srgb, var(--panel) 88%, transparent); box-shadow: var(--shadow); }
+      #audit b { font-size: 18px; font-variant-numeric: tabular-nums; }
+      #audit.ok b { color: var(--ok); }
+      #audit.bad b { color: var(--bad); }
+      #audit small { display: block; color: var(--muted); }
+      aside { width: 300px; flex: none; overflow: auto; padding: 14px 16px; border-left: 1px solid var(--border); background: var(--panel); }
+      aside h2 { margin: 14px 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+      aside h2:first-child { margin-top: 0; }
+      label { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 6px 0; }
+      label span.v { font-variant-numeric: tabular-nums; min-width: 2.5em; text-align: right; }
+      input[type='range'] { flex: 1; accent-color: var(--accent); }
+      select, button { font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; }
+      button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); min-width: 44px; min-height: 36px; font-weight: 600; }
+      .row { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
+      .row input[type='range'] { width: 100%; }
+      .legend { display: grid; grid-template-columns: 14px 1fr; gap: 4px 8px; align-items: center; }
+      .legend i { width: 14px; height: 10px; border-radius: 2px; display: inline-block; }
+      .note { color: var(--muted); font-size: 13px; }
+      @media (max-width: 760px) {
+        main { flex-direction: column; }
+        #stage { flex: none; height: 62vh; }
+        aside { width: auto; border-left: 0; border-top: 1px solid var(--border); }
+        #audit { max-width: 46vw; }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1 id="title">Yard engine demo</h1>
+      <p id="subtitle"></p>
+      <nav><a id="lang" href="?lang=zh">中文</a><a href="https://github.com/Glacieerr/storewright/tree/main/packages/yard" id="src">Source</a></nav>
+    </header>
+    <main>
+      <div id="stage">
+        <canvas id="view" aria-label="Top view of the truck yard"></canvas>
+        <div id="hud"><span id="clock">06:00:00</span><span id="counts"></span></div>
+        <div id="audit" aria-live="polite"><b id="ov">0</b> <span id="ov-unit"></span><small id="ov-note"></small></div>
+      </div>
+      <aside>
+        <h2 id="h-play"></h2>
+        <div class="row">
+          <button id="play" class="primary" aria-label="Play">▶</button>
+          <select id="speed" aria-label="Speed">
+            <option value="10">×10</option>
+            <option value="30">×30</option>
+            <option value="60" selected>×60</option>
+            <option value="120">×120</option>
+          </select>
+        </div>
+        <div class="row"><input id="time" type="range" min="0" max="1" step="1" value="0" aria-label="Time" /></div>
+        <h2 id="h-yard"></h2>
+        <label><span id="l-doors"></span><input id="doors" type="range" min="3" max="14" value="6" /><span class="v" id="v-doors">6</span></label>
+        <label><span id="l-rate"></span><input id="rate" type="range" min="4" max="24" value="10" /><span class="v" id="v-rate">10</span></label>
+        <label><span id="l-side"></span><select id="side"><option value="right"></option><option value="left"></option></select></label>
+        <label><span id="l-from"></span><select id="from"><option value="back"></option><option value="front"></option></select></label>
+        <label><span id="l-access"></span><select id="access"><option value="drive"></option><option value="street"></option></select></label>
+        <label><span id="l-drop"></span><input id="drop" type="checkbox" /></label>
+        <label><span id="l-seed"></span><input id="seed" type="number" min="1" max="9999" value="7" style="width: 6em" /></label>
+        <h2 id="h-legend"></h2>
+        <div class="legend" id="legend"></div>
+        <h2 id="h-what"></h2>
+        <p class="note" id="what"></p>
+        <p class="note" id="plan-notes"></p>
+      </aside>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

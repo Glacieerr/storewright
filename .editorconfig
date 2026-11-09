@@ -1,0 +1,23 @@
+# 编辑器的基本格式约定（https://editorconfig.org）：UTF-8、LF 换行、2 个空格缩进、文件末尾留一个空行
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 2
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Markdown 行尾的两个空格表示换行，不删
+[*.md]
+trim_trailing_whitespace = false
+
+# Python（Blender 脚本）和 MATLAB 用 4 个空格
+[*.{py,m}]
+indent_size = 4
+
+# 虚幻引擎插件按引擎的代码规范用制表符
+[StoreX-Chain/engines/ue5/**.{cpp,h,cs,uplugin}]
+indent_style = tab
+indent_size = 4

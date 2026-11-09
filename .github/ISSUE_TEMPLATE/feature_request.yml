@@ -1,0 +1,47 @@
+name: Feature request or idea · 功能建议或想法
+description: Suggest an idea or an improvement · 提出想法或改进建议
+labels: ['enhancement']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ideas are welcome. Please describe them in words, without code. As [CONTRIBUTING.md](https://github.com/Glacieerr/storewright/blob/main/CONTRIBUTING.md) says, by opening an issue you agree that the ideas in it may be used in this project without any obligation to you.
+
+        欢迎提想法！请用文字描述，不要贴代码。按 [CONTRIBUTING.md](https://github.com/Glacieerr/storewright/blob/main/CONTRIBUTING.md) 的说明，开 issue 即表示你同意：其中的想法可以用在本项目里，作者对你不承担任何义务。
+  - type: dropdown
+    id: part
+    attributes:
+      label: Part · 哪个部分
+      options:
+        - Storewright (part 1) · 第一部分：门店数字孪生、员工手机端、服务端
+        - StoreX (part 2) · 第二部分：2030 年的门店
+        - StoreX Chain (part 3) · 第三部分：StoreX 全链路（区域孪生、调度台、孪生服务）
+        - Repository, documentation or CI · 仓库、文档或 CI
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or motivation · 想解决什么问题
+      description: Who needs this, and in which situation? · 谁需要它，在什么情况下需要？
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Proposed idea · 建议的做法
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered (optional) · 考虑过的其他做法（可选）
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks · 确认
+      options:
+        - label: Only public information; nothing from an employer or another company. · 内容只来自公开信息，不含任何雇主或其他公司的内容。
+          required: true
+        - label: I agree to the "How ideas are used" terms in CONTRIBUTING.md. · 我同意 CONTRIBUTING.md 里「想法怎么用」的条款。
+          required: true

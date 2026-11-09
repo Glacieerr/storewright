@@ -68,3 +68,50 @@ jobs:
         with:
           name: e2e-report-${{ matrix.group }}
           path: experiments/results/e2e-report
+
+  # 第二部分 StoreX 和第三部分 StoreX 全链路（StoreX-Chain）：类型检查、代码检查（ESLint：error 会让作业失败，warning 只显示）、单元测试、生产构建；全链路再核对文档里的数字和 docs/results/data.json 一致
+  parts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    name: parts (${{ matrix.part }})
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [StoreX, StoreX-Chain]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+        working-directory: ${{ matrix.part }}
+      - name: Lint (errors fail, warnings allowed)
+        run: npm run lint
+        working-directory: ${{ matrix.part }}
+      - name: Unit tests
+        run: npm test
+        working-directory: ${{ matrix.part }}
+      - name: Build
+        run: npm run build
+        working-directory: ${{ matrix.part }}
+      - name: Document numbers match the results (docs:check)
+        if: matrix.part == 'StoreX-Chain'
+        run: npm run docs:check
+        working-directory: ${{ matrix.part }}
+      # The two standalone libraries StoreX Chain is built on (packages/yard, packages/overlap-audit)
+      - name: Libraries · typecheck, lint, tests
+        if: matrix.part == 'StoreX-Chain'
+        run: |
+          npm run typecheck -w @storewright/yard -w @storewright/overlap-audit
+          npm run lint -w @storewright/yard -w @storewright/overlap-audit
+          npm test -w @storewright/yard -w @storewright/overlap-audit
+      - name: Libraries · examples, demo build, npm tarballs
+        if: matrix.part == 'StoreX-Chain'
+        run: |
+          npm run example -w @storewright/yard
+          npm run audit:example -w @storewright/overlap-audit
+          npm run build:demo -w @storewright/yard
+          npm run pack:libs

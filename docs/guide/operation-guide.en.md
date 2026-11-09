@@ -28,7 +28,7 @@ Storewright is a store digital twin and operations system for grocery stores. On
 
 ### 1.2 Three ways to run it
 
-All of them need Node.js 20 or later. Run `npm install` once in the project folder first.
+All of them need Node.js 22 or later. Run `npm install` once in the project folder first.
 
 | Way | Commands (in order) | Open | Good for |
 |---|---|---|---|
@@ -37,7 +37,7 @@ All of them need Node.js 20 or later. Run `npm install` once in the project fold
 | Real backend | `npm run build:associate`, then `npm run server` | http://localhost:8787 | Several real phones working together. Phones on the same Wi-Fi as the computer open `http://<computer's LAN IP>:8787` |
 
 In-browser demo:
-- http://127.0.0.1:4177/ redirects to the showcase (`/app/showcase.html`). `/app/` is the associate app and `/sim/` is the simulator.
+- http://127.0.0.1:4177/ is the front page with the three parts of the portfolio. The showcase is `/app/showcase.html`, `/app/` is the associate app and `/sim/` is the simulator.
 - Add `?store=hardware` to the address for the home-improvement store, or `?lang=en` for the English interface.
 - Tabs opened from the same site share one store and stay in sync. The data stays in this browser only; operations data is cleared after 12 hours without activity.
 

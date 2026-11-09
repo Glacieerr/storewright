@@ -18,7 +18,7 @@ If code contributions open later, their terms will be written here first. · 以
 
 You can build, run and change your own copy as [AGPL-3.0](LICENSE) (code) and [CC BY 4.0](LICENSE-docs) (documentation) allow; the licenses do not grant the right to use the Storewright name or icon. See the [License section of the README](README.md#license--许可证). · 你可以按 [AGPL-3.0](LICENSE)（代码）和 [CC BY 4.0](LICENSE-docs)（文档）在自己的副本上构建、运行和修改；许可证不授予使用 Storewright 名称和图标的权利。详见 [README 的「许可证」一节](README.md#license--许可证)。
 
-Node.js 20 or later. · 需要 Node.js 20 或更高版本。
+Node.js 22 or later. · 需要 Node.js 22 或更高版本。
 
 ```bash
 npm install
@@ -45,3 +45,33 @@ npm run e2e
 - **Every UI string goes through `t()`** and needs an English entry; tests fail otherwise. · **界面文字都要经过 `t()`**，并且要有英文译文，否则测试会失败。
 - **Tests come with changes.** `npm run check` must pass; UI changes keep `npm run e2e` passing (add a scenario when behavior changes). Phase 1, AI and industry reports stay reproducible unless the change is meant to alter them. · **改动要带测试。** `npm run check` 必须通过；界面改动要保持 `npm run e2e` 通过（行为变了就加场景）。除非改动本来就要改变结果，否则 Phase 1、AI 和行业报告要能逐行复现。
 - **Record decisions.** Notable design decisions go into `docs/decisions/` as a new record. · **记录决策。** 重要的设计决定写成 `docs/decisions/` 里的一条新记录。
+
+## Parts 2 and 3 · 第二、三部分
+
+The rules above apply to the whole repository, including part 2 ([StoreX](StoreX/README.en.md)) and part 3 ([StoreX Chain](StoreX-Chain/README.en.md)): code contributions are not accepted for now, and issues follow the same public-information rules. The notes below are for working on your own copy. · 上面的规则适用于整个仓库，包括第二部分 [StoreX](StoreX/README.md) 和第三部分 [StoreX 全链路](StoreX-Chain/README.md)：暂不接受代码贡献，issue 同样只用公开信息。下面是在自己的副本上改这两部分时的说明。
+
+Both parts use the dependencies installed at the repository root (run `npm install` there first) and are run from their own folder. · 两部分都用仓库根目录装好的依赖（先在根目录运行 `npm install`），在各自的目录里运行。
+
+```bash
+cd StoreX-Chain          # or · 或者: cd StoreX
+npm run check            # typecheck + unit tests · 类型检查 + 单元测试
+npm run lint             # ESLint: errors must be fixed, warnings are allowed · 代码检查：error 必须改，warning 允许
+npm run format:check     # Prettier, run by hand only (not in CI) · 格式检查，只手动运行（不在自动测试里）
+npm run reports          # regenerate docs/results/ · 重新生成 docs/results/
+```
+
+StoreX Chain also has: · StoreX 全链路另外有：
+
+```bash
+npm run docs:sync        # update the marked numbers in the docs from docs/results/data.json · 按 data.json 更新文档里标出来的数字
+npm run docs:check       # check them only · 只检查
+npm run assistant:eval   # duty assistant evaluation · 值班助手评测
+npm run overlaps         # vehicle overlap audit · 车辆重叠审计
+node scripts/check3d.mjs # 3D regression check, with npm run dev running · 三维回归检查（开着 npm run dev）
+```
+
+- **`docs/results/` is generated.** Only `npm run reports` writes it; never edit it by hand. · **`docs/results/` 是生成的。** 只能由 `npm run reports` 写，不要手改。
+- **Numbers in documents come from the data.** In StoreX Chain, numbers taken from the results are marked `<!--n:path|digits|unit-->` and updated with `npm run docs:sync`; `npm run docs:check` must pass ([data dictionary](StoreX-Chain/docs/results/DATA.md)). · **文档里的数字来自数据。** StoreX 全链路文档里取自结果的数字用 `<!--n:路径|小数位|单位-->` 标出来，用 `npm run docs:sync` 更新，`npm run docs:check` 必须通过（见[数据字典](StoreX-Chain/docs/results/DATA.md)）。
+- **The default region is frozen.** New region options apply only to random and custom regions; the default region's generation and results must not change (after `npm run reports`, `data.json` differs only in `runtime`). · **默认区域冻结。** 新的区域选项只用于随机、自定义区域；默认区域的生成和结果不能变（`npm run reports` 以后 `data.json` 只有 `runtime` 变化）。
+- **Tests come with changes.** `npm run check` must pass in the part you changed. A new duty-assistant intent or tool comes with evaluation questions and a rerun of `npm run assistant:eval`, and the blind test sets are never used for tuning. 3D and vehicle-motion changes keep `node scripts/check3d.mjs` and `npm run overlaps` passing. · **改动要带测试。** 改了哪一部分，那一部分的 `npm run check` 必须通过；新的值班助手意图或工具要加评测题并重跑 `npm run assistant:eval`，盲测题不拿来调；三维和车辆运动的改动要保持 `node scripts/check3d.mjs` 和 `npm run overlaps` 通过。
+- **Extending StoreX Chain:** see the [extension guide](StoreX-Chain/docs/05-extending.md) and the [glossary](StoreX-Chain/docs/glossary.md); the twin server's interface is in [protocol.md](StoreX-Chain/server/protocol.md) (English: [protocol.en.md](StoreX-Chain/server/protocol.en.md)), and changes to it update both. · **扩展 StoreX 全链路：** 见[扩展指南](StoreX-Chain/docs/05-extending.md)和[术语表](StoreX-Chain/docs/glossary.md)；孪生服务的接口见 [protocol.md](StoreX-Chain/server/protocol.md)（英文版 [protocol.en.md](StoreX-Chain/server/protocol.en.md)），接口改了两份一起改。

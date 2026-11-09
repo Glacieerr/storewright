@@ -52,11 +52,15 @@
 
 | 地址 | 作用 |
 |---|---|
-| `/` | 跳到展示页 |
+| `/` | 首页：三个部分（门店孪生、StoreX、StoreX 全链路）、「一个集装箱从船到货架」导览和开发者入口（构建时由 `scripts/site-landing.mjs` 生成） |
 | `/app/showcase.html` | 展示页（引导、重置、源代码链接、窄屏标签）；`?store=hardware` 换成家居建材店 |
 | `/app/` | 员工端；`?as=A01`（或 `console`）直接以某个身份打开，`?store=hardware` 选门店 |
 | `/sim/` | 运营模拟器；`?live=demo&bridge=…&store=…` 连到浏览器里的中枢（展示页自动带上） |
 | `/app/label.html#…` | 标签预览与打印 |
+| `/storex/` | 第二部分 StoreX 的门店模拟器 |
+| `/storex-chain/` | 第三部分 StoreX 全链路的区域三维孪生；场景参数见 `StoreX-Chain/docs/07-scenarios.md`（如 `?tour=container` 直接放导览、`?scenario=port-congestion` 打开场景库里的场景、`?ex=ex01` 打开练习） |
+| `/benchmark/` | 值班台基准（Duty-Desk Bench）的结果页 |
+| `/yard/` | 卸货场引擎库 `@storewright/yard` 的浏览器演示 |
 
 员工端的常规构建也包含演示代码：在地址栏加 `?demo` 就在这个标签页里改用浏览器内的中枢（不连后端）。
 
@@ -173,7 +177,7 @@ npm run walkthrough
 npm run build:site
 ```
 
-产物在 `site/`（`app/`、`sim/`、`index.html`），所有路径都是相对的，可以放到任意静态托管的任意子路径：
+产物在 `site/`（首页 `index.html`，`app/`、`sim/`、`storex/`、`storex-chain/`、`benchmark/`、`yard/`），所有路径都是相对的，可以放到任意静态托管的任意子路径：
 
 | 托管 | 做法 |
 |---|---|

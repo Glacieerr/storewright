@@ -9,6 +9,8 @@ node_modules/
 dist/
 dist-demo/
 /site/
+# 程序库打出来的 npm 包（npm run pack:libs）
+/dist-pkg/
 coverage/
 *.tsbuildinfo
 
@@ -22,3 +24,12 @@ experiments/results/
 .DS_Store
 .env
 .env.*
+
+# 第二、三部分的生成物（运行脚本即可重新生成，不上传）
+# Blender 脚本 StoreX-Chain/engines/blender/build_fleet.py 每次运行都会重新导出这两个模型（命令见 engines/blender/README.md）
+StoreX-Chain/engines/blender/out/
+# 这份零件模型网页已经不再加载（公路车辆改成了代码放样的模型）；需要时用上面的脚本重新生成
+StoreX-Chain/web/public/assets/fleet.glb
+
+# 临时的探针和调试目录
+.probe-*/

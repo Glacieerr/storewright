@@ -6,11 +6,13 @@
   "license": "AGPL-3.0-only",
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "workspaces": [
     "packages/*",
-    "apps/*"
+    "apps/*",
+    "StoreX",
+    "StoreX-Chain"
   ],
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p apps/simulator/tsconfig.json --noEmit && tsc -p apps/associate/tsconfig.json --noEmit && tsc -p e2e/tsconfig.json --noEmit",
@@ -31,18 +33,24 @@
     "build:associate": "npm run build -w @storewright/associate",
     "build:demo": "npm run build:demo -w @storewright/associate",
     "build:all": "npm run build:sim && npm run build:associate && npm run build:demo",
-    "build:site": "npm run build:sim && npm run build:demo && node scripts/build-site.mjs",
+    "build:site": "npm run build:sim && npm run build:demo && npm run build -w storex && npm run build -w storex-chain && npm run build:demo -w @storewright/yard && node scripts/build-site.mjs",
+    "pack:libs": "node scripts/pack-libs.mjs",
     "e2e": "playwright test",
     "e2e:browsers": "PW_ALL=1 playwright test",
     "walkthrough": "playwright test -c playwright.walkthrough.config.ts; node scripts/walkthrough-report.mjs",
-    "demo:site": "node e2e/static-server.mjs"
+    "demo:site": "node e2e/static-server.mjs",
+    "release:check": "node scripts/release-check.mjs"
   },
   "devDependencies": {
+    "@eslint/js": "10.0.1",
     "@playwright/test": "1.63.0",
     "@types/node": "22.10.2",
+    "eslint": "10.14.0",
     "fast-check": "3.23.2",
+    "globals": "17.14.0",
     "tsx": "4.19.2",
     "typescript": "5.7.2",
+    "typescript-eslint": "8.72.1",
     "vitest": "2.1.8"
   }
 }

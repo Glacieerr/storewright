@@ -1,0 +1,20 @@
+# 自动生成发布说明时，按 PR 的标签分类（https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes）
+# 标签不存在时对应的类别就是空的；bug、enhancement、documentation 是 GitHub 默认就有的标签，dependencies 由 Dependabot 自动加。
+changelog:
+  exclude:
+    labels: ['ignore-for-release', 'duplicate', 'invalid', 'wontfix']
+  categories:
+    - title: Breaking changes · 不兼容的改动
+      labels: ['breaking-change']
+    - title: Security · 安全
+      labels: ['security']
+    - title: New features · 新功能
+      labels: ['enhancement']
+    - title: Bug fixes · 错误修复
+      labels: ['bug']
+    - title: Documentation · 文档
+      labels: ['documentation']
+    - title: Dependencies · 依赖
+      labels: ['dependencies']
+    - title: Other changes · 其他改动
+      labels: ['*']

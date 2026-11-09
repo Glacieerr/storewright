@@ -8,6 +8,32 @@ This project is based on public information, common industry practice and the au
 
 ![Showcase: the 3D digital twin, the demo console and two associate phones, all running in the browser](docs/images/showcase-en.jpg)
 
+## Portfolio parts
+
+This repository holds three parts of one portfolio:
+
+| Part | What it is | Docs | Status |
+|---|---|---|---|
+| 1 · Storewright (this page) | Store digital twin: the 3D store in sync with live operations, replay and forecast, associate phones, per-store AI | This page · [简体中文](README.zh-CN.md) | Public, [live demo](https://glacieerr.github.io/storewright/app/showcase.html) |
+| 2 · [StoreX](StoreX/README.en.md) | A digital-twin grocery store for 2030: redesigned process, store simulator (2D and 3D), planning and business reports | [English](StoreX/README.en.md) · [简体中文](StoreX/README.md) | New; live demo after deployment: [glacieerr.github.io/storewright/storex/](https://glacieerr.github.io/storewright/storex/) (available after the first push) |
+| 3 · [StoreX Chain](StoreX-Chain/README.en.md) | Regional digital twin of one store's supply chain, from port, rail, air and highway to the shelf: dispatch board, closed-loop twin, duty assistant, twin server | [English](StoreX-Chain/README.en.md) · [简体中文](StoreX-Chain/README.md) | New; live demo after deployment: [glacieerr.github.io/storewright/storex-chain/](https://glacieerr.github.io/storewright/storex-chain/) (available after the first push) |
+
+**Start here:** the live demo’s front page (after deployment: [glacieerr.github.io/storewright](https://glacieerr.github.io/storewright/)) opens any part in one click; in part 3, [watch one container travel from ship to shelf](https://glacieerr.github.io/storewright/storex-chain/?tour=container) (a one-minute guided tour), or read the [five-minute quick start](StoreX-Chain/docs/00-quickstart.en.md).
+
+<a href="https://glacieerr.github.io/storewright/storex-chain/?tour=container&lang=en"><img src="StoreX-Chain/docs/images/tour/ship-to-shelf.en.jpg" width="640" alt="One container, ship to shelf: the guided tour of part 3"></a>
+
+**Reusable pieces**
+
+| What | Where |
+|---|---|
+| [`@storewright/yard`](packages/yard/README.en.md): truck-yard and loading-dock motion engine — one-way lane layout, driver-side reversing with articulated trailers, drop-and-hook with a yard shunter, one deterministic schedule from your simulation’s times; pure TypeScript, zero dependencies | `packages/yard` · [demo](https://glacieerr.github.io/storewright/yard/) (after deployment) |
+| [`@storewright/overlap-audit`](packages/overlap-audit/README.en.md): vehicle-footprint overlap audit — SAT tests, exact grid broad phase, pair-seconds by area / vehicle pair / static or moving, limits as a regression gate; JSON trajectories and a CLI for any engine | `packages/overlap-audit` |
+| [Duty-Desk Bench](StoreX-Chain/docs/benchmark.en.md): 320 blind questions for an operations duty assistant, five measures, five reproducible baselines; any system — including an LLM you connect yourself — is scored by the same scorer | `StoreX-Chain/bench/duty-desk` · [results page](https://glacieerr.github.io/storewright/benchmark/) (after deployment) |
+| [Operations teaching sandbox](StoreX-Chain/docs/teaching/README.en.md): ten auto-graded exercises for logistics, supply-chain and industrial-engineering courses, with a lab manual and an instructor key in Chinese and English | `StoreX-Chain/docs/teaching` |
+| [Validation](StoreX-Chain/docs/08-validation.en.md): the algorithms checked against exact optima, exhaustive search, Monte Carlo and textbook values; CVRPLIB instances for other solvers | `StoreX-Chain/bench/validation` |
+
+Both libraries were extracted from StoreX Chain, which now imports them by package name; `npm run pack:libs` builds installable npm tarballs (not published to the npm registry).
+
 ## What it shows
 
 | Question | What Storewright does | Result (simulation, synthetic data) |
@@ -69,7 +95,7 @@ No profile wins on every metric: a store picks its priorities and sees the trade
 
 | Link | What it is |
 |---|---|
-| [Showcase](https://glacieerr.github.io/storewright/) | The 3D digital twin, a demo console and two associate phones side by side, all connected to an in-browser store hub (a SharedWorker running the same code as the server) |
+| [Showcase](https://glacieerr.github.io/storewright/app/showcase.html) | The 3D digital twin, a demo console and two associate phones side by side, all connected to an in-browser store hub (a SharedWorker running the same code as the server) |
 | [Store simulator](https://glacieerr.github.io/storewright/sim/) | The planning twin: a full day of operations in 2.5D / 3D, policy comparison, reports and the layout editor; a short tour on the first visit |
 | [Your Store](https://glacieerr.github.io/storewright/sim/?yours) | Build a store from an empty lot, check it is ready to open and run it live |
 | [Associate app](https://glacieerr.github.io/storewright/app/) | One associate phone: pick a role and work orders |
@@ -88,7 +114,7 @@ npm run build:site
 npm run demo:site
 ```
 
-Then open http://127.0.0.1:4177/. Create an order in the console and watch it get picked, staged and handed off on the phones while it appears in the twin. In the console's "Equipment and alerts", cause a fault and watch the alert reach the shift lead's phone; drag the timeline under the twin to replay the past or forecast the next hours. `?store=hardware` switches to the home-improvement store.
+Then open the showcase at http://127.0.0.1:4177/app/showcase.html (http://127.0.0.1:4177/ is the front page with all three parts). Create an order in the console and watch it get picked, staged and handed off on the phones while it appears in the twin. In the console's "Equipment and alerts", cause a fault and watch the alert reach the shift lead's phone; drag the timeline under the twin to replay the past or forecast the next hours. `?store=hardware` switches to the home-improvement store.
 
 **With the real backend:**
 
@@ -116,7 +142,7 @@ Open http://localhost:8787 (phones on the same Wi-Fi can open the computer's LAN
 | `npm run notices` | Regenerate the third-party notices (`THIRD_PARTY_NOTICES.md`) from the installed dependencies; run it after changing dependencies |
 | `npm run industry-report` | Grocery vs home-improvement comparison: configuration, order shape, operations, AI, forecasting (~10 s) |
 
-Requires Node.js 20+.
+Requires Node.js 22+.
 
 ## Browser support
 
@@ -181,5 +207,7 @@ All results are **evidence level B** (simulation with synthetic data): useful fo
 Storewright is the author's portfolio: it shows the ideas, practice and planning behind a complete store-workflow solution. Everything is in this repository, with no paid features, private modules or commercial services ([decision 0027](docs/decisions/0027-portfolio-license.md)).
 
 Code (core, simulator, backend, associate app, AI) is under [AGPL-3.0](LICENSE) and documentation, pseudocode and reports under [CC BY 4.0](LICENSE-docs); use them as those licenses allow, without any warranty or support. The built-in store templates and the stores built in Your Store are synthetic demo data: they do not represent any real store and are not an operating plan for one.
+
+Parts 2 and 3, and the two libraries in `packages/yard` and `packages/overlap-audit`, use the same licenses (code AGPL-3.0; documentation, images, generated and sample data CC BY 4.0) with one exception: the Unreal Engine plugin of part 3 (`StoreX-Chain/engines/ue5/`) is under [MIT](StoreX-Chain/engines/ue5/LICENSE), because the engine's license agreement does not allow combining engine code with copyleft code, and the plugin only talks to the twin server over the network protocol. Per-file licenses are listed in [REUSE.toml](REUSE.toml).
 
 The licenses do not grant the right to use the Storewright name or icon. Code contributions are not accepted for now; ideas and bug reports are welcome as issues (see [CONTRIBUTING.md](CONTRIBUTING.md)). Report security issues as described in [SECURITY.md](SECURITY.md). The compliance statement and self-check are in [COMPLIANCE.md](COMPLIANCE.md); the open-source packages used at run time and their license texts are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

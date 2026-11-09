@@ -6,7 +6,7 @@
 
 > This project is based on public information, common industry practice and the author's own design. **It is not affiliated with any retailer or company.** All data is synthetic, and every result is evidence level B (simulation under stated assumptions).
 >
-> Repository: [github.com/Glacieerr/storewright](https://github.com/Glacieerr/storewright) · Live demo: [showcase](https://glacieerr.github.io/storewright/) · [store simulator](https://glacieerr.github.io/storewright/sim/)
+> Repository: [github.com/Glacieerr/storewright](https://github.com/Glacieerr/storewright) · Live demo: [showcase](https://glacieerr.github.io/storewright/app/showcase.html) · [store simulator](https://glacieerr.github.io/storewright/sim/)
 
 ---
 
@@ -140,7 +140,7 @@ TypeScript (strict, npm-workspaces monorepo) · React 18 · three.js, React Thre
 
 ## 13. Reproduce
 
-Requires Node.js 20 or later.
+Requires Node.js 22 or later.
 
 ```bash
 npm install

@@ -8,6 +8,32 @@
 
 ![展示页：三维数字孪生、演示控制台和两部员工手机，全部在浏览器里运行](docs/images/showcase.jpg)
 
+## 作品集的三个部分
+
+本仓库是一个作品集的三个部分：
+
+| 部分 | 是什么 | 文档 | 状态 |
+|---|---|---|---|
+| 1 · Storewright（本页） | 门店数字孪生：三维门店与现场作业实时同步、回放和推演、员工手机端、门店 AI | 本页 · [English](README.en.md) | 已公开，[在线演示](https://glacieerr.github.io/storewright/app/showcase.html) |
+| 2 · [StoreX](StoreX/README.md) | 面向 2030 年的数字孪生门店：重新设计的流程、门店模拟器（二维和三维）、规划和商业报告 | [中文](StoreX/README.md) · [English](StoreX/README.en.md) | 新增；部署后地址：[glacieerr.github.io/storewright/storex/](https://glacieerr.github.io/storewright/storex/)（首次推送后可用） |
+| 3 · [StoreX 全链路](StoreX-Chain/README.md) | 一家综合店的区域供应链数字孪生，从港口、铁路、空运、公路到门店：调度台、闭环孪生、值班助手、孪生服务 | [中文](StoreX-Chain/README.md) · [English](StoreX-Chain/README.en.md) | 新增；部署后地址：[glacieerr.github.io/storewright/storex-chain/](https://glacieerr.github.io/storewright/storex-chain/)（首次推送后可用） |
+
+**从这里开始：**在线演示的首页（部署后：[glacieerr.github.io/storewright](https://glacieerr.github.io/storewright/)）一键打开任何一个部分；第三部分可以直接看[「一个集装箱从船到货架」](https://glacieerr.github.io/storewright/storex-chain/?tour=container)（一分钟的自动导览），或者读[5 分钟上手](StoreX-Chain/docs/00-quickstart.md)。
+
+<a href="https://glacieerr.github.io/storewright/storex-chain/?tour=container"><img src="StoreX-Chain/docs/images/tour/ship-to-shelf.jpg" width="640" alt="第三部分的导览：一个集装箱从船到货架"></a>
+
+**可以复用的部分**
+
+| 是什么 | 在哪 |
+|---|---|
+| [`@storewright/yard`](packages/yard/README.md)：卸货场 / 月台场地引擎——单向绕行的车道布置、从司机一侧倒车（挂车铰接）、甩挂和场内牵引车、按仿真时刻统一排程、任意时刻取位姿；纯 TypeScript、零依赖、结果确定 | `packages/yard` · [演示](https://glacieerr.github.io/storewright/yard/)（部署后） |
+| [`@storewright/overlap-audit`](packages/overlap-audit/README.md)：车辆重叠审计——分离轴检验、精确的网格粗筛、按区域 / 车型对 / 静止或行驶统计「车对 × 秒」、上限做回归门槛；附 JSON 轨迹格式和命令行，任何引擎导出的轨迹都能用 | `packages/overlap-audit` |
+| [值班台基准（Duty-Desk Bench）](StoreX-Chain/docs/benchmark.md)：运营值班助手的 320 道盲测题、五项评分、五个可复现的对照系统；任何系统（包括你自己接的大模型）用同一个评分器比较 | `StoreX-Chain/bench/duty-desk` · [结果页](https://glacieerr.github.io/storewright/benchmark/)（部署后） |
+| [运营教学沙盘](StoreX-Chain/docs/teaching/README.md)：给物流、供应链、工业工程课程的 10 道自动批改的练习，附中英文实验指导书和教师参考答案 | `StoreX-Chain/docs/teaching` |
+| [对照验证](StoreX-Chain/docs/08-validation.md)：算法和精确最优解、穷举、蒙特卡洛模拟、教科书的值对照；给别的求解器核对的 CVRPLIB 算例 | `StoreX-Chain/bench/validation` |
+
+两个程序库都从 StoreX 全链路拆出来，StoreX 全链路现在按包名使用它们；`npm run pack:libs` 打出可以安装的 npm 包（还没有发布到 npm）。
+
 ## 现在能做什么
 
 - **门店数字孪生**（[决策记录 0016](docs/decisions/0016-digital-twin.md)、[14 数字孪生](docs/14-digital-twin.md)）：
@@ -93,12 +119,12 @@
 
 | 链接 | 内容 |
 |---|---|
-| [展示页](https://glacieerr.github.io/storewright/) | 三维数字孪生、演示控制台和两部员工手机并排，全部连到浏览器里的门店中枢 |
+| [展示页](https://glacieerr.github.io/storewright/app/showcase.html) | 三维数字孪生、演示控制台和两部员工手机并排，全部连到浏览器里的门店中枢 |
 | [门店模拟器](https://glacieerr.github.io/storewright/sim/) | 规划孪生：2.5D / 3D 看一整天的运营、对比策略、报告和布局编辑器；第一次打开有一分钟的导览 |
 | [你的商店](https://glacieerr.github.io/storewright/sim/?yours) | 从一块空地搭一家店，开业检查后实时运营 |
 | [员工手机端](https://glacieerr.github.io/storewright/app/) | 一部员工手机：选一个岗位，处理订单 |
 
-在本机运行需要 Node.js 20 或更高版本。
+在本机运行需要 Node.js 22 或更高版本。
 
 ```bash
 npm install
@@ -112,7 +138,7 @@ npm run build:site
 npm run demo:site
 ```
 
-打开 http://127.0.0.1:4177/ 就是展示页：在控制台下单，看它在手机上被拣货、暂存、交付，同时出现在三维数字孪生里；在控制台的「设备与告警」里制造一个故障，看告警怎样传到手机和孪生；拖动孪生底部的时间轴回放过去、推演未来。`?store=hardware` 换成家居建材店。
+打开 http://127.0.0.1:4177/app/showcase.html 就是展示页（http://127.0.0.1:4177/ 是三个部分的首页）：在控制台下单，看它在手机上被拣货、暂存、交付，同时出现在三维数字孪生里；在控制台的「设备与告警」里制造一个故障，看告警怎样传到手机和孪生；拖动孪生底部的时间轴回放过去、推演未来。`?store=hardware` 换成家居建材店。
 
 | 命令 | 作用 |
 |---|---|
@@ -250,6 +276,8 @@ flowchart LR
 Storewright 是作者的作品集，用来展示一整套门店工作流解决方案的构想、实践和规划能力。全部内容都在本仓库，没有付费功能、私有模块或商业服务（[决策记录 0027](docs/decisions/0027-portfolio-license.md)）。
 
 全部代码（核心、模拟器、后端、员工作业端、AI）使用 [AGPL-3.0](LICENSE)，文档、伪代码与报告使用 [CC BY 4.0](LICENSE-docs)，按许可证使用，不提供任何保证，也不提供技术支持。内置门店模板和在「你的商店」里搭建的门店都是演示用的合成数据，不代表任何真实门店，不能当作门店的运营方案。
+
+第二、三部分和 `packages/yard`、`packages/overlap-audit` 两个程序库使用同样的许可（代码 AGPL-3.0；文档、图片、生成的数据和示例数据 CC BY 4.0），只有一个例外：第三部分的虚幻引擎插件（`StoreX-Chain/engines/ue5/`）使用 [MIT](StoreX-Chain/engines/ue5/LICENSE)，因为引擎的许可协议不允许把引擎代码和 copyleft 代码组合，插件只通过网络协议和孪生服务通信。每个文件的许可见 [REUSE.toml](REUSE.toml)。
 
 许可证不授予使用 Storewright 名称和图标的权利。暂不接受代码贡献，欢迎用 issue 提建议和问题。
 

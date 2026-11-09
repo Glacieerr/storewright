@@ -28,7 +28,7 @@ Run this package's tests. · 运行这个包的测试。
 npx vitest run packages/twin
 ```
 
-To see the twin in the browser, build and serve the demo site, then open http://127.0.0.1:4177/. · 想在浏览器里看孪生，先构建并启动演示站点，再打开 http://127.0.0.1:4177/ 。
+To see the twin in the browser, build and serve the demo site, then open the showcase at http://127.0.0.1:4177/app/showcase.html. · 想在浏览器里看孪生，先构建并启动演示站点，再打开展示页 http://127.0.0.1:4177/app/showcase.html 。
 
 ```bash
 npm run build:site

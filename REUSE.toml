@@ -1,0 +1,76 @@
+# Copyright and license of each file, in the REUSE format (https://reuse.software/spec-3.2/).
+# It covers parts 2 and 3 (StoreX/, StoreX-Chain/), the two libraries split out of part 3 (packages/yard, packages/overlap-audit)
+# and the community files at the root. Part 1 (apps/, packages/, docs/ and
+# the rest) is licensed as its README says (code: LICENSE, AGPL-3.0; documentation: LICENSE-docs, CC BY 4.0) but is not
+# annotated file by file, so `reuse lint` still lists it. The license texts are in LICENSES/.
+# When several tables match a file, the last one applies: the general rule comes first, the exceptions after it.
+# 第二、三部分和根目录社区文件的版权与许可证（REUSE 格式）。第一部分按它的 README 所写（代码 LICENSE，AGPL-3.0；文档 LICENSE-docs，
+# CC BY 4.0），还没有逐个文件标注。许可证全文在 LICENSES/。多条规则同时匹配同一个文件时，以最后一条为准：先写通用规则，再写例外。
+version = 1
+
+# Code: the default for everything in parts 2 and 3. · 代码：第二、三部分的默认许可。
+[[annotations]]
+path = ["StoreX/**", "StoreX-Chain/**"]
+SPDX-FileCopyrightText = "2026 Glacieerr"
+SPDX-License-Identifier = "AGPL-3.0-only"
+
+# Documentation, reports, diagrams and screenshots, as the root README states for documentation. · 文档、报告、图表和截图。
+[[annotations]]
+path = [
+  "StoreX/*.md", "StoreX/**/*.md", "StoreX/docs/**",
+  "StoreX-Chain/*.md", "StoreX-Chain/**/*.md", "StoreX-Chain/docs/**",
+]
+SPDX-FileCopyrightText = "2026 Glacieerr"
+SPDX-License-Identifier = "CC-BY-4.0"
+
+# Generated 3D models, generated result data and synthetic sample data. · 生成的三维模型、生成的结果数据和合成的示例数据。
+[[annotations]]
+path = [
+  "StoreX/**/*.glb", "StoreX-Chain/**/*.glb",
+  "StoreX/web/src/data/**", "StoreX-Chain/web/src/data/**",
+  "StoreX-Chain/server/adapters/samples/**",
+  "StoreX-Chain/engines/matlab/reference/*.csv",
+]
+SPDX-FileCopyrightText = "2026 Glacieerr"
+SPDX-License-Identifier = "CC-BY-4.0"
+
+# Benchmark and validation datasets (Duty-Desk Bench questions, schemas, evaluation context, results and its generated page;
+# routing instances and validation results) and the scenario library: data, CC BY 4.0 (the code in src/ stays AGPL).
+# 基准和对照验证的数据集（值班台基准的题目、schema、评测时刻的数据、结果和生成的网页；路径例子和验证结果）和场景库：数据，CC BY 4.0
+#（src/ 里的代码仍是 AGPL）。
+[[annotations]]
+path = ["StoreX-Chain/bench/**", "StoreX-Chain/web/public/scenarios/**"]
+SPDX-FileCopyrightText = "2026 Glacieerr"
+SPDX-License-Identifier = "CC-BY-4.0"
+
+# The two libraries split out of part 3 (packages/yard, packages/overlap-audit): code AGPL-3.0-only, documentation CC BY 4.0.
+# 从第三部分拆出来的两个程序库：代码 AGPL-3.0-only，文档 CC BY 4.0。
+[[annotations]]
+path = ["packages/yard/**", "packages/overlap-audit/**"]
+SPDX-FileCopyrightText = "2026 Glacieerr"
+SPDX-License-Identifier = "AGPL-3.0-only"
+
+[[annotations]]
+path = ["packages/yard/**/*.md", "packages/overlap-audit/**/*.md"]
+SPDX-FileCopyrightText = "2026 Glacieerr"
+SPDX-License-Identifier = "CC-BY-4.0"
+
+# The Unreal Engine plugin, every file in it: MIT (StoreX-Chain/engines/ue5/LICENSE). The engine's license agreement does not
+# allow combining engine code with copyleft code, and the plugin talks to the AGPL twin server only over its network protocol.
+# 虚幻引擎插件（目录里的全部文件）：MIT。引擎的许可协议不允许把引擎代码和 copyleft 代码组合，插件只通过网络协议和 AGPL 的孪生服务通信。
+[[annotations]]
+path = "StoreX-Chain/engines/ue5/**"
+SPDX-FileCopyrightText = "2026 Glacieerr"
+SPDX-License-Identifier = "MIT"
+
+# Community and maintainer files at the root. · 根目录的社区文件和维护说明。
+[[annotations]]
+path = ["SUPPORT.md", "RELEASING.md", ".github/PULL_REQUEST_TEMPLATE.md", ".github/ISSUE_TEMPLATE/**"]
+SPDX-FileCopyrightText = "2026 Glacieerr"
+SPDX-License-Identifier = "CC-BY-4.0"
+
+# Adapted from the Contributor Covenant 2.1 (CC BY 4.0). · 改编自 Contributor Covenant 2.1。
+[[annotations]]
+path = "CODE_OF_CONDUCT.md"
+SPDX-FileCopyrightText = ["Contributor Covenant contributors", "2026 Glacieerr"]
+SPDX-License-Identifier = "CC-BY-4.0"

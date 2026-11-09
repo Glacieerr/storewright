@@ -1,0 +1,68 @@
+# 发布附件：在 GitHub 上发布（publish）一个 Release 以后自动构建并挂上附件，按标签前缀决定是哪一部分（见 RELEASING.md）：
+#   storex-chain-v*   → 第三部分的静态网页包（zip）+ 运行时依赖的 SBOM（CycloneDX）
+#   storex-v*         → 第二部分的静态网页包（zip）+ SBOM
+#   yard-v*           → @storewright/yard 的 npm 安装包（.tgz）+ SBOM
+#   overlap-audit-v*  → @storewright/overlap-audit 的 npm 安装包（.tgz）+ SBOM
+# 只在发布时运行；不推送代码、不发布到 npm。标签名经环境变量传进脚本（不直接拼进命令，防止注入）。
+#
+# Release assets: when a GitHub Release is published, build and attach assets chosen by the tag prefix.
+name: Release assets
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  assets:
+    runs-on: ubuntu-24.04
+    env:
+      TAG: ${{ github.event.release.tag_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Which part does this tag release
+        id: part
+        run: |
+          case "$TAG" in
+            storex-chain-v*) echo "part=storex-chain" >> "$GITHUB_OUTPUT"; echo "version=${TAG#storex-chain-v}" >> "$GITHUB_OUTPUT" ;;
+            storex-v*) echo "part=storex" >> "$GITHUB_OUTPUT"; echo "version=${TAG#storex-v}" >> "$GITHUB_OUTPUT" ;;
+            yard-v*) echo "part=yard" >> "$GITHUB_OUTPUT"; echo "version=${TAG#yard-v}" >> "$GITHUB_OUTPUT" ;;
+            overlap-audit-v*) echo "part=overlap-audit" >> "$GITHUB_OUTPUT"; echo "version=${TAG#overlap-audit-v}" >> "$GITHUB_OUTPUT" ;;
+            *) echo "part=none" >> "$GITHUB_OUTPUT" ;;
+          esac
+      - name: Static web build (StoreX / StoreX Chain)
+        if: steps.part.outputs.part == 'storex-chain' || steps.part.outputs.part == 'storex'
+        env:
+          PART: ${{ steps.part.outputs.part }}
+          VERSION: ${{ steps.part.outputs.version }}
+        run: |
+          dir=$([ "$PART" = storex-chain ] && echo StoreX-Chain || echo StoreX)
+          npm run build -w "$PART"
+          (cd "$dir/dist" && zip -qr "$RUNNER_TEMP/$PART-$VERSION-web.zip" .)
+          npm sbom --sbom-format cyclonedx --omit dev -w "$PART" > "$RUNNER_TEMP/$PART-$VERSION.cdx.json"
+      - name: npm packages (libraries)
+        if: steps.part.outputs.part == 'yard' || steps.part.outputs.part == 'overlap-audit'
+        env:
+          PART: ${{ steps.part.outputs.part }}
+          VERSION: ${{ steps.part.outputs.version }}
+        run: |
+          npm run pack:libs
+          cp dist-pkg/storewright-"$PART"-"$VERSION".tgz "$RUNNER_TEMP/"
+          npm sbom --sbom-format cyclonedx --omit dev -w "@storewright/$PART" > "$RUNNER_TEMP/$PART-$VERSION.cdx.json"
+      - name: Attach to the release
+        if: steps.part.outputs.part != 'none'
+        run: |
+          shopt -s nullglob
+          files=("$RUNNER_TEMP"/*.zip "$RUNNER_TEMP"/*.tgz "$RUNNER_TEMP"/*.cdx.json)
+          gh release upload "$TAG" "${files[@]}" --clobber --repo "$GITHUB_REPOSITORY"

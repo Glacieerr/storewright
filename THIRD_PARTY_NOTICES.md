@@ -1,8 +1,8 @@
 # Third-party notices · 第三方组件声明
 
-Storewright uses the open-source packages below at run time: in the associate app and simulator (and so in the in-browser demo site), and in the server. Each keeps its own license. This file lists them and reproduces the license texts and copyright notices that those licenses ask to be kept when the software is distributed, for example as the demo site or a Docker image. Development tools that are not distributed (TypeScript, Vite, Vitest, Playwright and the like) are not listed. A package listed here is installed as a run-time dependency; a bundler may leave unused parts out of the built files.
+Storewright uses the open-source packages below at run time: in the associate app and simulator (and so in the in-browser demo site), in the server, and in the web apps of StoreX and StoreX Chain (parts 2 and 3). Each keeps its own license. This file lists them and reproduces the license texts and copyright notices that those licenses ask to be kept when the software is distributed, for example as the demo site or a Docker image. Development tools that are not distributed (TypeScript, Vite, Vitest, Playwright and the like) are not listed. A package listed here is installed as a run-time dependency; a bundler may leave unused parts out of the built files.
 
-Storewright 在运行时用到下面这些开源软件包：员工作业端和模拟器（因此也包括浏览器内演示站点）以及服务端。它们各自保留自己的许可证。本文件列出这些软件包，并附上这些许可证要求在分发软件时保留的许可文本和版权声明（例如分发演示站点或 Docker 镜像时）。不随软件分发的开发工具（TypeScript、Vite、Vitest、Playwright 等）不列入。这里列出的是作为运行时依赖安装的软件包；打包工具可能会把没用到的部分排除在构建产物之外。
+Storewright 在运行时用到下面这些开源软件包：员工作业端和模拟器（因此也包括浏览器内演示站点）、服务端，以及第二、三部分 StoreX 和 StoreX 全链路的网页。它们各自保留自己的许可证。本文件列出这些软件包，并附上这些许可证要求在分发软件时保留的许可文本和版权声明（例如分发演示站点或 Docker 镜像时）。不随软件分发的开发工具（TypeScript、Vite、Vitest、Playwright 等）不列入。这里列出的是作为运行时依赖安装的软件包；打包工具可能会把没用到的部分排除在构建产物之外。
 
 Generated from the installed packages by `npm run notices` (`scripts/third-party-notices.mjs`); run it again after changing dependencies. · 由 `npm run notices`（`scripts/third-party-notices.mjs`）根据已安装的软件包生成；改了依赖以后请重新生成。
 
@@ -10,13 +10,14 @@ Generated from the installed packages by `npm run notices` (`scripts/third-party
 
 | License · 许可证 | Packages · 软件包数 |
 |---|---|
-| MIT | 167 |
+| MIT | 172 |
 | ISC | 12 |
+| Apache-2.0 | 8 |
 | BlueOak-1.0.0 | 8 |
-| Apache-2.0 | 6 |
 | BSD-3-Clause | 5 |
 | 0BSD | 1 |
-| **Total · 合计** | **199** |
+| Unlicense | 1 |
+| **Total · 合计** | **207** |
 
 All of these are permissive licenses that are compatible with distributing Storewright under AGPL-3.0. · 以上都是宽松许可证，与以 AGPL-3.0 发布 Storewright 兼容。
 
@@ -24,6 +25,7 @@ All of these are permissive licenses that are compatible with distributing Store
 
 | Package · 软件包 | Version · 版本 | License · 许可证 | Used by · 使用方 |
 |---|---|---|---|
+| @anthropic-ai/sdk | 1.6.0 | Apache-2.0 | `StoreX-Chain` |
 | @electric-sql/pglite | 0.2.15 | Apache-2.0 | `apps/server` |
 | @fastify/cors | 10.0.1 | MIT | `apps/server` |
 | @fastify/static | 8.0.3 | MIT | `apps/server` |
@@ -37,13 +39,13 @@ All of these are permissive licenses that are compatible with distributing Store
 | qrcode-generator | 1.4.4 | MIT | `packages/labels` |
 | react | 18.3.1 | MIT | `apps/associate`, `apps/simulator` |
 | react-dom | 18.3.1 | MIT | `apps/associate`, `apps/simulator` |
-| three | 0.170.0 | MIT | `apps/simulator` |
-| zod | 3.23.8 | MIT | `packages/store-config` |
+| three | 0.170.0 | MIT | `apps/simulator`, `StoreX`, `StoreX-Chain` |
+| zod | 3.23.8 | MIT | `packages/store-config`, `StoreX-Chain` |
 | zustand | 4.5.7 | MIT | `apps/simulator` |
 
 ## Packages and license texts · 软件包与许可文本
 
-### MIT (167)
+### MIT (172)
 
 | Package · 软件包 | Copyright · 版权声明 | Source · 来源 |
 |---|---|---|
@@ -68,6 +70,7 @@ All of these are permissive licenses that are compatible with distributing Store
 | @react-spring/types@9.7.5 | Copyright (c) 2018-present Paul Henschel, react-spring, all contributors | https://github.com/pmndrs/react-spring#readme |
 | @react-three/drei@9.117.3 | Copyright (c) 2020 react-spring | https://github.com/pmndrs/drei |
 | @react-three/fiber@8.17.10 | Copyright (c) Paul Henschel (https://github.com/drcmda) | https://github.com/pmndrs/react-three-fiber#readme |
+| @stablelib/base64@1.0.1 | Copyright (C) 2016 Dmitry Chestnykh | https://github.com/StableLib/stablelib/tree/master/packages/base64 |
 | @tweenjs/tween.js@23.1.3 | Copyright (c) 2010-2012 Tween.js authors.; Easing equations Copyright (c) 2001 Robert Penner http://robertpenner.com/easing/ | https://github.com/tweenjs/tween.js |
 | @types/draco3d@1.4.10 | Copyright (c) Microsoft Corporation. | https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/draco3d |
 | @types/node@22.10.2 | Copyright (c) Microsoft Corporation. | https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/node |
@@ -127,6 +130,7 @@ All of these are permissive licenses that are compatible with distributing Store
 | js-sdsl@4.3.0 | Copyright (c) 2021 Zilong Yao | https://js-sdsl.org |
 | js-tokens@4.0.0 | Copyright (c) 2014, 2015, 2016, 2017, 2018 Simon Lydell | https://github.com/lydell/js-tokens |
 | json-schema-ref-resolver@3.0.1 | Copyright (c) 2023-present The Fastify team <https://github.com/fastify/fastify#team> | https://github.com/fastify/json-schema-ref-resolver#readme |
+| json-schema-to-ts@3.1.1 | Copyright (c) 2020 Thomas Aribart | https://github.com/ThomasAribart/json-schema-to-ts#readme |
 | lie@3.3.0 | Copyright (c) 2014-2018 Calvin Metcalf, Jordan Harband | https://github.com/calvinmetcalf/lie |
 | loose-envify@1.4.0 | Copyright (c) 2015 Andres Suarez <zertosh@gmail.com> | https://github.com/zertosh/loose-envify |
 | maath@0.10.8 | (no license file in the package; package.json declares MIT) | — |
@@ -182,6 +186,7 @@ All of these are permissive licenses that are compatible with distributing Store
 | scheduler@0.23.2 | Copyright (c) Facebook, Inc. and its affiliates. | https://reactjs.org/ |
 | set-cookie-parser@3.1.4 | Copyright (c) 2015 Nathan Friedly <nathan@nfriedly.com> (http://nfriedly.com/) | https://github.com/nfriedly/set-cookie-parser |
 | sonic-boom@4.2.1 | Copyright (c) 2017 Matteo Collina | https://github.com/pinojs/sonic-boom#readme |
+| standardwebhooks@1.1.1 | Copyright (c) Standard Webhooks | https://github.com/standard-webhooks/standard-webhooks/tree/main/libraries/javascript |
 | stats-gl@2.4.2 | Copyright (c) Renaud ROHLINGER (https://github.com/RenaudRohlinger) | https://github.com/RenaudRohlinger/stats-gl |
 | stats.js@0.17.0 | Copyright (c) 2009-2016 stats.js authors | https://github.com/mrdoob/stats.js |
 | statuses@2.0.2 | Copyright (c) 2014 Jonathan Ong <me@jongleberry.com>; Copyright (c) 2016 Douglas Christopher Wilson <doug@somethingdoug.com> | https://github.com/jshttp/statuses |
@@ -197,6 +202,7 @@ All of these are permissive licenses that are compatible with distributing Store
 | troika-three-text@0.52.5 | Copyright (c) 2019 ProtectWise; Copyright (c) 2021 Jason Johnston | https://github.com/protectwise/troika |
 | troika-three-utils@0.52.5 | Copyright (c) 2019 ProtectWise; Copyright (c) 2021 Jason Johnston | https://github.com/protectwise/troika |
 | troika-worker-utils@0.52.0 | Copyright (c) 2019 ProtectWise; Copyright (c) 2021 Jason Johnston | https://github.com/protectwise/troika |
+| ts-algebra@2.0.0 | Copyright (c) 2020 Thomas Aribart | https://github.com/ThomasAribart/ts-algebra#readme |
 | tunnel-rat@0.1.2 | Copyright (c) 2022 Poimandres | https://github.com/pmndrs/tunnel-rat#readme |
 | typedarray@0.0.6 | Copyright (c) 2010, Linden Research, Inc.; Copyright (c) 2012, Joshua Bell | https://github.com/substack/typedarray |
 | undici-types@6.20.0 | Copyright (c) Matteo Collina and Undici contributors | https://undici.nodejs.org |
@@ -212,6 +218,7 @@ All of these are permissive licenses that are compatible with distributing Store
 | ws@8.22.0 | Copyright (c) 2011 Einar Otto Stangvik <einaros@gmail.com>; Copyright (c) 2013 Arnout Kazemier and contributors; Copyright (c) 2016 Luigi Pinca and contributors | https://github.com/websockets/ws |
 | xtend@4.0.2 | Copyright (c) 2012-2014 Raynos. | https://github.com/Raynos/xtend |
 | zod@3.23.8 | Copyright (c) 2020 Colin McDonnell | https://zod.dev |
+| zod@3.25.76 | Copyright (c) 2025 Colin McDonnell | https://zod.dev |
 | zustand@4.5.7 | Copyright (c) 2019 Paul Henschel | https://github.com/pmndrs/zustand |
 | zustand@5.0.2 | Copyright (c) 2019 Paul Henschel | https://github.com/pmndrs/zustand |
 
@@ -270,93 +277,14 @@ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
 
-### BlueOak-1.0.0 (8)
+### Apache-2.0 (8)
 
 | Package · 软件包 | Copyright · 版权声明 | Source · 来源 |
 |---|---|---|
-| @isaacs/cliui@9.0.0 | Copyright; copyright in it. | ssh://git@github.com:isaacs/cliui |
-| glob@11.1.0 | Copyright; copyright in it. | git@github.com:isaacs/node-glob |
-| jackspeak@4.2.3 | Copyright; copyright in it. | https://github.com/isaacs/jackspeak |
-| lru-cache@11.5.3 | Copyright; copyright in it. | ssh://git@github.com/isaacs/node-lru-cache |
-| minimatch@10.2.6 | Copyright; copyright in it. | git@github.com:isaacs/minimatch |
-| minipass@7.1.3 | Copyright; copyright in it. | https://github.com/isaacs/minipass |
-| package-json-from-dist@1.0.1 | Copyright; copyright in it. | https://github.com/isaacs/package-json-from-dist |
-| path-scurry@2.0.2 | Copyright; copyright in it. | https://github.com/isaacs/path-scurry |
-
-License text shared by the packages above: · 上表各软件包共用的许可文本：
-
-```text
-Several modules are vendored under `./src`, which are used and
-distributed according to their respective licenses, each provided
-in the same directory as the code.
-
-Everything else is released under the following license.
-
-----
-
-# Blue Oak Model License
-
-Version 1.0.0
-
-## Purpose
-
-This license gives everyone as much permission to work with
-this software as possible, while protecting contributors
-from liability.
-
-## Acceptance
-
-In order to receive this license, you must agree to its
-rules. The rules of this license are both obligations
-under that agreement and conditions to your license.
-You must not do anything with this software that triggers
-a rule that you cannot or will not follow.
-
-## Copyright
-
-Each contributor licenses you to do everything with this
-software that would otherwise infringe that contributor's
-copyright in it.
-
-## Notices
-
-You must ensure that everyone who gets a copy of
-any part of this software from you, with or without
-changes, also gets the text of this license or a link to
-<https://blueoakcouncil.org/license/1.0.0>.
-
-## Excuse
-
-If anyone notifies you in writing that you have not
-complied with [Notices](#notices), you can keep your
-license by taking all practical steps to comply within 30
-days after the notice. If you do not do so, your license
-ends immediately.
-
-## Patent
-
-Each contributor licenses you to do everything with this
-software that would otherwise infringe any patent claims
-they can license or become able to license.
-
-## Reliability
-
-No contributor can revoke this license.
-
-## No Liability
-
-**_As far as the law allows, this software comes as is,
-without any warranty or condition, and no contributor
-will be liable to anyone for any damages related to this
-software or this license, under any kind of legal claim._**
-```
-
-### Apache-2.0 (6)
-
-| Package · 软件包 | Copyright · 版权声明 | Source · 来源 |
-|---|---|---|
+| @anthropic-ai/sdk@1.6.0 | 2. Grant of Copyright License. Subject to the terms and conditions of; copyright license to reproduce, prepare Derivative Works of,; (c) You must retain, in the Source form of any Derivative Works; that You distribute, all copyright, patent, trademark, and; You may add Your own copyright statement to Your modifications and; Copyright 2023 Anthropic, PBC. | https://github.com/anthropics/anthropic-sdk-typescript |
 | @electric-sql/pglite@0.2.15 | 2. Grant of Copyright License. Subject to the terms and conditions of; copyright license to reproduce, prepare Derivative Works of,; (c) You must retain, in the Source form of any Derivative Works; that You distribute, all copyright, patent, trademark, and; You may add Your own copyright statement to Your modifications and | https://pglite.dev |
 | @mediapipe/tasks-vision@0.10.17 | Copyright (c) mediapipe@google.com | http://mediapipe.dev |
+| @opentelemetry/api@1.10.0 | 2. Grant of Copyright License. Subject to the terms and conditions of; copyright license to reproduce, prepare Derivative Works of,; (c) You must retain, in the Source form of any Derivative Works; that You distribute, all copyright, patent, trademark, and; You may add Your own copyright statement to Your modifications and | https://github.com/open-telemetry/opentelemetry-js/tree/main/api |
 | draco3d@1.5.9 | Copyright (c) Google Draco Team | https://github.com/google/draco |
 | hls.js@1.7.3 | Copyright (c) 2017 Dailymotion (http://www.dailymotion.com); That work is also covered by the Apache 2 License, following copyright:; Copyright (c) 2013-2015 Brightcove | https://github.com/video-dev/hls.js |
 | jsqr@1.4.0 | 2. Grant of Copyright License. Subject to the terms and conditions of; copyright license to reproduce, prepare Derivative Works of,; (c) You must retain, in the Source form of any Derivative Works; that You distribute, all copyright, patent, trademark, and; You may add Your own copyright statement to Your modifications and | https://github.com/cozmo/jsQR |
@@ -541,6 +469,124 @@ Apache License
       of your accepting any such warranty or additional liability.
 
    END OF TERMS AND CONDITIONS
+
+   APPENDIX: How to apply the Apache License to your work.
+
+      To apply the Apache License to your work, attach the following
+      boilerplate notice, with the fields enclosed by brackets "[]"
+      replaced with your own identifying information. (Don't include
+      the brackets!)  The text should be enclosed in the appropriate
+      comment syntax for the file format. We also recommend that a
+      file or class name and description of purpose be included on the
+      same "printed page" as the copyright notice for easier
+      identification within third-party archives.
+
+   Copyright 2023 Anthropic, PBC.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+
+This repository changed its license from the MIT License to the Apache License, Version 2.0 (see LICENSE) in version 1.0.0 of the @anthropic-ai/sdk package. The MIT License below still applies to every version published under it, and to third-party contributions merged into this repository before the change.
+
+--------------------------------------------------------------------------------
+
+Copyright 2023 Anthropic, PBC.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+### BlueOak-1.0.0 (8)
+
+| Package · 软件包 | Copyright · 版权声明 | Source · 来源 |
+|---|---|---|
+| @isaacs/cliui@9.0.0 | Copyright; copyright in it. | ssh://git@github.com:isaacs/cliui |
+| glob@11.1.0 | Copyright; copyright in it. | git@github.com:isaacs/node-glob |
+| jackspeak@4.2.3 | Copyright; copyright in it. | https://github.com/isaacs/jackspeak |
+| lru-cache@11.5.3 | Copyright; copyright in it. | ssh://git@github.com/isaacs/node-lru-cache |
+| minimatch@10.2.6 | Copyright; copyright in it. | git@github.com:isaacs/minimatch |
+| minipass@7.1.3 | Copyright; copyright in it. | https://github.com/isaacs/minipass |
+| package-json-from-dist@1.0.1 | Copyright; copyright in it. | https://github.com/isaacs/package-json-from-dist |
+| path-scurry@2.0.2 | Copyright; copyright in it. | https://github.com/isaacs/path-scurry |
+
+License text shared by the packages above: · 上表各软件包共用的许可文本：
+
+```text
+Several modules are vendored under `./src`, which are used and
+distributed according to their respective licenses, each provided
+in the same directory as the code.
+
+Everything else is released under the following license.
+
+----
+
+# Blue Oak Model License
+
+Version 1.0.0
+
+## Purpose
+
+This license gives everyone as much permission to work with
+this software as possible, while protecting contributors
+from liability.
+
+## Acceptance
+
+In order to receive this license, you must agree to its
+rules. The rules of this license are both obligations
+under that agreement and conditions to your license.
+You must not do anything with this software that triggers
+a rule that you cannot or will not follow.
+
+## Copyright
+
+Each contributor licenses you to do everything with this
+software that would otherwise infringe that contributor's
+copyright in it.
+
+## Notices
+
+You must ensure that everyone who gets a copy of
+any part of this software from you, with or without
+changes, also gets the text of this license or a link to
+<https://blueoakcouncil.org/license/1.0.0>.
+
+## Excuse
+
+If anyone notifies you in writing that you have not
+complied with [Notices](#notices), you can keep your
+license by taking all practical steps to comply within 30
+days after the notice. If you do not do so, your license
+ends immediately.
+
+## Patent
+
+Each contributor licenses you to do everything with this
+software that would otherwise infringe any patent claims
+they can license or become able to license.
+
+## Reliability
+
+No contributor can revoke this license.
+
+## No Liability
+
+**_As far as the law allows, this software comes as is,
+without any warranty or condition, and no contributor
+will be liable to anyone for any damages related to this
+software or this license, under any kind of legal claim._**
 ```
 
 ### BSD-3-Clause (5)
@@ -734,5 +780,38 @@ INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
 LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
 OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
+```
+
+### Unlicense (1)
+
+#### fast-sha256@1.3.0
+
+Source · 来源: https://github.com/dchest/fast-sha256-js
+
+```text
+This is free and unencumbered software released into the public domain.
+
+Anyone is free to copy, modify, publish, use, compile, sell, or
+distribute this software, either in source code form or as a compiled
+binary, for any purpose, commercial or non-commercial, and by any
+means.
+
+In jurisdictions that recognize copyright laws, the author or authors
+of this software dedicate any and all copyright interest in the
+software to the public domain. We make this dedication for the benefit
+of the public at large and to the detriment of our heirs and
+successors. We intend this dedication to be an overt act of
+relinquishment in perpetuity of all present and future rights to this
+software under copyright law.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
+
+For more information, please refer to <http://unlicense.org>
 ```
 

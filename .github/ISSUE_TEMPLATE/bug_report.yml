@@ -1,0 +1,78 @@
+name: Bug report · 错误报告
+description: Something is broken or differs from the documentation · 某个功能出错，或者和文档说的不一样
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for the report. · 感谢报告！
+
+        - **Do not report security vulnerabilities here**; report them privately as described in [SECURITY.md](https://github.com/Glacieerr/storewright/blob/main/SECURITY.md). · **安全漏洞不要在这里报告**，请按 [SECURITY.md](https://github.com/Glacieerr/storewright/blob/main/SECURITY.md) 私下报告。
+        - **Public information only**: nothing taken from an employer or another company (internal documents, screenshots, system names, data or metrics), and no code. · **只写公开信息**：不要贴任何来自雇主或其他公司的内容（内部文档、截图、系统名称、数据或指标），也不要贴代码。
+  - type: dropdown
+    id: part
+    attributes:
+      label: Part · 哪个部分
+      options:
+        - Storewright (part 1) · 第一部分：门店数字孪生、员工手机端、服务端
+        - StoreX (part 2) · 第二部分：2030 年的门店
+        - StoreX Chain (part 3) · 第三部分：StoreX 全链路（区域孪生、调度台、孪生服务）
+        - Repository, documentation or CI · 仓库、文档或 CI
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where · 在哪里遇到的
+      options:
+        - Online demo · 在线演示
+        - Local dev server or local build · 本地开发服务器或本地构建
+        - Command line (simulation, reports, tests) · 命令行（仿真、报告、测试）
+        - Twin server or external engine integration · 孪生服务或外部引擎对接
+        - Other · 其他
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened · 发生了什么
+      description: Describe the problem in words, with any error message. Screenshots are welcome if they show nothing private. · 用文字描述问题，有报错就写上报错信息；截图里没有私人信息的话也欢迎附上。
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce · 复现步骤
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior · 期望的结果
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment · 环境
+      description: Operating system, browser and version, GPU for 3D problems; Node.js version and commit when running locally. · 操作系统、浏览器和版本，三维相关的问题写显卡；本地运行时写 Node.js 版本和提交号。
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs (optional) · 日志（可选）
+      description: Output from the browser console or the terminal. · 浏览器控制台或命令行的输出。
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks · 确认
+      options:
+        - label: Only public information; nothing from an employer or another company. · 内容只来自公开信息，不含任何雇主或其他公司的内容。
+          required: true
+        - label: This is not a security vulnerability. · 这不是安全漏洞。
+          required: true
+        - label: I searched the existing issues. · 我搜索过已有的 issue。

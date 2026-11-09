@@ -1,4 +1,5 @@
 # 浏览器内演示站点部署到 GitHub Pages。只能手动触发（Actions → Deploy demo site → Run workflow）。
+# npm run build:site 构建全部三个部分：第一部分在站点根目录（展示页 app/、模拟器 sim/），第二部分 StoreX 在 storex/，第三部分 StoreX 全链路在 storex-chain/（见 scripts/build-site.mjs）。
 name: Deploy demo site
 
 on:

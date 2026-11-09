@@ -10,6 +10,8 @@
   ],
   "exclude": [
     "apps/simulator/**",
-    "apps/associate/**"
+    "apps/associate/**",
+    "packages/yard/**",
+    "packages/overlap-audit/**"
   ]
 }

@@ -1,0 +1,33 @@
+# Citation metadata (https://citation-file-format.github.io/); GitHub shows it as "Cite this repository".
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata below. · 如果在工作中用到了本项目，请按下面的信息引用。"
+type: software
+title: "Storewright, StoreX and StoreX Chain: digital twins of grocery store operations and of a store's supply chain"
+abstract: >-
+  A portfolio project in three parts, built only from public information and synthetic data, and not affiliated with any
+  retailer or company. Storewright (part 1) is a digital twin of a grocery store: the 3D store follows live operations,
+  replays the day and forecasts the next hours, and drives fulfilment, backroom work and AI on associate phones.
+  StoreX (part 2) redesigns the store for 2030 and compares it item by item with the previous generation on the same
+  discrete-event simulation engine, with a browser simulator and planning, comparison and business reports.
+  StoreX Chain (part 3) places the store in its full supply chain (sea, rail, air and long-haul road freight, a
+  distribution center and the fleet) with a 3D regional twin, a dispatch board, a closed-loop twin, a twin server for
+  external engines, and planning, comparison and business reports.
+authors:
+  - alias: Glacieerr
+repository-code: "https://github.com/Glacieerr/storewright"
+url: "https://glacieerr.github.io/storewright/"
+license: AGPL-3.0-only
+version: 0.1.0
+keywords:
+  - digital twin
+  - discrete-event simulation
+  - grocery retail operations
+  - supply chain
+  - logistics
+  - dispatch and scheduling
+  - 3D visualization
+  - vehicle routing
+  - truck yard and loading-dock motion
+  - AI assistant evaluation benchmark
+  - operations education
+  - TypeScript

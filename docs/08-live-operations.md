@@ -113,7 +113,7 @@ flowchart LR
 
 ## 5. 运行
 
-需要 Node.js 20 或更高版本，不需要安装数据库。
+需要 Node.js 22 或更高版本，不需要安装数据库。
 
 ```bash
 npm run build:associate

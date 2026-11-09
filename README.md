@@ -4,7 +4,7 @@
 
 **面向超市的门店数字孪生。三维门店与现场作业实时同步，可以回放当天任意时刻、推演未来 3 小时；同一个孪生驱动员工手机上的履约、后仓作业和 AI。整个系统可以直接在浏览器里运行。**
 
-**Try it online / 在线体验：** [Showcase / 展示页](https://glacieerr.github.io/storewright/) · [Store simulator / 门店模拟器](https://glacieerr.github.io/storewright/sim/) · [Your Store / 你的商店](https://glacieerr.github.io/storewright/sim/?yours) · [Associate app / 员工手机端](https://glacieerr.github.io/storewright/app/)
+**Try it online / 在线体验：** [Showcase / 展示页](https://glacieerr.github.io/storewright/app/showcase.html) · [Store simulator / 门店模拟器](https://glacieerr.github.io/storewright/sim/) · [Your Store / 你的商店](https://glacieerr.github.io/storewright/sim/?yours) · [Associate app / 员工手机端](https://glacieerr.github.io/storewright/app/)
 
 [Full English guide](README.en.md) · [完整中文说明](README.zh-CN.md) · [Technical overview (English)](docs/en/overview.md) · [数字孪生设计（中文）](docs/14-digital-twin.md)
 
@@ -15,6 +15,32 @@
 > This project is based on public information, common industry practice and the author's own design. **It is not affiliated with any retailer or company.** All stores, products, customers and numbers are synthetic.
 >
 > 本项目基于公开资料、行业通用做法和作者的独立构想设计。**本项目与任何零售商、企业无隶属关系。** 所有门店、商品、顾客和数字都是合成的。
+
+## Portfolio parts · 作品集的三个部分
+
+This repository holds three parts of one portfolio. · 本仓库是一个作品集的三个部分。
+
+| Part · 部分 | What it is · 是什么 | Docs · 文档 | Status · 状态 |
+|---|---|---|---|
+| 1 · Storewright (this page · 本页) | Store digital twin: the 3D store in sync with live operations, replay and forecast, associate phones, per-store AI · 门店数字孪生：三维门店与现场作业实时同步、回放和推演、员工手机端、门店 AI | [English](README.en.md) · [中文](README.zh-CN.md) | Public, [live demo · 在线演示](https://glacieerr.github.io/storewright/app/showcase.html) |
+| 2 · [StoreX](StoreX/README.en.md) | A digital-twin grocery store for 2030: redesigned process, store simulator (2D and 3D), planning and business reports · 面向 2030 年的数字孪生门店：重新设计的流程、门店模拟器（二维和三维）、规划和商业报告 | [English](StoreX/README.en.md) · [中文](StoreX/README.md) | New · 新增; after deployment · 部署后地址：[glacieerr.github.io/storewright/storex/](https://glacieerr.github.io/storewright/storex/) (available after the first push · 首次推送后可用) |
+| 3 · [StoreX Chain · StoreX 全链路](StoreX-Chain/README.en.md) | Regional digital twin of one store's supply chain, from port, rail, air and highway to the shelf: dispatch board, closed-loop twin, duty assistant, twin server · 一家综合店的区域供应链数字孪生，从港口、铁路、空运、公路到门店：调度台、闭环孪生、值班助手、孪生服务 | [English](StoreX-Chain/README.en.md) · [中文](StoreX-Chain/README.md) | New · 新增; after deployment · 部署后地址：[glacieerr.github.io/storewright/storex-chain/](https://glacieerr.github.io/storewright/storex-chain/) (available after the first push · 首次推送后可用) |
+
+**Start here · 从这里开始**: the live demo’s front page (after deployment: [glacieerr.github.io/storewright](https://glacieerr.github.io/storewright/)) opens any part in one click; in part 3, [watch one container travel from ship to shelf](https://glacieerr.github.io/storewright/storex-chain/?tour=container) (a one-minute guided tour), or read the [five-minute quick start](StoreX-Chain/docs/00-quickstart.en.md). · 在线演示的首页（部署后）一键打开任何一个部分；第三部分可以直接看[「一个集装箱从船到货架」](https://glacieerr.github.io/storewright/storex-chain/?tour=container)（一分钟的自动导览），或者读[5 分钟上手](StoreX-Chain/docs/00-quickstart.md)。
+
+<a href="https://glacieerr.github.io/storewright/storex-chain/?tour=container&lang=en"><img src="StoreX-Chain/docs/images/tour/ship-to-shelf.en.jpg" width="640" alt="One container, ship to shelf: the guided tour of part 3 · 第三部分的导览「一个集装箱从船到货架」"></a>
+
+**Reusable pieces · 可以复用的部分**
+
+| What · 是什么 | Where · 在哪 |
+|---|---|
+| [`@storewright/yard`](packages/yard/README.en.md): truck-yard and loading-dock motion engine — one-way lane layout, driver-side reversing with articulated trailers, drop-and-hook with a yard shunter, one deterministic schedule from your simulation’s times; pure TypeScript, zero dependencies · 卸货场 / 月台场地引擎：单向绕行的车道布置、从司机一侧倒车（挂车铰接）、甩挂和场内牵引车、按仿真时刻统一排程；纯 TypeScript、零依赖 | `packages/yard` · [demo · 演示](https://glacieerr.github.io/storewright/yard/) (after deployment · 部署后) |
+| [`@storewright/overlap-audit`](packages/overlap-audit/README.en.md): vehicle-footprint overlap audit — SAT tests, exact grid broad phase, pair-seconds by area / vehicle pair / static or moving, limits as a regression gate; JSON trajectories and a CLI for any engine · 车辆重叠审计：分离轴检验、精确的网格粗筛、按区域 / 车型对 / 静止或行驶统计「车对 × 秒」、上限做回归门槛；JSON 轨迹格式和命令行，任何引擎都能用 | `packages/overlap-audit` |
+| [Duty-Desk Bench · 值班台基准](StoreX-Chain/docs/benchmark.en.md): 320 blind questions for an operations duty assistant, five measures, five reproducible baselines; any system — including an LLM you connect yourself — is scored by the same scorer · 运营值班助手的 320 道盲测题、五项评分、五个可复现的对照系统；任何系统（包括你自己接的大模型）用同一个评分器比较 | `StoreX-Chain/bench/duty-desk` · [results page · 结果页](https://glacieerr.github.io/storewright/benchmark/) (after deployment · 部署后) |
+| [Operations teaching sandbox · 运营教学沙盘](StoreX-Chain/docs/teaching/README.en.md): ten auto-graded exercises for logistics, supply-chain and industrial-engineering courses, with a lab manual and an instructor key in Chinese and English · 给物流、供应链、工业工程课程的 10 道自动批改的练习，附中英文实验指导书和教师参考答案 | `StoreX-Chain/docs/teaching` |
+| [Validation · 对照验证](StoreX-Chain/docs/08-validation.en.md): the algorithms checked against exact optima, exhaustive search, Monte Carlo and textbook values; CVRPLIB instances for other solvers · 算法和精确最优解、穷举、蒙特卡洛模拟、教科书的值对照；给别的求解器核对的 CVRPLIB 算例 | `StoreX-Chain/bench/validation` |
+
+Both libraries were extracted from StoreX Chain, which now imports them by package name; `npm run pack:libs` builds installable npm tarballs (not published to the npm registry). · 两个程序库都从 StoreX 全链路拆出来，StoreX 全链路现在按包名使用它们；`npm run pack:libs` 打出可以安装的 npm 包（还没有发布到 npm）。
 
 ## The twin · 孪生
 
@@ -77,7 +103,7 @@ Evidence level B: simulation under stated assumptions, not a claim about any rea
 
 ## Quick start · 快速开始
 
-Requires Node.js 20 or later. · 需要 Node.js 20 或更高版本。
+Requires Node.js 22 or later. · 需要 Node.js 22 或更高版本。
 
 ```bash
 npm install
@@ -91,7 +117,7 @@ npm run build:site
 npm run demo:site
 ```
 
-Open http://127.0.0.1:4177/ for the showcase: console, two phones, the 3D digital twin and a full-day simulation, all in the browser. In the console's "Equipment and alerts", cause a fault and watch the alert travel to the phones and the twin; drag the twin's timeline to replay or forecast. · 打开 http://127.0.0.1:4177/ 就是展示页：控制台、两部手机、三维数字孪生和全天仿真，全部在浏览器里运行。在控制台的「设备与告警」里制造一个故障，看告警怎样传到手机和孪生；拖动孪生的时间轴回放或推演。
+Open http://127.0.0.1:4177/app/showcase.html for the showcase (http://127.0.0.1:4177/ is the front page with all three parts): console, two phones, the 3D digital twin and a full-day simulation, all in the browser. In the console's "Equipment and alerts", cause a fault and watch the alert travel to the phones and the twin; drag the twin's timeline to replay or forecast. · 打开 http://127.0.0.1:4177/app/showcase.html 就是展示页（http://127.0.0.1:4177/ 是三个部分的首页）：控制台、两部手机、三维数字孪生和全天仿真，全部在浏览器里运行。在控制台的「设备与告警」里制造一个故障，看告警怎样传到手机和孪生；拖动孪生的时间轴回放或推演。
 
 | Command · 命令 | What it does · 作用 |
 |---|---|
@@ -124,6 +150,7 @@ e2e/              End-to-end tests and walkthrough (Playwright) · 端到端测�
 Storewright is the author's portfolio: it shows the ideas, practice and planning behind a complete store-workflow solution. Everything is in this repository, with no paid features, private modules or commercial services ([decision 0027](docs/decisions/0027-portfolio-license.md)). · Storewright 是作者的作品集，用来展示一整套门店工作流解决方案的构想、实践和规划能力。全部内容都在本仓库，没有付费功能、私有模块或商业服务（[决策记录 0027](docs/decisions/0027-portfolio-license.md)）。
 
 - Code is under [AGPL-3.0](LICENSE) and documentation, pseudocode and reports under [CC BY 4.0](LICENSE-docs); use them as those licenses allow, without any warranty or support. · 代码使用 [AGPL-3.0](LICENSE)，文档、伪代码与报告使用 [CC BY 4.0](LICENSE-docs)，按许可证使用；不提供任何保证，也不提供技术支持。
+- Parts 2 and 3, and the two libraries in `packages/yard` and `packages/overlap-audit`, use the same licenses (code AGPL-3.0; documentation, images, generated and sample data CC BY 4.0) with one exception: the Unreal Engine plugin of part 3 (`StoreX-Chain/engines/ue5/`) is under [MIT](StoreX-Chain/engines/ue5/LICENSE), because the engine's license agreement does not allow combining engine code with copyleft code, and the plugin only talks to the twin server over the network protocol. Per-file licenses: [REUSE.toml](REUSE.toml). · 第二、三部分和 `packages/yard`、`packages/overlap-audit` 两个程序库使用同样的许可（代码 AGPL-3.0；文档、图片、生成的数据和示例数据 CC BY 4.0），只有一个例外：第三部分的虚幻引擎插件（`StoreX-Chain/engines/ue5/`）使用 [MIT](StoreX-Chain/engines/ue5/LICENSE)，因为引擎的许可协议不允许把引擎代码和 copyleft 代码组合，插件只通过网络协议和孪生服务通信。每个文件的许可见 [REUSE.toml](REUSE.toml)。
 - The built-in store templates and the stores built in Your Store are synthetic demo data: they do not represent any real store and are not an operating plan for one. · 内置门店模板和在「你的商店」里搭建的门店都是演示用的合成数据，不代表任何真实门店，不能当作门店的运营方案。
 - The licenses do not grant the right to use the Storewright name or icon. · 许可证不授予使用 Storewright 名称和图标的权利。
 - Code contributions are not accepted for now; ideas and bug reports are welcome as issues (see [CONTRIBUTING.md](CONTRIBUTING.md)). · 暂不接受代码贡献，欢迎用 issue 提建议和问题（见 [CONTRIBUTING.md](CONTRIBUTING.md)）。

@@ -1,0 +1,24 @@
+# 依赖更新机器人：每周检查一次 npm 依赖（含全部 workspaces：第一部分的 apps、packages，第二部分 StoreX，第三部分 StoreX-Chain）
+# 和 GitHub Actions 的新版本，有更新就开 PR。需要在仓库的 Settings → Code security 里启用 Dependabot version updates。
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    # 互相约束版本的包放进同一个 PR
+    groups:
+      three:
+        patterns: ['three', '@types/three', '@react-three/*']
+      vite-vitest:
+        patterns: ['vite', 'vitest', '@vitejs/*', '@vitest/*']
+      playwright:
+        patterns: ['playwright', '@playwright/test']
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']

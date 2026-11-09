@@ -1,4 +1,4 @@
-// 生成 THIRD_PARTY_NOTICES.md：列出运行时用到的开源软件包（应用、浏览器内演示、服务端）和它们的许可证，
+// 生成 THIRD_PARTY_NOTICES.md：列出运行时用到的开源软件包（第一部分的应用、浏览器内演示、服务端，以及第二、三部分 StoreX、StoreX-Chain 的网页）和它们的许可证，
 // 并附上这些许可证要求随软件分发时保留的许可文本和版权声明。开发工具（TypeScript、Vite、Vitest、Playwright 等）不随软件分发，不列入。
 // 改了依赖以后重新运行：npm run notices
 import { execSync } from 'node:child_process';
@@ -9,13 +9,15 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const tree = JSON.parse(execSync('npm ls --omit=dev --all --json --long', { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] }));
 
-// 工作区里各应用和包的直接依赖：谁用到了哪个第三方包
-const workspaces = ['apps/associate', 'apps/server', 'apps/simulator', 'apps/sim-cli', ...readdirSync(join(root, 'packages')).map((p) => `packages/${p}`)];
+// 工作区里各应用和包的直接依赖：谁用到了哪个第三方包（第二部分 StoreX、第三部分 StoreX-Chain 也是工作区）
+const workspaces = ['apps/associate', 'apps/server', 'apps/simulator', 'apps/sim-cli', ...readdirSync(join(root, 'packages')).map((p) => `packages/${p}`), 'StoreX', 'StoreX-Chain'];
 const usedBy = new Map();
+const own = new Set(); // 本仓库自己的包名（不是第三方）
 for (const ws of workspaces) {
   const file = join(root, ws, 'package.json');
   if (!existsSync(file)) continue;
   const pkg = JSON.parse(readFileSync(file, 'utf8'));
+  own.add(pkg.name);
   for (const dep of Object.keys(pkg.dependencies ?? {})) {
     if (dep.startsWith('@storewright/')) continue;
     usedBy.set(dep, [...(usedBy.get(dep) ?? []), ws]);
@@ -26,7 +28,7 @@ for (const ws of workspaces) {
 const pkgs = new Map();
 function walk(node) {
   for (const [name, dep] of Object.entries(node.dependencies ?? {})) {
-    if (name.startsWith('@storewright/')) {
+    if (name.startsWith('@storewright/') || own.has(name)) {
       walk(dep);
       continue;
     }
@@ -106,9 +108,9 @@ const fence = (s) => '```text\n' + s.trim() + '\n```';
 const out = [];
 out.push('# Third-party notices · 第三方组件声明');
 out.push('');
-out.push('Storewright uses the open-source packages below at run time: in the associate app and simulator (and so in the in-browser demo site), and in the server. Each keeps its own license. This file lists them and reproduces the license texts and copyright notices that those licenses ask to be kept when the software is distributed, for example as the demo site or a Docker image. Development tools that are not distributed (TypeScript, Vite, Vitest, Playwright and the like) are not listed. A package listed here is installed as a run-time dependency; a bundler may leave unused parts out of the built files.');
+out.push('Storewright uses the open-source packages below at run time: in the associate app and simulator (and so in the in-browser demo site), in the server, and in the web apps of StoreX and StoreX Chain (parts 2 and 3). Each keeps its own license. This file lists them and reproduces the license texts and copyright notices that those licenses ask to be kept when the software is distributed, for example as the demo site or a Docker image. Development tools that are not distributed (TypeScript, Vite, Vitest, Playwright and the like) are not listed. A package listed here is installed as a run-time dependency; a bundler may leave unused parts out of the built files.');
 out.push('');
-out.push('Storewright 在运行时用到下面这些开源软件包：员工作业端和模拟器（因此也包括浏览器内演示站点）以及服务端。它们各自保留自己的许可证。本文件列出这些软件包，并附上这些许可证要求在分发软件时保留的许可文本和版权声明（例如分发演示站点或 Docker 镜像时）。不随软件分发的开发工具（TypeScript、Vite、Vitest、Playwright 等）不列入。这里列出的是作为运行时依赖安装的软件包；打包工具可能会把没用到的部分排除在构建产物之外。');
+out.push('Storewright 在运行时用到下面这些开源软件包：员工作业端和模拟器（因此也包括浏览器内演示站点）、服务端，以及第二、三部分 StoreX 和 StoreX 全链路的网页。它们各自保留自己的许可证。本文件列出这些软件包，并附上这些许可证要求在分发软件时保留的许可文本和版权声明（例如分发演示站点或 Docker 镜像时）。不随软件分发的开发工具（TypeScript、Vite、Vitest、Playwright 等）不列入。这里列出的是作为运行时依赖安装的软件包；打包工具可能会把没用到的部分排除在构建产物之外。');
 out.push('');
 out.push('Generated from the installed packages by `npm run notices` (`scripts/third-party-notices.mjs`); run it again after changing dependencies. · 由 `npm run notices`（`scripts/third-party-notices.mjs`）根据已安装的软件包生成；改了依赖以后请重新生成。');
 out.push('');

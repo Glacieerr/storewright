@@ -69,7 +69,8 @@ describe('界面英文', () => {
 
   it('模拟器和引擎里出现的每一段中文都有英文译文', () => {
     applyLang('en', false);
-    const sources = [...files(ROOT), ...files(ENGINE).filter((p) => p.includes('/src/'))];
+    // packages/yard、packages/overlap-audit 是第三部分（StoreX 全链路）用的两个独立程序库，不在模拟器界面里显示，不用这里的英文对照
+    const sources = [...files(ROOT), ...files(ENGINE).filter((p) => p.includes('/src/') && !/[\\/]packages[\\/](yard|overlap-audit)[\\/]/.test(p))];
     const missing = new Set<string>();
     for (const p of sources) {
       for (const s of chineseLiterals(readFileSync(p, 'utf8'))) {

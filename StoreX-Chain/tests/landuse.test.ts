@@ -18,9 +18,12 @@ const hashGrid = (p: RegionPlan) => createHash('md5').update(planLandUse(p).grid
 describe('用地规划', () => {
   afterAll(() => setRegion(DEFAULT_REGION));
 
+  // 取指纹以前把数字取整到 1e-9 公里（1 微米）：JavaScript 引擎 V8 的 sin、cos、atan2、exp 和一般的乘方，在 Apple 芯片（arm64）和 Intel / AMD（x64）上
+  // 最后一位会不一样。2026-11-09 实测默认区域：2,161 个数里有 4 个差 1e-15 公里左右，结构完全一样，报告里的数字两边也完全一样；
+  // 不取整的指纹在 arm64 上是 312690be…、在 x64 上是 80f875df…（GitHub 的测试机是 x64）。
   it('默认区域的仿真规划没有变（报告里的数字按它算）', () => {
-    const md5 = createHash('md5').update(JSON.stringify(generateRegion(DEFAULT_REGION))).digest('hex');
-    expect(md5).toBe('312690becdee47688fdca71f35d06b04');
+    const json = JSON.stringify(generateRegion(DEFAULT_REGION), (_k, v: unknown) => (typeof v === 'number' ? Math.round(v * 1e9) : v));
+    expect(createHash('md5').update(json).digest('hex')).toBe('be386fba951f7d5cd8d0f31390459e28');
   });
 
   it('同一个区域每次一样（换一个区域对象重算，栅格一模一样）', () => {

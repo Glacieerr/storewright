@@ -8,7 +8,7 @@ There is a lot in it, and you don't need all of it on day one. Follow the three 
 
 ## 1. Open it (pick one)
 
-- **Live demo** (nothing to install): <https://glacieerr.github.io/storewright/storex-chain/> (available after the first push and deployment). The hosted demo is a static site without the local twin server; everything else works the same.
+- **Live demo** (nothing to install): <https://glacieerr.github.io/storewright/storex-chain/>. The hosted demo is a static site without the local twin server; everything else works the same.
 - **Run it locally** (needs [Node.js 22](https://nodejs.org/)):
 
   ```bash

@@ -12,7 +12,7 @@
 
 ## Quick start
 
-Live demo after deployment: <https://glacieerr.github.io/storewright/storex/> (available after the first push). To run it locally, use the dependencies installed at the repository root (Node.js 22 or later).
+Live demo: <https://glacieerr.github.io/storewright/storex/>. To run it locally, use the dependencies installed at the repository root (Node.js 22 or later).
 
 ```bash
 npm install                      # once, at the repository root

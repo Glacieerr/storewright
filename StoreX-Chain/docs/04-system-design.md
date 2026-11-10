@@ -974,7 +974,7 @@ StoreX-Chain/
 
 全链路用仓库根目录已经装好的依赖（先在仓库根目录 `npm install`），不需要另外安装。Node.js 用 22（仓库根目录的 `.nvmrc` 和自动测试都用它）。
 
-在线演示：<https://glacieerr.github.io/storewright/storex-chain/>（第二部分 StoreX 的在 <https://glacieerr.github.io/storewright/storex/>，都是首次推送后可用）。在线演示是打包好的静态网页，没有孪生服务：三维、调度台、闭环和内置的值班助手在浏览器里照常能用；值班助手的大模型引擎（10.14）和孪生服务的接口（9.7）要在本机运行。
+在线演示：<https://glacieerr.github.io/storewright/storex-chain/>（第二部分 StoreX 的在 <https://glacieerr.github.io/storewright/storex/>）。在线演示是打包好的静态网页，没有孪生服务：三维、调度台、闭环和内置的值班助手在浏览器里照常能用；值班助手的大模型引擎（10.14）和孪生服务的接口（9.7）要在本机运行。
 
 ```bash
 cd StoreX-Chain

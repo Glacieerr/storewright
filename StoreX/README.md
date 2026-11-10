@@ -16,7 +16,7 @@
 
 ## 快速开始 · 在线演示
 
-部署后地址：<https://glacieerr.github.io/storewright/storex/>（首次推送后可用）。在本机运行：先在仓库根目录 `npm install`（Node.js 22 或更高），然后：
+在线演示：<https://glacieerr.github.io/storewright/storex/>。在本机运行：先在仓库根目录 `npm install`（Node.js 22 或更高），然后：
 
 ```bash
 cd StoreX

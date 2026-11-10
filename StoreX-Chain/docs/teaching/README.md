@@ -39,7 +39,7 @@
 
 ## 准备
 
-**在线演示（不用安装）**：<https://glacieerr.github.io/storewright/storex-chain/>（首次推送后可用）。全部练习都在浏览器里跑，学生只要一台能打开网页的电脑（建议用最新的 Chrome、Edge、Firefox 或 Safari，有独立显卡更流畅）。
+**在线演示（不用安装）**：<https://glacieerr.github.io/storewright/storex-chain/>。全部练习都在浏览器里跑，学生只要一台能打开网页的电脑（建议用最新的 Chrome、Edge、Firefox 或 Safari，有独立显卡更流畅）。
 
 **本地运行**（离线教室、或者想改练习）：装 Node.js 22，在仓库根目录：
 

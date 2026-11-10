@@ -15,10 +15,10 @@
 | 部分 | 是什么 | 文档 | 状态 |
 |---|---|---|---|
 | 1 · Storewright（本页） | 门店数字孪生：三维门店与现场作业实时同步、回放和推演、员工手机端、门店 AI | 本页 · [English](README.en.md) | 已公开，[在线演示](https://glacieerr.github.io/storewright/app/showcase.html) |
-| 2 · [StoreX](StoreX/README.md) | 面向 2030 年的数字孪生门店：重新设计的流程、门店模拟器（二维和三维）、规划和商业报告 | [中文](StoreX/README.md) · [English](StoreX/README.en.md) | 新增；部署后地址：[glacieerr.github.io/storewright/storex/](https://glacieerr.github.io/storewright/storex/)（首次推送后可用） |
-| 3 · [StoreX 全链路](StoreX-Chain/README.md) | 一家综合店的区域供应链数字孪生，从港口、铁路、空运、公路到门店：调度台、闭环孪生、值班助手、孪生服务 | [中文](StoreX-Chain/README.md) · [English](StoreX-Chain/README.en.md) | 新增；部署后地址：[glacieerr.github.io/storewright/storex-chain/](https://glacieerr.github.io/storewright/storex-chain/)（首次推送后可用） |
+| 2 · [StoreX](StoreX/README.md) | 面向 2030 年的数字孪生门店：重新设计的流程、门店模拟器（二维和三维）、规划和商业报告 | [中文](StoreX/README.md) · [English](StoreX/README.en.md) | 新增；在线演示：[glacieerr.github.io/storewright/storex/](https://glacieerr.github.io/storewright/storex/) |
+| 3 · [StoreX 全链路](StoreX-Chain/README.md) | 一家综合店的区域供应链数字孪生，从港口、铁路、空运、公路到门店：调度台、闭环孪生、值班助手、孪生服务 | [中文](StoreX-Chain/README.md) · [English](StoreX-Chain/README.en.md) | 新增；在线演示：[glacieerr.github.io/storewright/storex-chain/](https://glacieerr.github.io/storewright/storex-chain/) |
 
-**从这里开始：**在线演示的首页（部署后：[glacieerr.github.io/storewright](https://glacieerr.github.io/storewright/)）一键打开任何一个部分；第三部分可以直接看[「一个集装箱从船到货架」](https://glacieerr.github.io/storewright/storex-chain/?tour=container)（一分钟的自动导览），或者读[5 分钟上手](StoreX-Chain/docs/00-quickstart.md)。
+**从这里开始：**在线演示的首页（[glacieerr.github.io/storewright](https://glacieerr.github.io/storewright/)）一键打开任何一个部分；第三部分可以直接看[「一个集装箱从船到货架」](https://glacieerr.github.io/storewright/storex-chain/?tour=container)（一分钟的自动导览），或者读[5 分钟上手](StoreX-Chain/docs/00-quickstart.md)。
 
 <a href="https://glacieerr.github.io/storewright/storex-chain/?tour=container"><img src="StoreX-Chain/docs/images/tour/ship-to-shelf.jpg" width="640" alt="第三部分的导览：一个集装箱从船到货架"></a>
 
@@ -26,9 +26,9 @@
 
 | 是什么 | 在哪 |
 |---|---|
-| [`@storewright/yard`](packages/yard/README.md)：卸货场 / 月台场地引擎——单向绕行的车道布置、从司机一侧倒车（挂车铰接）、甩挂和场内牵引车、按仿真时刻统一排程、任意时刻取位姿；纯 TypeScript、零依赖、结果确定 | `packages/yard` · [演示](https://glacieerr.github.io/storewright/yard/)（部署后） |
+| [`@storewright/yard`](packages/yard/README.md)：卸货场 / 月台场地引擎——单向绕行的车道布置、从司机一侧倒车（挂车铰接）、甩挂和场内牵引车、按仿真时刻统一排程、任意时刻取位姿；纯 TypeScript、零依赖、结果确定 | `packages/yard` · [演示](https://glacieerr.github.io/storewright/yard/) |
 | [`@storewright/overlap-audit`](packages/overlap-audit/README.md)：车辆重叠审计——分离轴检验、精确的网格粗筛、按区域 / 车型对 / 静止或行驶统计「车对 × 秒」、上限做回归门槛；附 JSON 轨迹格式和命令行，任何引擎导出的轨迹都能用 | `packages/overlap-audit` |
-| [值班台基准（Duty-Desk Bench）](StoreX-Chain/docs/benchmark.md)：运营值班助手的 320 道盲测题、五项评分、五个可复现的对照系统；任何系统（包括你自己接的大模型）用同一个评分器比较 | `StoreX-Chain/bench/duty-desk` · [结果页](https://glacieerr.github.io/storewright/benchmark/)（部署后） |
+| [值班台基准（Duty-Desk Bench）](StoreX-Chain/docs/benchmark.md)：运营值班助手的 320 道盲测题、五项评分、五个可复现的对照系统；任何系统（包括你自己接的大模型）用同一个评分器比较 | `StoreX-Chain/bench/duty-desk` · [结果页](https://glacieerr.github.io/storewright/benchmark/) |
 | [运营教学沙盘](StoreX-Chain/docs/teaching/README.md)：给物流、供应链、工业工程课程的 10 道自动批改的练习，附中英文实验指导书和教师参考答案 | `StoreX-Chain/docs/teaching` |
 | [对照验证](StoreX-Chain/docs/08-validation.md)：算法和精确最优解、穷举、蒙特卡洛模拟、教科书的值对照；给别的求解器核对的 CVRPLIB 算例 | `StoreX-Chain/bench/validation` |
 

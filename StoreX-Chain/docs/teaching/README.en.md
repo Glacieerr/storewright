@@ -39,7 +39,7 @@ About 3.5 hours in total. Suggested plans:
 
 ## Preparation
 
-**Online demo (no installation)**: <https://glacieerr.github.io/storewright/storex-chain/> (available after the first push). Everything runs in the browser; students only need a computer with an up-to-date Chrome, Edge, Firefox or Safari (a discrete GPU makes the 3D smoother).
+**Online demo (no installation)**: <https://glacieerr.github.io/storewright/storex-chain/>. Everything runs in the browser; students only need a computer with an up-to-date Chrome, Edge, Firefox or Safari (a discrete GPU makes the 3D smoother).
 
 **Local** (offline classrooms, or to edit the exercises): install Node.js 22 and, at the repository root:
 

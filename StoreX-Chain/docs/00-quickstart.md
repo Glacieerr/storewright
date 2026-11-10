@@ -8,7 +8,7 @@ StoreX 全链路是一家综合店整条供应链的区域数字孪生：远洋�
 
 ## 一、打开它（二选一）
 
-- **在线演示**（不用安装）：<https://glacieerr.github.io/storewright/storex-chain/>（首次推送、部署以后可用）。在线版是静态网页，没有本机的孪生服务，其余功能都一样。
+- **在线演示**（不用安装）：<https://glacieerr.github.io/storewright/storex-chain/>。在线版是静态网页，没有本机的孪生服务，其余功能都一样。
 - **在本机运行**（需要 [Node.js 22](https://nodejs.org/)）：
 
   ```bash

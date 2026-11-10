@@ -15,7 +15,7 @@
     <img src="docs/images/tour/ship-to-shelf.webp" width="960" alt="演示导览：跟着一个本店的集装箱，从班轮、港口堆场、物流园配送中心一路到门店货架">
   </a>
 </p>
-<p align="center"><b>一个集装箱从船到货架</b>（约 1 分钟）· <a href="https://glacieerr.github.io/storewright/storex-chain/?tour=container">在线打开导览</a>（首次推送后可用）· 每一段都标明数据从哪来：仿真记录 / 按规则估算 / 今天的同类作业</p>
+<p align="center"><b>一个集装箱从船到货架</b>（约 1 分钟）· <a href="https://glacieerr.github.io/storewright/storex-chain/?tour=container">在线打开导览</a> · 每一段都标明数据从哪来：仿真记录 / 按规则估算 / 今天的同类作业</p>
 
 ![区域三维孪生：港口、机场、高速、铁路、物流园、城区和综合店，车船飞机按仿真结果移动；左边是实时跟踪，右边是集团总览](docs/images/twin.jpg)
 
@@ -23,7 +23,7 @@
 
 **第一次来？** 看 [5 分钟上手](docs/00-quickstart.md)。网页第一次打开会出现欢迎卡：一键看[「一个集装箱从船到货架」](https://glacieerr.github.io/storewright/storex-chain/?tour=container)（一分钟的自动导览，镜头跟着一个集装箱从班轮靠泊、卸船、堆场、拖车、配送中心一直到门店货架；每一段都标明数据从哪来：仿真记录、按规则估算，或者用今天的同类作业演示）、做一道练习，或者跟着 30 秒的界面导览自己看。顶栏「场景库」里有 10 个精选场景，「分享」可以把此刻（区域、方案、负荷、演练、设施、时刻、镜头）复制成链接或导出成场景文件（[场景文件和分享链接](docs/07-scenarios.md)）。
 
-在线演示：<https://glacieerr.github.io/storewright/storex-chain/>（首次推送后可用；第二部分 StoreX 的在 <https://glacieerr.github.io/storewright/storex/>）。在线演示是打包好的静态网页，没有孪生服务：三维、调度台、闭环和内置的值班助手都在浏览器里跑，照常能用；只有孪生服务才有的功能——值班助手的大模型引擎和孪生服务的接口——要在本机运行。在本机运行：先在仓库根目录 `npm install`（Node.js 22），然后：
+在线演示：<https://glacieerr.github.io/storewright/storex-chain/>（第二部分 StoreX 的在 <https://glacieerr.github.io/storewright/storex/>）。在线演示是打包好的静态网页，没有孪生服务：三维、调度台、闭环和内置的值班助手都在浏览器里跑，照常能用；只有孪生服务才有的功能——值班助手的大模型引擎和孪生服务的接口——要在本机运行。在本机运行：先在仓库根目录 `npm install`（Node.js 22），然后：
 
 ```bash
 cd StoreX-Chain
@@ -295,7 +295,7 @@ AI 只读、提议，人确认、按角色审批，全部留记录；数字全�
 
 卸货场引擎和车辆重叠审计拆成了两个独立的小程序库（在仓库根目录的 `packages/`），全链路按包名使用它们，别的项目也可以直接用：
 
-- [`@storewright/yard`](../packages/yard/README.md)：卸货场 / 月台场地引擎——单向绕行的车道布置、从司机一侧倒车（挂车铰接）、甩挂和场内牵引车、按仿真时刻统一排程、任意时刻取位姿；纯 TypeScript、零依赖、结果确定；附浏览器里的二维演示（部署后在 <https://glacieerr.github.io/storewright/yard/>）。
+- [`@storewright/yard`](../packages/yard/README.md)：卸货场 / 月台场地引擎——单向绕行的车道布置、从司机一侧倒车（挂车铰接）、甩挂和场内牵引车、按仿真时刻统一排程、任意时刻取位姿；纯 TypeScript、零依赖、结果确定；附浏览器里的二维演示：<https://glacieerr.github.io/storewright/yard/>。
 - [`@storewright/overlap-audit`](../packages/overlap-audit/README.md)：车辆重叠审计——分离轴检验、精确的网格粗筛、按区域 / 车型对 / 静止或行驶统计「车对 × 秒」、上限做回归门槛；附 JSON 轨迹格式和命令行，任何引擎导出的轨迹都能用。
 
 在仓库根目录运行 `npm run pack:libs` 打出可以安装的 npm 包（`.tgz`；还没有发布到 npm）。拆出来以后 `npm run overlaps` 的结果逐行不变。

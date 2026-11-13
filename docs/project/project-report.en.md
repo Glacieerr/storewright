@@ -120,7 +120,7 @@ No profile wins on every measure: the default profile spends a little more labor
 
 ## 10. What I learned
 
-- **Design from the floor**: every extra tap or scan is a cost, and rules must cover the exceptions (cancellations, no-shows, out-of-stocks, broken equipment) or work gets stuck.
+- **Design for the people doing the work**: every extra tap or scan is a cost, and rules must cover the exceptions (cancellations, no-shows, out-of-stocks, broken equipment) or work gets stuck.
 - **Evidence over claims**: decide how to compare before building the feature, and write down what may and may not be claimed.
 - **Working with an AI assistant**: write requirements as checkable criteria, keep every phase presentable, accept results through tests, walkthroughs and hands-on use, and record every decision with its reasons.
 - **Compliance is part of the design**: information boundaries, naming and licenses are easier to manage from day one than to fix later.

@@ -2,11 +2,56 @@
 
 > 一套面向**中型区域连锁与独立超市**的**门店数字孪生**：三维门店与现场作业**实时同步**，可以**回放**当天任意时刻、**推演**未来 3 小时；设备遥测越线时，带着影响分析的**告警**推到员工手机上。孪生的作业层覆盖**线上订单履约（拣货 / 暂存 / 交付）**、**后仓库存管理**、**货架补货**与**人员调配**，每家店都有自己的**本地 AI**；改布局、排班、策略之前，先在**规划孪生**（像模拟经营游戏一样的 2.5D / 3D 仿真）里试。**门店定制化**是核心能力，整个系统也可以**直接在浏览器里运行**，不需要后端。
 
-**[在线演示](https://glacieerr.github.io/storewright/)** · [双语首页](README.md) · [English](README.en.md) · [英文技术概览](docs/en/overview.md) · [数字孪生设计](docs/14-digital-twin.md) · [操作指南](docs/guide/operation-guide.zh-CN.md) · [项目报告](docs/project/project-report.zh-CN.md) · [文档导航](docs/README.md)
+**状态：** 已完成，v1.0（2026 年 11 月）。不再计划新功能；欢迎提 issue。
+
+**[在线演示](https://glacieerr.github.io/storewright/)** · [三分钟概览（英文）](README.md) · [English](README.en.md) · [英文技术概览](docs/en/overview.md) · [数字孪生设计](docs/14-digital-twin.md) · [操作指南](docs/guide/operation-guide.zh-CN.md) · [项目报告](docs/project/project-report.zh-CN.md) · [文档导航](docs/README.md)
 
 本项目基于公开资料、行业通用做法和作者的独立构想设计。**本项目与任何零售商、企业无隶属关系。** 所有门店、商品、顾客和数字都是合成的。
 
 ![展示页：三维数字孪生、演示控制台和两部员工手机，全部在浏览器里运行](docs/images/showcase.jpg)
+
+## 我和 AI 怎么分工
+
+Storewright 是我和 Claude Code（Anthropic 的 AI 编程助手）一起做的（见[合规声明第 8 节](COMPLIANCE.md#8-use-of-ai--ai-的使用)）。分工如下。
+
+**我负责：**
+
+- 只从公开资料出发界定问题；
+- 定范围和阶段；
+- 写验收标准；
+- 做取舍，第一部分有 27 份[决策记录](docs/decisions/)；
+- 审查改动：在运行中的系统和文档里看；
+- 跑截图走查，走查发现过需要修的缺陷；
+- 决定什么时候算完成。
+
+第二部分 StoreX 的设计决定，我交给了 Claude。
+
+**Claude Code 负责：**
+
+- 写几乎全部的代码和测试；
+- 根据我的笔记和要求起草设计文档和决策记录；
+- 列出可选的方案；
+- 跑测试。
+
+**具体例子：**
+
+<!-- CANDIDATE: pending the author's confirmation -->
+<!-- 写法：一两句话，说清当时的情况、我提的要求或否决了什么、结果改了什么，附上决策记录或提交的链接。作者确认属实后才填，不引用原话里的私人信息。 -->
+- *例子 1（从会话记录里整理，作者确认属实后填写）*
+
+<!-- CANDIDATE: pending the author's confirmation -->
+- *例子 2（从会话记录里整理，作者确认属实后填写）*
+
+<!-- CANDIDATE: pending the author's confirmation -->
+- *例子 3（从会话记录里整理，作者确认属实后填写）*
+
+<!-- CANDIDATE: pending the author's confirmation -->
+<!-- 第 4 个例子（可选）：不用的话，连同上一行一起删掉。 -->
+
+<!-- CANDIDATE: pending the author's confirmation -->
+<!-- 第 5 个例子（可选）：不用的话，连同上一行一起删掉。 -->
+
+**如果重来：** 范围更小；按功能拆成更小的提交；核心模块先手写一遍。<!-- 手写练习仓库公开以后，在这里加上链接。 -->
 
 ## 作品集的三个部分
 

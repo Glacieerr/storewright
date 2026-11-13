@@ -2,7 +2,9 @@
 
 > A **digital twin** for **mid-size regional and independent grocers**. The 3D store **stays in sync** with live operations, **replays** any moment of the day and **forecasts** the next three hours; when equipment telemetry crosses a limit, an **alert** with its impact reaches the associates' phones. The twin's operations layer covers online-order fulfilment (**pick → stage → hand off**), **backroom inventory**, **shelf replenishment** and **staffing**, and every store gets its own **local, per-store AI** that explains each recommendation. Before changing layout, staffing or policies, a store tries them in the **planning twin**, a 2.5D / 3D simulation you can watch and steer like a management game. The whole system also runs **inside your browser** with no backend.
 
-**[Live demo](https://glacieerr.github.io/storewright/)** · [Bilingual home](README.md) · [简体中文](README.zh-CN.md) · [Technical overview](docs/en/overview.md) · [Digital twin design (Chinese)](docs/14-digital-twin.md) · [Operation guide](docs/guide/operation-guide.en.md) · [Project report](docs/project/project-report.en.md) · [Purpose and outlook](docs/project/purpose-and-outlook.en.md) · [Documentation map](docs/README.md)
+**Status:** complete, v1.0 (Nov 2026). No new features are planned; issues are welcome.
+
+**[Live demo](https://glacieerr.github.io/storewright/)** · [3-minute overview](README.md) · [简体中文](README.zh-CN.md) · [Technical overview](docs/en/overview.md) · [Digital twin design (Chinese)](docs/14-digital-twin.md) · [Operation guide](docs/guide/operation-guide.en.md) · [Project report](docs/project/project-report.en.md) · [Purpose and outlook](docs/project/purpose-and-outlook.en.md) · [Documentation map](docs/README.md)
 
 This project is based on public information, common industry practice and the author's own design. **It is not affiliated with any retailer or company.** All stores, products, customers and numbers are synthetic. Most design documents are in Chinese; [docs/en/overview.md](docs/en/overview.md) summarizes all of them in English.
 

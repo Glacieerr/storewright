@@ -2,7 +2,7 @@
 
 > A **digital twin** for **mid-size regional and independent grocers**. The 3D store **stays in sync** with live operations, **replays** any moment of the day and **forecasts** the next three hours; when equipment telemetry crosses a limit, an **alert** with its impact reaches the associates' phones. The twin's operations layer covers online-order fulfilment (**pick → stage → hand off**), **backroom inventory**, **shelf replenishment** and **staffing**, and every store gets its own **local, per-store AI** that explains each recommendation. Before changing layout, staffing or policies, a store tries them in the **planning twin**, a 2.5D / 3D simulation you can watch and steer like a management game. The whole system also runs **inside your browser** with no backend.
 
-**[Live demo](https://glacieerr.github.io/storewright/)** · [Bilingual home](README.md) · [简体中文](README.zh-CN.md) · [Technical overview](docs/en/overview.md) · [Digital twin design (Chinese)](docs/14-digital-twin.md) · [Operation guide](docs/guide/operation-guide.en.md) · [Project report](docs/project/project-report.en.md) · [Documentation map](docs/README.md)
+**[Live demo](https://glacieerr.github.io/storewright/)** · [Bilingual home](README.md) · [简体中文](README.zh-CN.md) · [Technical overview](docs/en/overview.md) · [Digital twin design (Chinese)](docs/14-digital-twin.md) · [Operation guide](docs/guide/operation-guide.en.md) · [Project report](docs/project/project-report.en.md) · [Purpose and outlook](docs/project/purpose-and-outlook.en.md) · [Documentation map](docs/README.md)
 
 This project is based on public information, common industry practice and the author's own design. **It is not affiliated with any retailer or company.** All stores, products, customers and numbers are synthetic. Most design documents are in Chinese; [docs/en/overview.md](docs/en/overview.md) summarizes all of them in English.
 
@@ -34,6 +34,21 @@ This repository holds three parts of one portfolio:
 
 Both libraries were extracted from StoreX Chain, which now imports them by package name; `npm run pack:libs` builds installable npm tarballs (not published to the npm registry).
 
+## The twin
+
+| Layer | What it holds |
+|---|---|
+| Store | People, orders, totes, cases, shelves, cold rooms, dock doors, vehicles, areas and bays |
+| Data capture | Every scan and action on associate phones, POS sales, shelf sensors, equipment telemetry (temperature, doors, entrance count), customer arrival times |
+| Twin core | Store layout + event-sourced operations state + telemetry time series + AI predictions |
+| Use | 3D twin, console, associate phones, local assistant |
+
+Data flows both ways. Store → twin: every scan, sale and reading reaches the twin at once. Twin → store: AI recommendations, replenishment and count tasks and equipment alerts go straight to the right associate's phone.
+
+| Past | Present | Future |
+|---|---|---|
+| Replay the store at any moment of the day, rebuilt exactly from the event log | Live sync with twin health: data freshness, sensor status, record accuracy | Forecast the next 3 hours from the current state, calibrated on today's work, and try staffing changes |
+
 ## What it shows
 
 | Question | What Storewright does | Result (simulation, synthetic data) |
@@ -57,6 +72,7 @@ No profile wins on every metric: a store picks its priorities and sees the trade
 - **A game-style 3D world** ([decision 0017](docs/decisions/0017-stylized-world.md)): cel shading with outlines, a procedural sky, glowing lamps at night, and a diorama that ends at the neighbourhood with soil cross-sections on its edges; the store, roads and surroundings are modelled from scratch with procedural geometry and textures: a lake with a weir, a stone-walled canal under a two-arch stone bridge, a wooden pier with boats, detailed streets, trees and grass. Nothing is downloaded.
 - **Realistic vehicles and driving** ([decision 0018](docs/decisions/0018-vehicles-and-yard.md)): cars, SUVs, pickups, vans, box trucks, sleeper-cab tractors with 53-foot trailers, motorhomes and towed campers, boat and utility trailers, plus rowboats, a runabout, a small sailboat, kayaks and a pontoon boat, all generic shapes built from public dimensions; bodies dip under braking and lean in turns; motorhomes and towing rigs park across several stalls, some drivers back in or pull through; trucks queue in the yard first come, first served, back in from the driver's side and loop out; forklifts split the work, take turns in a trailer and in a rack aisle, and go back to the charger.
 - **Truck yard and surroundings** ([decision 0019](docs/decisions/0019-yard-access-deliveries-harbor.md)): 1–10 dock doors; the truck access can be on the left or right, a private drive or a side street, with configurable staging slots and trailer stalls, and semis turn on 15 m arcs; the lot has separate in and out lanes; deliveries follow the weekday, season and store size (DC reefer, line-haul and general-merchandise trucks, a dozen vendors, parcels); the lake has a channel to the sea and boats leave and return on a timetable; a school and a rail crossing can be switched on and delay arrivals; two-floor stores get a second-floor checkout, freight lift, unloading area and stockroom; the online-order room has its own cooler and freezer and a connecting passage to receiving, where overflow pallets go.
+- **Surroundings**: choose the road style, plot, water (a harbour with a sea outlet, or none), road works, a school (drop-off and pick-up rushes with a crossing guard) and a rail crossing (trains close the gates); congestion, the school and the crossing delay customers, drivers and trucks. The world has day and night, seasons and weather; the harbour has breakwaters and a lifting footbridge over the channel, and boats leave in the morning and come back in the afternoon.
 - **AI operations advice, student part-timers and boat traffic** ([decision 0020](docs/decisions/0020-students-boats-ai-advice.md)): an "AI advice" tab looks for problems in the planned day (deliveries and yard, backroom and restocking, online-order staging by temperature zone, checkout lanes and parking, exceptions and risks), checks other days to see whether they recur, and tries each actionable fix on the plan to estimate its effect; every suggestion says what to do, why, the expected effect and the confidence, and can be adopted (and undone), dismissed with a reason, or located in the scene; a daily plan, a shift handoff summary and an adopt-versus-not comparison sit alongside. Student part-timers work only after school on school days (at most 4 hours), at most 6 hours on weekends and in the summer, and no more than 20 hours a week. Boat traffic can be set to few, normal or many, with visiting boats, passing boats and anchored anglers that keep to their side of the channel and never collide.
 - **Fulfilment** on associate phones: tote labels, cold-chain limits, staging slots, pickup bays, multi-order delivery trips. A wrong pickup code never locks entry; a delivery driver may cancel only outside the prep window, and the system re-dispatches the trip, returns pulled totes to staging and notifies customers ([decision 0014](docs/decisions/0014-handoff-rules-and-scale.md)).
 - **Backroom and shelves**: receiving, put-away, counts, backroom retrieval, shelf-stock estimates and replenishment, with sensor and POS feeds; receiving, backroom and staging are split into editable areas with capacity, occupancy and alerts.
@@ -76,12 +92,14 @@ No profile wins on every metric: a store picks its priorities and sees the trade
 
 <table>
 <tr>
-<td width="62%"><img src="docs/images/simulator-3d-en.jpg" alt="3D digital twin with equipment readings, an alarm on a staging cooler and the replay and forecast timeline"></td>
+<td width="54%"><img src="docs/images/simulator-3d-en.jpg" alt="3D digital twin with equipment readings, an alarm on a staging cooler and the replay and forecast timeline"></td>
 <td><img src="docs/images/phone-picker-en.jpg" alt="Picker's phone: walks to claim, with due time, distance and cold-chain limit"></td>
+<td><img src="docs/images/phone-ai-en.jpg" alt="Lead's phone: an equipment alert with its impact, and AI recommendations with reasons"></td>
 </tr>
 <tr>
 <td>3D twin: equipment readings, an alarm, the replay · live · forecast timeline</td>
 <td>A picker's phone: walks to claim</td>
+<td>The lead's phone: alerts and recommendations with reasons</td>
 </tr>
 </table>
 
@@ -164,6 +182,8 @@ packages/ops           Operations core: command → events → state as pure fun
 packages/labels        QR, tote / case / slot / location labels (SVG + ZPL)
 packages/ai            Recommendations with reasons, backtests, model registry with promotion gates, models
 packages/twin          Sensor registry, telemetry, alert rules and impact, replay, forecast, twin health
+docs/                  Design docs, decision records, results (Chinese) + English overview (docs/en/)
+e2e/                   End-to-end tests and walkthrough (Playwright)
 ```
 
 Key design choices:

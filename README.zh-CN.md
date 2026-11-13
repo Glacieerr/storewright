@@ -267,6 +267,7 @@ storewright/
 | [伪代码](docs/pseudocode/) | 分箱、分批与路线、一天的仿真 |
 | [决策记录](docs/decisions/) | 0001 Phase 0 决议 · 0002 Phase 1 工程决策 · 0003 模拟器工程决策 · 0004 / 0005 / 0006 模拟器第二、三、四轮升级 · 0007 模拟器展示打磨 · 0008 Phase 3 · 0009 Phase 4 · 0010 路线图调整与 Phase 5 · 0011 Phase 6 · 0012 Phase 7 · 0013 Phase 8 · 0014 交付规则调整与大型店容量 · 0015 v1.0 收尾 · 0016 数字孪生 · 0017 卡通画面与周边建模 · 0018 载具、停车、卸货场与叉车协同 · 0019 卸货场与进场道路、到货排班、出海口、二楼与线上订单区 · 0020 学生兼职工、船只多少与 AI 运营建议 · 0021 门店 AI 第一批：实时预判与少打扰 · 0022 第二批：人与设备 · 0023 第三批：线上订单深化 · 0024 第四批：语言、复盘与看图，以及收尾 · 0025 在岗人员与调配 · 0026 修复全部卡点、门店设置 · 0027 作品集定位、完全公开与许可证 |
 | [标签样本](docs/samples/labels/) | 取货框、大件、后仓箱、行程标签 |
+| [发布步骤（英文）](docs/releasing.md) | 维护说明：整个仓库、第二和第三部分、两个程序库怎么打标签、做本地检查、建 GitHub Release |
 | [货架传感原型指南](docs/hardware/shelf-sensing-prototype.md) | 桌面级原型的物料、接线、固件设计与校准 |
 
 ## 数字孪生的结构
@@ -340,6 +341,6 @@ Storewright 是作者的作品集，用来展示一整套门店工作流解决�
 
 第二、三部分和 `packages/yard`、`packages/overlap-audit` 两个程序库使用同样的许可（代码 AGPL-3.0；文档、图片、生成的数据和示例数据 CC BY 4.0），只有一个例外：第三部分的虚幻引擎插件（`StoreX-Chain/engines/ue5/`）使用 [MIT](StoreX-Chain/engines/ue5/LICENSE)，因为引擎的许可协议不允许把引擎代码和 copyleft 代码组合，插件只通过网络协议和孪生服务通信。每个文件的许可见 [REUSE.toml](REUSE.toml)。
 
-许可证不授予使用 Storewright 名称和图标的权利。暂不接受代码贡献，欢迎用 issue 提建议和问题。
+许可证不授予使用 Storewright 名称和图标的权利。暂不接受代码贡献，欢迎用 issue 提建议和问题：用文字描述，只写公开信息（不贴代码，也不贴任何保密信息）；开 issue 即表示你同意其中的想法可以用在 Storewright 里，作者对你不承担任何义务。
 
-贡献方式见 [CONTRIBUTING.md](CONTRIBUTING.md)；报告安全问题见 [SECURITY.md](SECURITY.md)；合规声明与自查记录见 [COMPLIANCE.md](COMPLIANCE.md)；运行时用到的第三方开源组件和许可文本见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+安全问题请在仓库的 **Security** 页选择 **Report a vulnerability** 私下报告，不要开公开的 issue；合规声明与自查记录见 [COMPLIANCE.md](COMPLIANCE.md)；运行时用到的第三方开源组件和许可文本见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。

@@ -219,6 +219,7 @@ Key design choices:
 | [15 Store AI roadmap (Chinese)](docs/15-store-ai-roadmap.md) | The second round of in-store AI (all four batches done, see decisions 0021–0024): from single predictions to a closed loop, coverage map and gaps, a day in the store, about 40 proposals in eight areas, four batches, evaluation, open decisions, what not to do |
 | [16 Operation flows (Chinese)](docs/16-operation-flows.md) | Every workflow step by step as built (what people tap and scan, what the system does, what other devices see), taps and scans per unit of work, friction points, and simplification proposals for the author to choose from |
 | [Decision records](docs/decisions/) | 0001–0027 |
+| [Releasing](docs/releasing.md) | Maintainer notes: tags, local checks and GitHub releases for the repository, parts 2 and 3 and the two libraries |
 
 ## Evidence level and limits
 
@@ -232,4 +233,4 @@ Code (core, simulator, backend, associate app, AI) is under [AGPL-3.0](LICENSE) 
 
 Parts 2 and 3, and the two libraries in `packages/yard` and `packages/overlap-audit`, use the same licenses (code AGPL-3.0; documentation, images, generated and sample data CC BY 4.0) with one exception: the Unreal Engine plugin of part 3 (`StoreX-Chain/engines/ue5/`) is under [MIT](StoreX-Chain/engines/ue5/LICENSE), because the engine's license agreement does not allow combining engine code with copyleft code, and the plugin only talks to the twin server over the network protocol. Per-file licenses are listed in [REUSE.toml](REUSE.toml).
 
-The licenses do not grant the right to use the Storewright name or icon. Code contributions are not accepted for now; ideas and bug reports are welcome as issues (see [CONTRIBUTING.md](CONTRIBUTING.md)). Report security issues as described in [SECURITY.md](SECURITY.md). The compliance statement and self-check are in [COMPLIANCE.md](COMPLIANCE.md); the open-source packages used at run time and their license texts are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+The licenses do not grant the right to use the Storewright name or icon. Code contributions are not accepted for now; ideas and bug reports are welcome as issues, in words and with public information only (no code, nothing confidential); by opening an issue you agree that the ideas in it may be used in Storewright without any obligation to you. Report security issues privately on the repository's **Security** tab (**Report a vulnerability**), not in a public issue. The compliance statement and self-check are in [COMPLIANCE.md](COMPLIANCE.md); the open-source packages used at run time and their license texts are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

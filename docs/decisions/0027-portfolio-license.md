@@ -6,6 +6,8 @@
 > - 项目完全公开，只作为个人作品集使用。
 >
 > 取代：[决策记录 0001](0001-phase0-decisions.md) 第 2.2 节和 [决策记录 0010](0010-roadmap-and-phase5-plan.md) 里「保留商业许可的双许可」的部分；[决策记录 0013](0013-phase8-plan.md) 第 6、9 节里「你的商店」的私有模块和授权安排；[决策记录 0016](0016-digital-twin.md) 里「你的商店」继续是私有模块的说法。
+>
+> 2026-11-13 修订：`CONTRIBUTING.md` 已在 v1.0 定稿时删除；「暂不接受代码贡献、欢迎用 issue 提建议和问题」以及 issue 里的想法怎么用，现在写在 `README.en.md`、`README.zh-CN.md` 的「许可证」一节和 [COMPLIANCE.md](../../COMPLIANCE.md) 第 3 节。
 
 ## 1. 决定
 

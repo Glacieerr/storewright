@@ -1037,4 +1037,4 @@ npm run build                    # 打包成静态网页（dist/）
 - **文档、图片、生成的数据和示例数据**（Markdown 文件、`docs/` 里的报告和截图、`.glb` 模型、`web/src/data/` 里的结果副本、`server/adapters/samples/` 和 `engines/matlab/reference/` 里的示例数据）：[CC BY 4.0](../../LICENSE-docs)。
 - **虚幻引擎插件**（`engines/ue5/`）：[MIT](../engines/ue5/LICENSE)。虚幻引擎的许可协议不允许把引擎代码和 copyleft 许可的代码组合，而插件要和引擎一起编译；插件只通过网络协议和孪生服务通信（9.7、9.8），所以单独用宽松的 MIT 许可。
 
-当前版本 0.2.0（待发布），改动见 [`CHANGELOG.md`](../CHANGELOG.md)，发布步骤见仓库根目录的 [`RELEASING.md`](../../RELEASING.md)。
+当前版本 0.2.0（待发布），改动见 [`CHANGELOG.md`](../CHANGELOG.md)，发布步骤见仓库根目录的 [`docs/releasing.md`](../../docs/releasing.md)（英文）。

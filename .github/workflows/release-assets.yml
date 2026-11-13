@@ -1,4 +1,4 @@
-# 发布附件：在 GitHub 上发布（publish）一个 Release 以后自动构建并挂上附件，按标签前缀决定是哪一部分（见 RELEASING.md）：
+# 发布附件：在 GitHub 上发布（publish）一个 Release 以后自动构建并挂上附件，按标签前缀决定是哪一部分（见 docs/releasing.md）：
 #   storex-chain-v*   → 第三部分的静态网页包（zip）+ 运行时依赖的 SBOM（CycloneDX）
 #   storex-v*         → 第二部分的静态网页包（zip）+ SBOM
 #   yard-v*           → @storewright/yard 的 npm 安装包（.tgz）+ SBOM

@@ -6,13 +6,13 @@ Where to start, by what you want to do. Most design documents are in Chinese; th
 
 | If you want to · 如果你想 | Read · 看这里 |
 |---|---|
-| See what it is in five minutes · 五分钟了解项目 | [README](../README.md) (bilingual · 双语) → in-browser demo · 浏览器内演示 (`npm run build:site`, `npm run demo:site`) |
+| See what it is in five minutes · 五分钟了解项目 | [README](../README.md) (a three-minute overview in English · 英文的三分钟概览; full guides: [English](../README.en.md) · [中文](../README.zh-CN.md)) → in-browser demo · 浏览器内演示 (`npm run build:site`, `npm run demo:site`) |
 | Use the system · 使用这套系统 | [操作指南](guide/operation-guide.zh-CN.md) · [Operation guide](guide/operation-guide.en.md) |
 | Evaluate the project (reviewers, hiring) · 评估项目（评审、招聘） | [项目报告](project/project-report.zh-CN.md) · [Project report](project/project-report.en.md) |
 | Know why it exists and where it goes · 了解为什么做、做到了什么、以后做什么 | [项目目的、达成的目标与未来展望](project/purpose-and-outlook.zh-CN.md) · [Purpose, results and outlook](project/purpose-and-outlook.en.md) |
 | Read the design in English · 看英文的设计摘要 | [Technical overview](en/overview.md) |
-| Work on the code · 改代码 | [CONTRIBUTING](../CONTRIBUTING.md), each module's README · 各模块的 README (`apps/*`, `packages/*`, `e2e/`) |
-| Check compliance · 查看合规 | [Compliance statement · 合规声明](../COMPLIANCE.md), [Third-party notices · 第三方组件声明](../THIRD_PARTY_NOTICES.md), [Security · 安全](../SECURITY.md), [LICENSE](../LICENSE) (AGPL-3.0), [LICENSE-docs](../LICENSE-docs) (CC BY 4.0) |
+| Work on the code · 改代码 | [Architecture](../README.en.md#architecture) · [仓库结构](../README.zh-CN.md#仓库结构), each module's README · 各模块的 README (`apps/*`, `packages/*`, `e2e/`), [releasing · 发布步骤](releasing.md) |
+| Check compliance · 查看合规 | [Compliance statement · 合规声明](../COMPLIANCE.md), [Third-party notices · 第三方组件声明](../THIRD_PARTY_NOTICES.md), [Security · 安全](../COMPLIANCE.md#5-security--安全), [LICENSE](../LICENSE) (AGPL-3.0), [LICENSE-docs](../LICENSE-docs) (CC BY 4.0) |
 
 ## Design documents · 设计文档（中文）
 

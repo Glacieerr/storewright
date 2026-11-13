@@ -2,7 +2,7 @@
 
 > 适用于第三部分 StoreX 全链路。[系统设计 §13](04-system-design.md#13-怎么扩展) 列了扩展的要点，先列出不改代码也能用的接口，再把最常见的七种扩展写成步骤，每种都按「要改的文件 → 最小示例 → 测试和自检」来写。示例照着现有代码的结构写；示例里新起的名字（`cold-hub`、`late40`、`battery`、`parseGate`、`terrain`……）只是举例。术语见[术语表](glossary.md)，结果数据的字段见 [DATA.md](results/DATA.md)。
 >
-> 本项目与任何零售商、企业无隶属关系；扩展时同样只用公开资料和合成数据（见仓库根目录的 [CONTRIBUTING.md](../../CONTRIBUTING.md) 和 [COMPLIANCE.md](../../COMPLIANCE.md)）。
+> 本项目与任何零售商、企业无隶属关系；扩展时同样只用公开资料和合成数据（见仓库根目录的 [COMPLIANCE.md](../../COMPLIANCE.md)）。
 
 ## 不改代码也能用的接口 · Using it without changing the code
 

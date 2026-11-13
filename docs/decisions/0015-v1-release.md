@@ -4,6 +4,8 @@
 >
 > 2026-10-28 修订：项目完全公开、不收费；「你的商店」并入本仓库，`SW_PUBLIC_ONLY` 和私有模块的测试随之取消，见 [决策记录 0027](0027-portfolio-license.md)。
 >
+> 2026-11-13 修订：v1.0 定稿时，`README.md` 改为英文的三分钟概览，完整说明仍是 `README.en.md` 和 `README.zh-CN.md`；`CONTRIBUTING.md`、`SECURITY.md` 等社区模板文件删除，要点并入两份完整说明的「许可证」一节和 [COMPLIANCE.md](../../COMPLIANCE.md)，发布步骤移到 [docs/releasing.md](../releasing.md)。
+>
 > 作者要求（原话要点）：先把整套系统完善，再上传到 GitHub、放进网站和简历，收款最后讨论；发布前按「v1.0 收尾」做；README 两种语言共存；同意下载 Safari 和 Firefox 的测试浏览器，但要解决兼容性问题，在任意平台都能正常使用；同意下载许可证全文。
 
 ---

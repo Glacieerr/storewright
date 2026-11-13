@@ -1,7 +1,7 @@
 <!--
-Code pull requests from outside are not accepted for now (see CONTRIBUTING.md); please open an issue for ideas, questions and bug reports.
+Code pull requests from outside are not accepted for now (see the License section of README.en.md); please open an issue for ideas, questions and bug reports.
 The checklist below is for the maintainer, or for a change agreed in an issue beforehand.
-暂不接受外部的代码 pull request（见 CONTRIBUTING.md）；想法、问题和错误报告请开 issue。
+暂不接受外部的代码 pull request（见 README.zh-CN.md 的「许可证」一节）；想法、问题和错误报告请开 issue。
 下面的清单给维护者自己用，或用于事先在 issue 里确认过的改动。
 -->
 

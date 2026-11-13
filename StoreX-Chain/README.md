@@ -336,7 +336,7 @@ AI 只读、提议，人确认、按角色审批，全部留记录；数字全�
 | [值班台基准](docs/benchmark.md) | 方法、评分口径、排行榜、按类别和角色的细分、每一道答错的题、复现、怎样提交自己的系统、局限（[英文](docs/benchmark.en.md)） |
 | [运营教学沙盘](docs/teaching/README.md) | 10 道练习、实验指导书、教师参考答案和教学说明（[英文](docs/teaching/README.en.md)） |
 | [孪生服务的接口（英文）](server/protocol.en.md) | `server/protocol.md` 的英文翻译，以中文版为准 |
-| [变更记录](CHANGELOG.md) | 新增、变更和安全方面的改动（中英对照）；当前版本 0.2.0（待发布），发布步骤见仓库根目录的 [RELEASING.md](../RELEASING.md) |
+| [变更记录](CHANGELOG.md) | 新增、变更和安全方面的改动（中英对照）；当前版本 0.2.0（待发布），发布步骤见仓库根目录的 [docs/releasing.md](../docs/releasing.md)（英文） |
 
 ## 运行
 

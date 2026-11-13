@@ -7,7 +7,7 @@ body:
       value: |
         Thank you for the report. · 感谢报告！
 
-        - **Do not report security vulnerabilities here**; report them privately as described in [SECURITY.md](https://github.com/Glacieerr/storewright/blob/main/SECURITY.md). · **安全漏洞不要在这里报告**，请按 [SECURITY.md](https://github.com/Glacieerr/storewright/blob/main/SECURITY.md) 私下报告。
+        - **Do not report security vulnerabilities here**; report them privately on the repository's [Security tab](https://github.com/Glacieerr/storewright/security/advisories/new) (Report a vulnerability). · **安全漏洞不要在这里报告**，请在仓库的 [Security 页](https://github.com/Glacieerr/storewright/security/advisories/new)（Report a vulnerability）私下报告。
         - **Public information only**: nothing taken from an employer or another company (internal documents, screenshots, system names, data or metrics), and no code. · **只写公开信息**：不要贴任何来自雇主或其他公司的内容（内部文档、截图、系统名称、数据或指标），也不要贴代码。
   - type: dropdown
     id: part

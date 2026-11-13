@@ -2,7 +2,7 @@
 
 > **This is an English translation of [protocol.md](protocol.md).** protocol.md is the reference: if the two differ, protocol.md (and the code) is right. String values inside the JSON examples are what the server actually returns (Chinese interface text) and are left untranslated; where a field takes a fixed set of Chinese values, the English meaning is given in brackets.
 >
-> **Security:** the twin server is meant for local use. Its security model (loopback by default, a token for anything else, no wildcard CORS) is in the [Security](#security) section below and in [SECURITY.md](../../SECURITY.md).
+> **Security:** the twin server is meant for local use. Its security model (loopback by default, a token for anything else, no wildcard CORS) is in the [Security](#security) section below.
 
 The twin server runs the end-to-end simulation (to get the day's plan), the dispatch board (dock doors, store receiving docks and vehicles assigned) and the closed-loop twin (field + twin) on a server. It advances minute by minute in real time, which can be sped up, pushes the field's vehicle positions, sensor data and the twin's recommendations to external systems, and accepts their decisions and commands. Unreal Engine (`engines/ue5/`), MATLAB (`engines/matlab/`) and browsers all connect through this interface.
 

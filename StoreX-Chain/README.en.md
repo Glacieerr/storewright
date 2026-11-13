@@ -95,7 +95,7 @@ Averages over <!--n:seeds.compare|0-->20<!--/n--> seeds of an 18-week run ([all 
 - **MATLAB / Simulink** (`engines/matlab/`): a reefer model, delay filters, an external model service and a self-test against the TypeScript results (not run in MATLAB by the author).
 - **Blender** (`engines/blender/`): a headless script that generates vehicle models for Unreal Engine.
 
-The full interface (endpoints, messages, fields, coordinates in metres and their conversion to Unreal Engine centimetres) is in [server/protocol.en.md](server/protocol.en.md), an English translation of the reference [server/protocol.md](server/protocol.md). The server listens on 127.0.0.1 by default. A non-loopback `--host` needs an access token (`--token` or `STOREX_TOKEN`), otherwise the server refuses to start unless `--insecure` is given; with a token, approve, reject, command, control and WebSocket commands must carry it (preferably as `Authorization: Bearer`; `?token=` on the WebSocket URL is for clients that cannot set headers, over loopback or TLS only). There is no wildcard CORS (`--allow-origin` lists allowed origins; other browser origins get 403), and JSON bodies are capped at 64 KB. Read [SECURITY.md](../SECURITY.md) before running it anywhere else.
+The full interface (endpoints, messages, fields, coordinates in metres and their conversion to Unreal Engine centimetres) is in [server/protocol.en.md](server/protocol.en.md), an English translation of the reference [server/protocol.md](server/protocol.md). The server listens on 127.0.0.1 by default. A non-loopback `--host` needs an access token (`--token` or `STOREX_TOKEN`), otherwise the server refuses to start unless `--insecure` is given; with a token, approve, reject, command, control and WebSocket commands must carry it (preferably as `Authorization: Bearer`; `?token=` on the WebSocket URL is for clients that cannot set headers, over loopback or TLS only). There is no wildcard CORS (`--allow-origin` lists allowed origins; other browser origins get 403), and JSON bodies are capped at 64 KB. Read the [Security section of the protocol](server/protocol.en.md#security) before running it anywhere else.
 
 ## The duty assistant
 
@@ -214,7 +214,7 @@ All areas are within their limits at both loads. The store figure is car-seconds
 
 Simulated vehicles (delivery, long-haul, drayage, air reefer and online-delivery vehicles) are checked separately: step 5 of `node scripts/check3d.mjs` samples the day every 2 s in the browser and counts pair-seconds between simulated vehicles and between simulated vehicles and outside trucks, failing when standing overlaps exceed their limits (same rule). Standing overlaps between simulated vehicles are 0 in all four check scenarios (1,090 at extreme load before convoy spacing and queuing); between simulated vehicles and outside trucks they are 0 (default, normal), 118 (default, extreme), 8 (random-3, normal) and 88 (random-11, high). Of the 118, 88 are at the air cargo terminal, where the yard engine places a waiting truck for door 8 on the trailer docked at door 6.
 
-`docs/results/` is generated: do not edit it by hand. The default region is frozen: new region options must leave it unchanged. See [CONTRIBUTING.md](../CONTRIBUTING.md) and the [extension guide](docs/05-extending.md).
+`docs/results/` is generated: do not edit it by hand. The default region is frozen: new region options must leave it unchanged. See the [extension guide](docs/05-extending.md) (Chinese).
 
 ## Known limitations
 
@@ -249,7 +249,7 @@ Simulated vehicles (delivery, long-haul, drayage, air reefer and online-delivery
 | [Assistant evaluation](docs/results/assistant-eval.md) | Chinese | Standard questions, holdout sets and blind tests |
 | [Twin server protocol](server/protocol.en.md) | English (translation of [protocol.md](server/protocol.md)) | REST, WebSocket, coordinates, sensor data, commands, adapters |
 | `engines/*/README.md` | Chinese | Unreal Engine 5, MATLAB / Simulink and Blender |
-| [Changelog](CHANGELOG.md) | English and Chinese | Additions, changes and security changes; current version 0.2.0 (unreleased), release steps in [RELEASING.md](../RELEASING.md) |
+| [Changelog](CHANGELOG.md) | English and Chinese | Additions, changes and security changes; current version 0.2.0 (unreleased), release steps in [docs/releasing.md](../docs/releasing.md) |
 
 ## Licence
 

@@ -2,7 +2,7 @@ blank_issues_enabled: false
 contact_links:
   - name: Security vulnerability · 安全漏洞
     url: https://github.com/Glacieerr/storewright/security/advisories/new
-    about: Report it privately, never in a public issue (see SECURITY.md). · 请私下报告，不要开公开的 issue（见 SECURITY.md）。
+    about: Report it privately here, never in a public issue. · 请在这里私下报告，不要开公开的 issue。
   - name: Support and questions · 支持和提问
-    url: https://github.com/Glacieerr/storewright/blob/main/SUPPORT.md
-    about: Where to look first. This portfolio project offers no technical support. · 先看哪里。本项目是作品集，不提供技术支持。
+    url: https://github.com/Glacieerr/storewright/blob/main/docs/README.md
+    about: Start with the documentation map. This portfolio project is complete (v1.0) and offers no technical support. · 先看文档导航。本项目是作品集，已经完成（v1.0），不提供技术支持。

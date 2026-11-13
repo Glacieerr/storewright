@@ -65,5 +65,5 @@ const w = Math.max(...rows.map((r) => r.step.length));
 process.stdout.write(`\n${'step'.padEnd(w)}  result  note\n`);
 for (const r of rows) process.stdout.write(`${r.step.padEnd(w)}  ${r.ok ? 'pass  ' : 'FAIL  '}  ${r.note}\n`);
 const bad = rows.filter((r) => !r.ok).length;
-process.stdout.write(bad ? `\n${bad} check(s) failed — do not tag yet.\n` : '\nAll checks passed. Next: commit, push, wait for CI, then tag (RELEASING.md).\n');
+process.stdout.write(bad ? `\n${bad} check(s) failed — do not tag yet.\n` : '\nAll checks passed. Next: commit, push, wait for CI, then tag (docs/releasing.md).\n');
 process.exit(bad ? 1 : 0);

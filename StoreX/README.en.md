@@ -99,7 +99,7 @@ npm run lint                     # ESLint: errors fail CI, warnings are allowed
 npm run build                    # static web app in dist/
 ```
 
-How to add a parameter, a sweep or a KPI is described in [system design §8](docs/04-system-design.md#8-怎么扩展) (Chinese). See also [CONTRIBUTING.md](../CONTRIBUTING.md).
+How to add a parameter, a sweep or a KPI is described in [system design §8](docs/04-system-design.md#8-怎么扩展) (Chinese).
 
 ## Licence
 

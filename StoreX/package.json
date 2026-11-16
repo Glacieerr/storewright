@@ -30,11 +30,11 @@
     "format:check": "prettier --check \"src/**/*.ts\" \"web/src/**/*.{ts,css}\" \"tests/**/*.ts\" \"*.ts\""
   },
   "dependencies": {
-    "three": "0.170.0"
+    "three": "0.187.0"
   },
   "devDependencies": {
     "@types/node": "22.10.2",
-    "@types/three": "0.170.0",
+    "@types/three": "0.187.0",
     "prettier": "3.9.10",
     "tsx": "4.19.2",
     "typescript": "5.7.2",

@@ -42,13 +42,13 @@
   "dependencies": {
     "@anthropic-ai/sdk": "1.6.0",
     "@storewright/yard": "0.1.0",
-    "three": "0.170.0",
+    "three": "0.187.0",
     "zod": "3.25.76"
   },
   "devDependencies": {
     "@storewright/overlap-audit": "0.1.0",
     "@types/node": "22.10.2",
-    "@types/three": "0.170.0",
+    "@types/three": "0.187.0",
     "playwright": "1.63.0",
     "prettier": "3.9.10",
     "tsx": "4.19.2",

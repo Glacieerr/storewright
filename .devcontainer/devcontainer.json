@@ -1,0 +1,36 @@
+// Development container for GitHub Codespaces (and VS Code "Reopen in Container").
+// Node 22, the same as .nvmrc, the Dockerfile and CI. See .devcontainer/README.md.
+{
+  "name": "Storewright",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
+
+  // Install exactly what package-lock.json lists, for every workspace (parts 1 to 3 and the libraries).
+  // updateContentCommand also runs when a Codespaces prebuild is made, so a prebuilt codespace starts ready.
+  "updateContentCommand": "npm ci",
+
+  // The end-to-end tests use Playwright's own Chromium here (there is no installed Chrome), as CI does.
+  "containerEnv": {
+    "PW_CHANNEL": ""
+  },
+
+  "forwardPorts": [4177, 8787, 5173, 5174],
+  "portsAttributes": {
+    "4177": { "label": "Demo site (npm run demo:site)", "onAutoForward": "openPreview" },
+    "8787": { "label": "Live backend and associate app (npm run server)", "onAutoForward": "notify" },
+    "5173": { "label": "Store simulator, dev server (npm run dev)", "onAutoForward": "notify" },
+    "5174": { "label": "Associate app, dev server (npm run associate)", "onAutoForward": "notify" }
+  },
+
+  "customizations": {
+    "codespaces": {
+      "openFiles": [".devcontainer/README.md"]
+    },
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "vitest.explorer",
+        "ms-playwright.playwright"
+      ]
+    }
+  }
+}

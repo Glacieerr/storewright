@@ -1,4 +1,7 @@
-# Storewright
+<p><picture>
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/header-light.svg">
+  <img src="docs/images/header-dark.svg" width="100%" alt="Storewright: a digital twin of a grocery store that runs in your browser. Complete, v1.0. TypeScript and three.js, 800+ tests.">
+</picture></p>
 
 **A digital twin of a grocery store that runs in your browser: the 3D store follows live operations, replays any moment of the day and forecasts the next three hours, while associate phones run fulfilment, backroom work and per-store AI.**
 
@@ -93,6 +96,7 @@ For part 2 (StoreX), I left the design decisions to Claude.
 - **Full guide:** [English](README.en.md) · [简体中文](README.zh-CN.md): every feature, results, commands, architecture and documents.
 - [Project report](docs/project/project-report.en.md) (problem, role, decisions, evidence, lessons) · [Technical overview](docs/en/overview.md) · [Documentation map](docs/README.md)
 - **Run it locally** (Node.js 22 or later): `npm install`, `npm run build:site`, `npm run demo:site`, then open http://127.0.0.1:4177/app/showcase.html. More commands are in the [full guide](README.en.md#try-it).
+- **Or in your browser, with nothing to install:** [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/Glacieerr/storewright?quickstart=1). The codespace installs everything; `npm test` runs the unit tests. What else to run is in [.devcontainer/README.md](.devcontainer/README.md).
 
 ## License
 

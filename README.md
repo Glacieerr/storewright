@@ -7,11 +7,7 @@
 
 **Status:** complete, v1.0 (Nov 2026). No new features are planned; issues are welcome.
 
-<!-- DEMO VIDEO: put the GitHub video URL here.
-     When the 60–90 s demo video is ready (MP4 or MOV, under 10 MB), open this file in GitHub's web editor and drag the
-     video in. GitHub uploads it and inserts a URL like https://github.com/user-attachments/assets/<id>. Put that URL on
-     its own line in place of this comment, with a blank line before and after it, and GitHub shows a video player.
-     Keep the poster image below as the link to the live demo, or delete it. -->
+https://github.com/user-attachments/assets/949ca7df-c610-4c8d-856e-73e4058623bb
 
 <a href="https://glacieerr.github.io/storewright/"><img src="docs/images/showcase-en.jpg" width="100%" alt="The showcase: the 3D digital twin, the demo console and two associate phones side by side in one browser tab. Opens the live demo."></a>
 

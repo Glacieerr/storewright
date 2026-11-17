@@ -18,7 +18,7 @@ repository-code: "https://github.com/Glacieerr/storewright"
 url: "https://glacieerr.github.io/storewright/"
 license: AGPL-3.0-only
 version: 1.0.0
-# date-released: YYYY-MM-DD  <- add the real date on the day v1.0.0 is published (docs/releasing.md, step 1)
+date-released: 2026-11-17
 keywords:
   - digital twin
   - discrete-event simulation

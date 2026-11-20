@@ -1,13 +1,27 @@
-# 依赖更新机器人：每周检查一次 npm 依赖（含全部 workspaces：第一部分的 apps、packages，第二部分 StoreX，第三部分 StoreX-Chain）
+# 依赖更新机器人：每月检查一次 npm 依赖（含全部 workspaces：第一部分的 apps、packages，第二部分 StoreX，第三部分 StoreX-Chain）
 # 和 GitHub Actions 的新版本，有更新就开 PR。需要在仓库的 Settings → Code security 里启用 Dependabot version updates。
+# v1.0 之后，npm 依赖只接受小版本和补丁版本的更新：大版本升级要改代码，需要时再手动做。
+# 这些忽略规则同样作用于安全更新：只有升大版本才能修复的安全问题，不会自动开 PR。
 version: 2
 updates:
   - package-ecosystem: npm
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
     open-pull-requests-limit: 5
-    # 互相约束版本的包放进同一个 PR
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+      # 版本号还是 0.x 的包，小版本升级也可能不兼容，按大版本处理
+      - dependency-name: 'three'
+        update-types: ['version-update:semver-minor']
+      - dependency-name: '@types/three'
+        update-types: ['version-update:semver-minor']
+      - dependency-name: '@electric-sql/pglite'
+        update-types: ['version-update:semver-minor']
+      - dependency-name: 'aedes'
+        update-types: ['version-update:semver-minor']
+    # 互相约束版本的包放进同一个 PR；其余包的更新合成一个 PR
     groups:
       three:
         patterns: ['three', '@types/three', '@react-three/*']
@@ -15,10 +29,14 @@ updates:
         patterns: ['vite', 'vitest', '@vitejs/*', '@vitest/*']
       playwright:
         patterns: ['playwright', '@playwright/test']
+      everything-else:
+        patterns: ['*']
+        update-types: ['minor', 'patch']
+  # GitHub Actions 的大版本照常更新：旧版本会被 GitHub 停用，而且一般不用改代码
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
     groups:
       actions:
         patterns: ['*']

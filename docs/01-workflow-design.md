@@ -610,7 +610,6 @@ flowchart TD
 - Grocery Dive · Store Assist 与 Asda：https://www.grocerydive.com/news/walmart-asda-fulfillment-tech-store-assist/633753
 - Massmart 门店履约软件上线：https://www.massmart.co.za/news/2023/05/massmarts-latest-walmart-inspired-technology-launch-set-to-impro
 - Walmart · AI 工具发布（2025-06-24）：https://corporate.walmart.com/news/2025/06/24/walmart-unveils-new-ai-powered-tools-to-empower-1-5-million-associates/
-- Talk Business · 门店拣货实地报道（2024）：https://talkbusiness.net/2024/07/long-time-walmart-employee-now-picking-as-a-personal-shopper/
 - Grocery Dive · 替代推荐深度学习：https://www.grocerydive.com/news/walmart-boosts-shopper-acceptance-of-substitutions-with-deep-learning-ai/602429/
 - 司机端帮助 · 路边取货：https://sparkdriverapp-walmart.helpdocs.io/l/en/article/8rm6c03tzi-picking-up-a-curbside-order
 - 司机端帮助 · 退货送回门店：https://sparkdriverapp-walmart.helpdocs.io/l/en/article/vlszvswn0n-delivering-a-return-to-store-offer

@@ -21,6 +21,9 @@ updates:
         update-types: ['version-update:semver-minor']
       - dependency-name: 'aedes'
         update-types: ['version-update:semver-minor']
+      # TypeScript 不按语义化版本发布，小版本也会改类型检查（5.9 让 StoreX-Chain 编译不过），按大版本处理
+      - dependency-name: 'typescript'
+        update-types: ['version-update:semver-minor']
     # 互相约束版本的包放进同一个 PR；其余包的更新合成一个 PR
     groups:
       three:

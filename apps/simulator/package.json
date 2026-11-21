@@ -12,8 +12,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@react-three/drei": "9.117.3",
-    "@react-three/fiber": "8.17.10",
+    "@react-three/drei": "9.122.0",
+    "@react-three/fiber": "8.18.0",
     "@storewright/ai": "0.1.0",
     "@storewright/algorithms": "0.1.0",
     "@storewright/domain": "0.1.0",
